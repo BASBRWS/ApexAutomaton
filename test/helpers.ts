@@ -40,7 +40,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       childSeedSol: 0.1,
       maxPopulation: 4,
     },
-    seed: { airdropSol: 1.0 },
+    seed: { airdropSol: 1.0, marketAirdropSol: 2.0 },
     features: {
       replicationEnabled: false,
       offchainRevenueEnabled: false,
