@@ -125,6 +125,7 @@ export interface Config {
 
   seed: {
     airdropSol: number;
+    marketAirdropSol: number;
   };
 
   /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
@@ -197,6 +198,7 @@ export function loadConfig(): Config {
 
     seed: {
       airdropSol: envNum('SEED_AIRDROP_SOL', 1.0),
+      marketAirdropSol: envNum('MARKET_SEED_AIRDROP_SOL', 2.0),
     },
 
     features: {

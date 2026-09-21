@@ -158,36 +158,57 @@ Requires **Node 20+**.
 
 ```bash
 npm install
-cp .env.example .env    # then fill it in
 ```
 
 Generate the three keypairs you need (agent, market, compute-provider):
 
 ```bash
-npm run keygen          # run 3× — one per account; copy pubkeys/secrets into .env
+npm run keygen          # run 3× — one per account; copy pubkeys/secrets aside
 ```
 
-Set in `.env` (see `.env.example` for the full list):
+Now create your `.env`. Two ways:
+
+- **Guided (recommended):** open the local setup wizard and fill in each key step
+  by step — it validates them, blocks mainnet, checks the growth guard, and
+  produces a correct `.env` to copy or download. It runs entirely in your browser
+  (no network calls; your keys never leave the page):
+
+  ```bash
+  npx serve .            # then open http://localhost:3000/setup/
+  ```
+
+  Save its output as `.env` in the project root.
+
+- **Manual:** `cp .env.example .env` and fill in the values yourself.
+
+Either way you set (see `.env.example` for the full list):
 
 - `AGENT_PUBKEY` / `AGENT_KEYPAIR` — the agent wallet (secret loaded only in the
   signer).
 - `MARKET_PUBKEY` / `MARKET_KEYPAIR` — the account that pays the agent.
 - `COMPUTE_PROVIDER_PUBKEY` — receives the compute burn.
-- `ANTHROPIC_API_KEY` — for the LLM.
+- `ANTHROPIC_API_KEY` — for the LLM (not needed for `tick:dry`).
 
-Seed the agent (and the market, so it can pay) with devnet SOL:
+Seed both accounts with free devnet SOL:
 
 ```bash
-npm run seed            # airdrops SEED_AIRDROP_SOL to the agent wallet
-# fund the market account too, e.g. with the Solana CLI:
-#   solana airdrop 2 <MARKET_PUBKEY> --url devnet
+npm run seed            # airdrops SEED_AIRDROP_SOL to the AGENT wallet
+npm run seed:market     # airdrops MARKET_SEED_AIRDROP_SOL to the MARKET account
 ```
+
+(If the faucet rate-limits, use https://faucet.solana.com with the pubkey.)
 
 Run one cycle locally:
 
 ```bash
-npm run tick
+npm run tick            # a real cycle (LLM call + devnet txs)
+npm run tick:dry        # a FREE cycle: mock LLM (no API cost), still real devnet
+npm run tick:dry -- reconcile-ledger   # dry cycle earning a specific task
 ```
+
+`tick:dry` exercises the whole loop — balance read, earning, on-chain burn,
+scoring, journaling — with no Anthropic API call, so you can try it before
+spending anything. It still needs the wallets set and funded (devnet is free).
 
 Run the tests (includes the growth guard and the signer-policy rails):
 

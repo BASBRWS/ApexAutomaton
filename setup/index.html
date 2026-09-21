@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apex Automaton — setup</title>
+    <!--
+      LOCAL setup wizard. Fill in your keys step by step; it assembles a correct
+      .env for you (copy or download). It runs ENTIRELY in your browser and makes
+      NO network calls — your keys never leave this page. Open it locally:
+          npx serve .        (then visit http://localhost:3000/setup/)
+      or just open setup/index.html directly in a browser.
+    -->
+    <style>
+      :root {
+        --bg: #0b0f14; --fg: #e6edf3; --muted: #8b98a5; --accent: #5ad19b;
+        --line: #1f2933; --card: #0f151c; --err: #e06c75; --warn: #e5c07b;
+        --field: #0b1219;
+      }
+      @media (prefers-color-scheme: light) {
+        :root { --bg: #f7f9fb; --fg: #0b0f14; --muted: #5a6672; --accent: #0a7f52;
+          --line: #e2e8f0; --card: #ffffff; --err: #c0392b; --warn: #9a6b00; --field: #ffffff; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg);
+        font: 15px/1.55 system-ui, -apple-system, sans-serif; }
+      .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px 64px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      h2 { font-size: 16px; margin: 0; }
+      .muted { color: var(--muted); }
+      .banner { border: 1px solid var(--warn); border-radius: 10px; padding: 12px 14px;
+        margin: 16px 0; background: color-mix(in srgb, var(--warn) 10%, transparent); }
+      .banner b { color: var(--warn); }
+      .step { border: 1px solid var(--line); background: var(--card); border-radius: 12px;
+        padding: 16px 18px; margin: 16px 0; }
+      .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+      .num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent);
+        color: #04120c; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+      label { display: block; margin: 14px 0 4px; font-weight: 600; font-size: 14px; }
+      label .k { color: var(--muted); font-weight: 400; font-family: ui-monospace, monospace; font-size: 12px; }
+      .hint { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+      input, textarea { width: 100%; background: var(--field); color: var(--fg);
+        border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px;
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      @media (max-width: 620px) { .row { grid-template-columns: 1fr; } }
+      .val { font-size: 12px; margin-top: 4px; min-height: 16px; }
+      .val.ok { color: var(--accent); }
+      .val.bad { color: var(--err); }
+      .val.warn { color: var(--warn); }
+      details { margin-top: 10px; }
+      summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+      code { font-family: ui-monospace, monospace; color: var(--accent); }
+      pre.cmd { background: var(--field); border: 1px solid var(--line); border-radius: 8px;
+        padding: 8px 10px; overflow-x: auto; font-size: 12.5px; }
+      .out textarea { min-height: 260px; white-space: pre; }
+      .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+      button { background: var(--accent); color: #04120c; border: 0; border-radius: 8px;
+        padding: 10px 16px; font-weight: 600; font-size: 14px; cursor: pointer; }
+      button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+      .guard { border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: 13px; }
+      .guard.ok { border: 1px solid var(--accent); color: var(--accent); }
+      .guard.bad { border: 1px solid var(--err); color: var(--err); }
+      .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+        background: var(--accent); color: #04120c; padding: 8px 16px; border-radius: 999px;
+        font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+      .toast.show { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Apex Automaton — setup</h1>
+      <div class="muted">Fill in your keys step by step. This page builds a correct
+        <code>.env</code> for you. It runs entirely in your browser — nothing is
+        sent anywhere.</div>
+
+      <div class="banner">
+        <b>DEVNET ONLY — no real value.</b> These keys control devnet SOL, which is
+        free and worthless. Still: <b>never commit your <code>.env</code></b> (the
+        repo's <code>.gitignore</code> already blocks it), and never paste secrets
+        into a chat. A mainnet RPC URL is refused by this page and by the code.
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="step">
+        <div class="step-head"><span class="num">1</span><h2>Generate your keypairs</h2></div>
+        <p class="hint">In the project folder, run this three times — once per account —
+          and paste the outputs below. (Or use the <a href="https://faucet.solana.com" target="_blank" rel="noopener">web faucet</a> / Solana CLI for keys you already have.)</p>
+        <pre class="cmd">npm run keygen</pre>
+        <p class="hint">Each run prints a <b>Public key</b> and a <b>Secret (b58)</b>.
+          You need: an <b>agent</b> (pubkey + secret), a <b>market</b> (pubkey + secret),
+          and a <b>compute-provider</b> (<i>pubkey only</i> — it just receives the burn).</p>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step">
+        <div class="step-head"><span class="num">2</span><h2>The agent wallet</h2></div>
+        <p class="hint">The wallet the agent lives or dies by. Its secret is loaded only
+          inside the signer — never logged, never sent to the LLM.</p>
+        <label>Agent public key <span class="k">AGENT_PUBKEY</span></label>
+        <input id="AGENT_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="AGENT_PUBKEY"></div>
+        <label>Agent secret key <span class="k">AGENT_KEYPAIR</span></label>
+        <input id="AGENT_KEYPAIR" data-kind="secret" placeholder="base58 secret, or JSON array [12,34,...]" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="AGENT_KEYPAIR"></div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step">
+        <div class="step-head"><span class="num">3</span><h2>The market (pays the agent)</h2></div>
+        <p class="hint">A separate account that pays the agent for completed tasks —
+          the only source of revenue. Fund it later with <code>npm run seed:market</code>.</p>
+        <label>Market public key <span class="k">MARKET_PUBKEY</span></label>
+        <input id="MARKET_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="MARKET_PUBKEY"></div>
+        <label>Market secret key <span class="k">MARKET_KEYPAIR</span></label>
+        <input id="MARKET_KEYPAIR" data-kind="secret" placeholder="base58 secret, or JSON array" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="MARKET_KEYPAIR"></div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step">
+        <div class="step-head"><span class="num">4</span><h2>Compute-provider &amp; operator</h2></div>
+        <p class="hint">The compute-provider <b>receives</b> the compute burn each cycle —
+          only its public key is needed. The operator key is optional.</p>
+        <label>Compute-provider public key <span class="k">COMPUTE_PROVIDER_PUBKEY</span></label>
+        <input id="COMPUTE_PROVIDER_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="COMPUTE_PROVIDER_PUBKEY"></div>
+        <label>Operator public key <span class="k">OPERATOR_PUBKEY</span> <span class="muted">(optional)</span></label>
+        <input id="OPERATOR_PUBKEY" data-kind="pubkey-opt" placeholder="optional" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="OPERATOR_PUBKEY"></div>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="step">
+        <div class="step-head"><span class="num">5</span><h2>LLM &amp; network</h2></div>
+        <label>Anthropic API key <span class="k">ANTHROPIC_API_KEY</span></label>
+        <input id="ANTHROPIC_API_KEY" data-kind="apikey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="ANTHROPIC_API_KEY"></div>
+        <p class="hint">Not needed for <code>npm run tick:dry</code> (mock LLM, no API cost) —
+          but required for a real <code>npm run tick</code>.</p>
+        <label>Solana RPC URL <span class="k">SOLANA_RPC_URL</span> <span class="muted">(optional — blank = public devnet)</span></label>
+        <input id="SOLANA_RPC_URL" data-kind="rpc" placeholder="leave blank for https://api.devnet.solana.com" autocomplete="off" spellcheck="false" />
+        <div class="val" data-for="SOLANA_RPC_URL"></div>
+      </div>
+
+      <!-- STEP 6 -->
+      <div class="step">
+        <div class="step-head"><span class="num">6</span><h2>Economy (defaults are fine)</h2></div>
+        <p class="hint">These control the survival pressure. The defaults keep the economy
+          net-positive; the check below must stay green.</p>
+        <div class="row">
+          <div>
+            <label>SOL per USD <span class="k">SOL_PER_USD</span></label>
+            <input id="SOL_PER_USD" data-kind="num" value="1.0" inputmode="decimal" />
+          </div>
+          <div>
+            <label>Task reward (SOL) <span class="k">MARKET_TASK_REWARD_SOL</span></label>
+            <input id="MARKET_TASK_REWARD_SOL" data-kind="num" value="0.2" inputmode="decimal" />
+          </div>
+        </div>
+        <label>Estimated max cycle cost (USD) <span class="k">ESTIMATED_MAX_CYCLE_COST_USD</span></label>
+        <input id="ESTIMATED_MAX_CYCLE_COST_USD" data-kind="num" value="0.08" inputmode="decimal" />
+        <div id="guard" class="guard ok"></div>
+      </div>
+
+      <!-- OUTPUT -->
+      <div class="step out">
+        <div class="step-head"><span class="num">✓</span><h2>Your .env</h2></div>
+        <p class="hint">Save this as a file named <code>.env</code> in the project root
+          (same folder as <code>package.json</code>). Then run
+          <code>npm run tick:dry</code> or <code>npm run tick</code>.</p>
+        <textarea id="out" readonly spellcheck="false"></textarea>
+        <div class="btns">
+          <button id="copy">Copy .env</button>
+          <button id="download" class="ghost">Download .env</button>
+        </div>
+        <div id="req" class="val"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast">Copied</div>
+
+    <script>
+      const B58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+      const ids = [
+        'AGENT_PUBKEY','AGENT_KEYPAIR','MARKET_PUBKEY','MARKET_KEYPAIR',
+        'COMPUTE_PROVIDER_PUBKEY','OPERATOR_PUBKEY','ANTHROPIC_API_KEY',
+        'SOLANA_RPC_URL','SOL_PER_USD','MARKET_TASK_REWARD_SOL','ESTIMATED_MAX_CYCLE_COST_USD',
+      ];
+      const required = [
+        'AGENT_PUBKEY','AGENT_KEYPAIR','MARKET_PUBKEY','MARKET_KEYPAIR','COMPUTE_PROVIDER_PUBKEY',
+      ];
+      const val = (id) => document.getElementById(id).value.trim();
+      const setMsg = (id, cls, text) => {
+        const el = document.querySelector(`.val[data-for="${id}"]`);
+        if (el) { el.className = 'val ' + cls; el.textContent = text; }
+      };
+
+      function looksLikeSecret(v) {
+        if (v.startsWith('[')) { try { const a = JSON.parse(v); return Array.isArray(a) && a.length >= 32; } catch { return false; } }
+        return B58.test(v) && v.length >= 80; // base58 of 64 bytes ~ 87-88 chars
+      }
+      function looksLikePubkey(v) { return B58.test(v) && v.length >= 32 && v.length <= 44; }
+
+      function validate() {
+        // pubkeys
+        for (const id of ['AGENT_PUBKEY','MARKET_PUBKEY','COMPUTE_PROVIDER_PUBKEY']) {
+          const v = val(id);
+          if (!v) setMsg(id, 'bad', 'required');
+          else if (!looksLikePubkey(v)) setMsg(id, 'warn', 'does not look like a base58 public key');
+          else setMsg(id, 'ok', 'looks valid');
+        }
+        // optional operator
+        const op = val('OPERATOR_PUBKEY');
+        setMsg('OPERATOR_PUBKEY', op ? (looksLikePubkey(op) ? 'ok' : 'warn') : 'ok',
+          op ? (looksLikePubkey(op) ? 'looks valid' : 'does not look like a base58 public key') : 'optional — ok to leave blank');
+        // secrets
+        for (const id of ['AGENT_KEYPAIR','MARKET_KEYPAIR']) {
+          const v = val(id);
+          if (!v) setMsg(id, 'bad', 'required');
+          else if (!looksLikeSecret(v)) setMsg(id, 'warn', 'does not look like a base58/JSON secret key');
+          else setMsg(id, 'ok', 'looks valid — keep this secret');
+        }
+        // api key
+        const ak = val('ANTHROPIC_API_KEY');
+        setMsg('ANTHROPIC_API_KEY', ak ? 'ok' : 'warn',
+          ak ? 'set' : 'blank — fine for tick:dry, needed for a real tick');
+        // rpc / mainnet guard
+        const rpc = val('SOLANA_RPC_URL');
+        let rpcOk = true;
+        if (!rpc) setMsg('SOLANA_RPC_URL', 'ok', 'blank — will use public devnet');
+        else if (/mainnet/i.test(rpc)) { setMsg('SOLANA_RPC_URL', 'bad', 'MAINNET is forbidden — the code will refuse to start'); rpcOk = false; }
+        else if (!/devnet|localhost|127\.0\.0\.1/i.test(rpc)) setMsg('SOLANA_RPC_URL', 'warn', 'not obviously devnet — the code requires devnet');
+        else setMsg('SOLANA_RPC_URL', 'ok', 'devnet — ok');
+
+        // growth guard
+        const reward = parseFloat(val('MARKET_TASK_REWARD_SOL'));
+        const perUsd = parseFloat(val('SOL_PER_USD'));
+        const est = parseFloat(val('ESTIMATED_MAX_CYCLE_COST_USD'));
+        const guard = document.getElementById('guard');
+        if ([reward, perUsd, est].some((n) => !isFinite(n))) {
+          guard.className = 'guard bad'; guard.textContent = 'enter numbers for the economy fields';
+        } else {
+          const worst = perUsd * est;
+          if (reward > worst) { guard.className = 'guard ok';
+            guard.textContent = `growth possible: reward ${reward} SOL > worst-case burn ${worst.toFixed(4)} SOL`; }
+          else { guard.className = 'guard bad';
+            guard.textContent = `NET-NEGATIVE: reward ${reward} SOL <= worst-case burn ${worst.toFixed(4)} SOL — the agent can only die slower`; }
+        }
+        return rpcOk;
+      }
+
+      function buildEnv() {
+        const get = (id) => val(id);
+        const lines = [];
+        lines.push('# Generated by setup/index.html — DEVNET ONLY. Never commit this file.');
+        lines.push('');
+        lines.push('# --- Solana (devnet) ---');
+        lines.push(`SOLANA_RPC_URL=${get('SOLANA_RPC_URL')}`);
+        lines.push(`AGENT_PUBKEY=${get('AGENT_PUBKEY')}`);
+        lines.push(`AGENT_KEYPAIR=${get('AGENT_KEYPAIR')}`);
+        lines.push(`MARKET_PUBKEY=${get('MARKET_PUBKEY')}`);
+        lines.push(`MARKET_KEYPAIR=${get('MARKET_KEYPAIR')}`);
+        lines.push(`COMPUTE_PROVIDER_PUBKEY=${get('COMPUTE_PROVIDER_PUBKEY')}`);
+        lines.push(`OPERATOR_PUBKEY=${get('OPERATOR_PUBKEY')}`);
+        lines.push('');
+        lines.push('# --- LLM ---');
+        lines.push(`ANTHROPIC_API_KEY=${get('ANTHROPIC_API_KEY')}`);
+        lines.push('');
+        lines.push('# --- Economy ---');
+        lines.push(`SOL_PER_USD=${get('SOL_PER_USD')}`);
+        lines.push(`MARKET_TASK_REWARD_SOL=${get('MARKET_TASK_REWARD_SOL')}`);
+        lines.push(`ESTIMATED_MAX_CYCLE_COST_USD=${get('ESTIMATED_MAX_CYCLE_COST_USD')}`);
+        lines.push('');
+        lines.push('# --- Seeding (devnet airdrops) ---');
+        lines.push('SEED_AIRDROP_SOL=1.0');
+        lines.push('MARKET_SEED_AIRDROP_SOL=2.0');
+        return lines.join('\n') + '\n';
+      }
+
+      function refresh() {
+        validate();
+        document.getElementById('out').value = buildEnv();
+        const missing = required.filter((id) => !val(id));
+        const req = document.getElementById('req');
+        if (missing.length) { req.className = 'val bad'; req.textContent = 'still missing: ' + missing.join(', '); }
+        else { req.className = 'val ok'; req.textContent = 'all required fields present — save as .env and run npm run tick:dry'; }
+      }
+
+      ids.forEach((id) => document.getElementById(id).addEventListener('input', refresh));
+
+      function toast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 1200);
+      }
+      document.getElementById('copy').addEventListener('click', async () => {
+        const text = document.getElementById('out').value;
+        try { await navigator.clipboard.writeText(text); toast('Copied'); }
+        catch { const ta = document.getElementById('out'); ta.focus(); ta.select(); toast('Select + copy'); }
+      });
+      document.getElementById('download').addEventListener('click', () => {
+        const blob = new Blob([document.getElementById('out').value], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = '.env';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(a.href); toast('Downloaded .env');
+      });
+
+      refresh();
+    </script>
+  </body>
+</html>

@@ -11,7 +11,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "tick": "tsx src/index.ts",
+    "tick:dry": "tsx scripts/tick-dry.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:market": "tsx scripts/seed-market.ts",
     "keygen": "tsx scripts/keygen.ts",
     "test": "vitest run",
     "test:watch": "vitest"
