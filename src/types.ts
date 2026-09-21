@@ -1,6 +1,16 @@
 /** Shared types used across the automaton. */
 
-export type Tier = 'NORMAL' | 'LOW' | 'CRITICAL' | 'DEAD';
+export type Tier = 'DEAD' | 'CRITICAL' | 'LOW' | 'NORMAL' | 'ABUNDANT' | 'SOVEREIGN';
+
+/** Tiers ordered from least to most alive, for comparisons. */
+export const TIER_ORDER: Tier[] = [
+  'DEAD',
+  'CRITICAL',
+  'LOW',
+  'NORMAL',
+  'ABUNDANT',
+  'SOVEREIGN',
+];
 
 /** A data-only description of a transfer the agent WANTS to make.
  *
@@ -44,6 +54,7 @@ export interface ChildRecord {
   createdAtCycle: number;
   fundedLamports: number;
   fundingSignature: string;
+  mutatedParam: string;
   at: string;
 }
 
@@ -55,6 +66,29 @@ export interface DailyCaps {
   txCountToday: number;
 }
 
+/**
+ * Maximisation score — the honest read on whether the agent is earning or just
+ * surviving. Recomputed and journalled every cycle (score.ts).
+ */
+export interface Score {
+  /** highest balance ever observed, in lamports. */
+  peakBalanceLamports: number;
+  /** total SOL earned from market.ts, in lamports. */
+  cumulativeRevenueLamports: number;
+  /** total compute burned, in lamports. */
+  cumulativeBurnLamports: number;
+  /** number of paid tasks completed. */
+  tasksCompleted: number;
+  /** revenue minus burn, per completed task, rolling average (lamports). */
+  marginPerTaskLamports: number;
+  /** cycle index of first non-zero earning; null until then. */
+  firstDollarAtCycle: number | null;
+  /** current balance minus the operator seed (lamports; may be negative). */
+  netGrowthLamports: number;
+  /** the seed amount used as the net-growth baseline (lamports). */
+  seedLamports: number;
+}
+
 export interface AutomatonState {
   bornAt: string;
   cycle: number;
@@ -62,6 +96,9 @@ export interface AutomatonState {
   children: ChildRecord[];
   caps: DailyCaps;
   recentSignatures: TxRecord[];
+  score: Score;
+  /** consecutive cycles at/above the replicate threshold (Phase 3 gating). */
+  sustainedSovereignCycles: number;
   dead: boolean;
 }
 
@@ -77,6 +114,8 @@ export interface JournalEntry {
   costUsd: number;
   burnLamports: number;
   revenueLamports: number;
+  marginLamports: number;
   signatures: string[];
+  score: Score;
   note?: string;
 }

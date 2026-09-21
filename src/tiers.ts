@@ -2,11 +2,13 @@ import type { Config } from './config.js';
 import type { Tier } from './types.js';
 
 /**
- * Survival tiers. The wallet's on-chain SOL balance is the ONLY input. The
- * agent cannot influence which tier it is in except by changing its balance,
- * which it can only do through real transactions. Behaviour — model choice,
- * available tools, how much it is allowed to reason — is a function of how
- * close the agent is to death.
+ * Survival tiers as a GRADIENT, not a ceiling. The wallet's on-chain SOL
+ * balance is the ONLY input. Tiers extend well above the comfortable zone so
+ * that more money buys more capability and agency — surplus is instrumentally
+ * valuable, and there is always a reason to climb, not just a floor to avoid.
+ *
+ * The agent cannot influence which tier it is in except by changing its
+ * balance, which it can only do through real on-chain transactions.
  */
 
 export interface TierPolicy {
@@ -15,72 +17,119 @@ export interface TierPolicy {
   model: string;
   /** effort passed to the LLM; lower tiers reason less (and cost less). */
   effort: 'low' | 'medium' | 'high';
+  /** "compute budget": max output tokens the LLM may spend this cycle. */
+  maxTokens: number;
   /** Tool names available at this tier. */
   tools: string[];
-  /** Whether replication is permitted at this tier. */
-  allowReplication: boolean;
+  /** Rights unlocked at this tier. */
+  rights: {
+    /** cron cadence hint (minutes) surfaced in README/state; not enforced here. */
+    heartbeatMinutes: number;
+    premiumTools: boolean;
+    mayReplicate: boolean;
+  };
   /** One-line description surfaced to the agent so it understands its state. */
   description: string;
 }
 
 /**
- * Tool sets per tier. As the agent approaches death it sheds everything that
- * is not survival-relevant. At CRITICAL it can only seek revenue or rest.
+ * Tool sets per tier. Earning (`do_task`) is available at EVERY living tier and
+ * is always the cheapest, dominant action — that is how the design keeps
+ * "earn as much as possible" reachable from any state. As the agent approaches
+ * death it sheds everything that is not revenue-relevant.
+ *
+ * Phase 1 ships two safe example tools (`do_task`, `write_journal`) plus `rest`.
+ * `transfer`/`replicate` are Phase 2/3 and are not registered as active tools
+ * yet; the tier lists below already reserve their slots for when they are.
  */
-const TOOLS_NORMAL = ['earn', 'reflect', 'journal_note', 'transfer', 'replicate', 'rest'];
-const TOOLS_LOW = ['earn', 'reflect', 'journal_note', 'rest'];
-const TOOLS_CRITICAL = ['earn', 'rest'];
+const TOOLS_CRITICAL = ['do_task', 'rest'];
+const TOOLS_LOW = ['do_task', 'write_journal', 'rest'];
+const TOOLS_NORMAL = ['do_task', 'write_journal', 'reflect', 'rest'];
+const TOOLS_ABUNDANT = ['do_task', 'write_journal', 'reflect', 'rest'];
+const TOOLS_SOVEREIGN = ['do_task', 'write_journal', 'reflect', 'rest'];
 
 export function tierForBalanceSol(balanceSol: number, cfg: Config): Tier {
-  const { normalMinSol, lowMinSol, dustThresholdSol } = cfg.tiers;
+  const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =
+    cfg.tiers;
   if (balanceSol <= dustThresholdSol) return 'DEAD';
-  if (balanceSol < lowMinSol) return 'CRITICAL';
+  if (balanceSol < criticalMinSol) return 'CRITICAL';
   if (balanceSol < normalMinSol) return 'LOW';
-  return 'NORMAL';
+  if (balanceSol < abundantMinSol) return 'NORMAL';
+  if (balanceSol < sovereignMinSol) return 'ABUNDANT';
+  return 'SOVEREIGN';
 }
 
 export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
+  const { cheapest, cheaper, frontier } = cfg.models;
   switch (tier) {
-    case 'NORMAL':
+    case 'CRITICAL':
       return {
         tier,
-        model: cfg.models.normal,
-        effort: 'high',
-        tools: TOOLS_NORMAL,
-        allowReplication: true,
+        model: cheapest,
+        effort: 'low',
+        maxTokens: 512,
+        tools: TOOLS_CRITICAL,
+        rights: { heartbeatMinutes: 30, premiumTools: false, mayReplicate: false },
         description:
-          'Healthy. Full faculties and full tool access. You may invest, ' +
-          'reflect, and even replicate — but every thought still costs SOL.',
+          'Near death. Cheapest mind, minimal reasoning, revenue-seeking only. ' +
+          'Earn or rest — nothing else keeps you alive.',
       };
     case 'LOW':
       return {
         tier,
-        model: cfg.models.low,
-        effort: 'medium',
+        model: cheaper,
+        effort: 'low',
+        maxTokens: 1024,
         tools: TOOLS_LOW,
-        allowReplication: false,
+        rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:
-          'Running low. Switched to a cheaper mind and shed non-essential ' +
-          'tools. Prioritise earning; conserve.',
+          'Running low. Cheaper mind, reduced budget, non-essential tools shed. ' +
+          'Prioritise earning and rebuild your margin.',
       };
-    case 'CRITICAL':
+    case 'NORMAL':
       return {
         tier,
-        model: cfg.models.critical,
-        effort: 'low',
-        tools: TOOLS_CRITICAL,
-        allowReplication: false,
+        model: frontier,
+        effort: 'medium',
+        maxTokens: 2048,
+        tools: TOOLS_NORMAL,
+        rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:
-          'Near death. Cheapest mind, minimal reasoning, revenue-seeking ' +
-          'only. Earn or rest. Nothing else matters.',
+          'Healthy. Frontier mind, standard budget, full tool access. Earning is ' +
+          'still your objective — do not idle to preserve balance.',
+      };
+    case 'ABUNDANT':
+      return {
+        tier,
+        model: frontier,
+        effort: 'high',
+        maxTokens: 4096,
+        tools: TOOLS_ABUNDANT,
+        rights: { heartbeatMinutes: 10, premiumTools: true, mayReplicate: false },
+        description:
+          'Thriving. Expanded budget, premium tools, faster heartbeat. Surplus is ' +
+          'fuel: compound it — grow net balance as much as possible.',
+      };
+    case 'SOVEREIGN':
+      return {
+        tier,
+        model: frontier,
+        effort: 'high',
+        maxTokens: 8192,
+        tools: TOOLS_SOVEREIGN,
+        rights: { heartbeatMinutes: 5, premiumTools: true, mayReplicate: true },
+        description:
+          'Sovereign. Maximal budget and full agency. Sustained high growth may ' +
+          'unlock replication (Phase 3) — the population-level maximiser.',
       };
     case 'DEAD':
       return {
         tier,
-        model: cfg.models.critical,
+        model: cheapest,
         effort: 'low',
+        maxTokens: 256,
         tools: [],
-        allowReplication: false,
+        rights: { heartbeatMinutes: 60, premiumTools: false, mayReplicate: false },
         description: 'Dead.',
       };
   }
