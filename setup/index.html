@@ -87,13 +87,16 @@
 
       <!-- STEP 1 -->
       <div class="step">
-        <div class="step-head"><span class="num">1</span><h2>Generate your keypairs</h2></div>
-        <p class="hint">In the project folder, run this three times — once per account —
-          and paste the outputs below. (Or use the <a href="https://faucet.solana.com" target="_blank" rel="noopener">web faucet</a> / Solana CLI for keys you already have.)</p>
+        <div class="step-head"><span class="num">1</span><h2>Get your keys</h2></div>
+        <p class="hint">You don't fetch the Solana keys from anywhere — you <b>create</b> three
+          keypairs (all devnet, worthless). Only the Anthropic key comes from outside.</p>
+        <p class="hint"><b>Easiest:</b> click the green <b>“Generate”</b> button in steps 2–4 below —
+          it makes a devnet keypair right here in your browser (no install, nothing sent anywhere).
+          <b>Alternative:</b> run this in the project folder and paste the outputs:</p>
         <pre class="cmd">npm run keygen</pre>
-        <p class="hint">Each run prints a <b>Public key</b> and a <b>Secret (b58)</b>.
-          You need: an <b>agent</b> (pubkey + secret), a <b>market</b> (pubkey + secret),
-          and a <b>compute-provider</b> (<i>pubkey only</i> — it just receives the burn).</p>
+        <p class="hint">You need: an <b>agent</b> (pubkey + secret), a <b>market</b> (pubkey + secret),
+          a <b>compute-provider</b> (<i>pubkey only</i>), and an <b>Anthropic API key</b> from
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (step 5).</p>
       </div>
 
       <!-- STEP 2 -->
@@ -101,6 +104,7 @@
         <div class="step-head"><span class="num">2</span><h2>The agent wallet</h2></div>
         <p class="hint">The wallet the agent lives or dies by. Its secret is loaded only
           inside the signer — never logged, never sent to the LLM.</p>
+        <button type="button" class="ghost" data-gen="agent">✨ Generate agent keypair</button>
         <label>Agent public key <span class="k">AGENT_PUBKEY</span></label>
         <input id="AGENT_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
         <div class="val" data-for="AGENT_PUBKEY"></div>
@@ -114,6 +118,7 @@
         <div class="step-head"><span class="num">3</span><h2>The market (pays the agent)</h2></div>
         <p class="hint">A separate account that pays the agent for completed tasks —
           the only source of revenue. Fund it later with <code>npm run seed:market</code>.</p>
+        <button type="button" class="ghost" data-gen="market">✨ Generate market keypair</button>
         <label>Market public key <span class="k">MARKET_PUBKEY</span></label>
         <input id="MARKET_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
         <div class="val" data-for="MARKET_PUBKEY"></div>
@@ -127,9 +132,11 @@
         <div class="step-head"><span class="num">4</span><h2>Compute-provider &amp; operator</h2></div>
         <p class="hint">The compute-provider <b>receives</b> the compute burn each cycle —
           only its public key is needed. The operator key is optional.</p>
+        <button type="button" class="ghost" data-gen="compute">✨ Generate compute-provider key</button>
         <label>Compute-provider public key <span class="k">COMPUTE_PROVIDER_PUBKEY</span></label>
         <input id="COMPUTE_PROVIDER_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
         <div class="val" data-for="COMPUTE_PROVIDER_PUBKEY"></div>
+        <div id="compute-secret" class="val muted"></div>
         <label>Operator public key <span class="k">OPERATOR_PUBKEY</span> <span class="muted">(optional)</span></label>
         <input id="OPERATOR_PUBKEY" data-kind="pubkey-opt" placeholder="optional" autocomplete="off" spellcheck="false" />
         <div class="val" data-for="OPERATOR_PUBKEY"></div>
@@ -311,6 +318,64 @@
         document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(a.href); toast('Downloaded .env');
       });
+
+      // --- In-browser devnet keypair generation (no install, no network) -----
+      const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      function base58(bytes) {
+        const out = [];
+        for (const byte of bytes) {
+          let carry = byte;
+          for (let i = 0; i < out.length; i++) {
+            const x = (out[i] << 8) + carry;
+            out[i] = x % 58;
+            carry = (x / 58) | 0;
+          }
+          while (carry > 0) { out.push(carry % 58); carry = (carry / 58) | 0; }
+        }
+        for (const byte of bytes) { if (byte === 0) out.push(0); else break; }
+        return out.reverse().map((i) => B58_ALPHABET[i]).join('');
+      }
+      function b64urlToBytes(s) {
+        const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return arr;
+      }
+      // A Solana keypair is Ed25519. Web Crypto (recent browsers) can make one.
+      async function generateSolanaKeypair() {
+        const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+        const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+        const seed = b64urlToBytes(jwk.d); // 32-byte private seed
+        const pub = b64urlToBytes(jwk.x);  // 32-byte public key
+        const secret = new Uint8Array(64); // Solana secret key = seed || pubkey
+        secret.set(seed, 0); secret.set(pub, 32);
+        return { pubkey: base58(pub), secret: base58(secret) };
+      }
+      const setVal = (id, v) => { document.getElementById(id).value = v; };
+      async function fillGenerated(kind) {
+        try {
+          const { pubkey, secret } = await generateSolanaKeypair();
+          if (kind === 'agent') { setVal('AGENT_PUBKEY', pubkey); setVal('AGENT_KEYPAIR', secret); }
+          else if (kind === 'market') { setVal('MARKET_PUBKEY', pubkey); setVal('MARKET_KEYPAIR', secret); }
+          else if (kind === 'compute') {
+            setVal('COMPUTE_PROVIDER_PUBKEY', pubkey);
+            const el = document.getElementById('compute-secret');
+            el.className = 'val warn';
+            el.textContent = 'compute-provider secret (save only if you may later reclaim its SOL): ' + secret;
+          }
+          refresh();
+          toast('Generated');
+        } catch (e) {
+          alert(
+            'In-browser generation needs a recent browser (Ed25519 Web Crypto).\n' +
+            'Use `npm run keygen` in the project instead, or update your browser.\n\n' + e.message,
+          );
+        }
+      }
+      document.querySelectorAll('[data-gen]').forEach((b) =>
+        b.addEventListener('click', () => fillGenerated(b.getAttribute('data-gen'))),
+      );
 
       refresh();
     </script>
