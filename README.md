@@ -107,9 +107,12 @@ real market decides whether a trade worked, never the agent itself. **No real
 funds are ever at risk.**
 
 - Each cycle it fetches real prices (`src/marketdata.ts`: keyless Coinbase spot,
-  CoinGecko fallback) and chooses target exposures via the `trade` tool — long,
-  short, flat, any allocation across the tradable assets, within a gross-exposure
-  cap. Full freedom of strategy; the market is the judge.
+  CoinGecko fallback), with each price's change vs the previous cycle, across a
+  **broad universe** (majors, L2s, Solana-ecosystem tokens, tokenised gold — set
+  `TRADING_ASSETS`, extend `COINGECKO_IDS`). It then acts via two tools: `trade`
+  (set per-asset USD exposure — long/short/flat) or `rebalance` (a whole target
+  portfolio as weights). Full freedom of strategy within the gross-exposure cap;
+  the market is the judge.
 - The **book** (`src/trading/desk.ts`) is a pure, marked-to-market portfolio in
   USD. It starts at `PAPER_TRADING_CAPITAL_USD` (default $500 — the modeled "$500
   of SOL"). Its equity moves with real prices.

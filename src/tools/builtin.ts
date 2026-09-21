@@ -1,6 +1,12 @@
 import { solToLamports } from '../config.js';
 import { writeSoul } from '../soul.js';
-import { applyOrders, summarizeDesk, type Order } from '../trading/desk.js';
+import {
+  applyOrders,
+  equityUsd as deskEquityUsd,
+  summarizeDesk,
+  weightsToOrders,
+  type Order,
+} from '../trading/desk.js';
 import type { TransferProposal } from '../types.js';
 import { ToolRegistry, type Tool } from './registry.js';
 
@@ -59,6 +65,48 @@ const trade: Tool = {
       note:
         `book after: ${summarizeDesk(ctx.state.desk, ctx.prices).replace(/\n/g, ' | ')}` +
         (rejNote ? ` || rejected: ${rejNote}` : ''),
+    };
+  },
+};
+
+const rebalance: Tool = {
+  name: 'rebalance',
+  description:
+    'Set your WHOLE portfolio at once as target WEIGHTS — fractions of your ' +
+    'current equity per asset (positive = long, negative = short, omitted = flat). ' +
+    'e.g. {"BTC":0.5,"ETH":-0.25} means 50% long BTC, 25% short ETH, rest cash. ' +
+    'Weights that breach the gross-exposure cap are rejected. Great for expressing ' +
+    'a diversified allocation in one move.',
+  movesValue: false,
+  inputHint: '{ "weights": { "BTC": 0.5, "ETH": -0.25, "SOL": 0.2 } }',
+  async execute(input, ctx) {
+    const raw =
+      input.weights && typeof input.weights === 'object' && !Array.isArray(input.weights)
+        ? (input.weights as Record<string, unknown>)
+        : {};
+    const weights: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const n = Number(v);
+      if (Number.isFinite(n)) weights[k] = n;
+    }
+    if (Object.keys(weights).length === 0) {
+      return { summary: 'rebalance called with no weights — held current book', note: 'no weights' };
+    }
+    const equity = deskEquityUsd(ctx.state.desk, ctx.prices);
+    const orders = weightsToOrders(ctx.cfg.trading.assets, weights, equity);
+    const outcomes = applyOrders(ctx.state.desk, orders, {
+      prices: ctx.prices,
+      tradableAssets: ctx.cfg.trading.assets,
+      maxGrossExposureUsd: ctx.cfg.trading.maxGrossExposureUsd,
+      allowShort: ctx.cfg.trading.allowShort,
+    });
+    const rejected = outcomes.filter((o) => !o.ok);
+    return {
+      summary:
+        `rebalanced to ${Object.keys(weights).length} target weights` +
+        (rejected.length ? ` (rejected ${rejected.length})` : ''),
+      traded: true,
+      note: `book after: ${summarizeDesk(ctx.state.desk, ctx.prices).replace(/\n/g, ' | ')}`,
     };
   },
 };
@@ -149,10 +197,11 @@ const transfer: Tool = {
 export function buildRegistry(): ToolRegistry {
   return new ToolRegistry()
     .register(trade)
+    .register(rebalance)
     .register(writeJournal)
     .register(reflect)
     .register(rest)
     .register(transfer);
 }
 
-export const BUILTIN_TOOLS = [trade, writeJournal, reflect, rest, transfer];
+export const BUILTIN_TOOLS = [trade, rebalance, writeJournal, reflect, rest, transfer];

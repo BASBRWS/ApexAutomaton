@@ -80,6 +80,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const cycle = state.cycle;
 
   // --- Observe: fetch REAL prices (fall back to last known on failure). ------
+  const prevPrices: PriceMap = { ...state.lastPrices };
   const priceSource = deps.priceSource ?? makePriceSource(cfg);
   const prices: PriceMap = { ...state.lastPrices };
   let priceNote: string;
@@ -147,6 +148,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     equityUsd: equityPre,
     equitySol: equitySolPre,
     prices,
+    prevPrices,
     deskSummary: summarizeDesk(state.desk, prices),
     score: state.score,
     journalDigest: digestRecent(8),

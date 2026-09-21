@@ -225,7 +225,10 @@ export function loadConfig(): Config {
         'MAX_GROSS_EXPOSURE_USD',
         envNum('PAPER_TRADING_CAPITAL_USD', 500),
       ),
-      assets: (envStr('TRADING_ASSETS') ?? 'BTC,ETH')
+      assets: (
+        envStr('TRADING_ASSETS') ??
+        'BTC,ETH,SOL,BNB,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,MATIC,ATOM,UNI,ARB,SUI,JUP,BONK,WIF,PYTH,RENDER,PAXG'
+      )
         .split(',')
         .map((s) => s.trim().toUpperCase())
         .filter((s) => s.length > 0),

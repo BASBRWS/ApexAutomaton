@@ -55,11 +55,11 @@ export interface TierPolicy {
  * `transfer` is an optional Phase 2 value-mover, added only when enabled and
  * only at NORMAL+ (see toolNamesForCycle).
  */
-const TOOLS_CRITICAL = ['trade', 'rest'];
-const TOOLS_LOW = ['trade', 'write_journal', 'rest'];
-const TOOLS_NORMAL = ['trade', 'write_journal', 'reflect', 'rest'];
-const TOOLS_ABUNDANT = ['trade', 'write_journal', 'reflect', 'rest'];
-const TOOLS_SOVEREIGN = ['trade', 'write_journal', 'reflect', 'rest'];
+const TOOLS_CRITICAL = ['trade', 'rebalance', 'rest'];
+const TOOLS_LOW = ['trade', 'rebalance', 'write_journal', 'rest'];
+const TOOLS_NORMAL = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
+const TOOLS_ABUNDANT = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
+const TOOLS_SOVEREIGN = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
 
 export function tierForBalanceSol(balanceSol: number, cfg: Config): Tier {
   const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =

@@ -42,9 +42,10 @@ describe('policyForTier', () => {
     expect(policyForTier('SOVEREIGN', cfg).rights.mayReplicate).toBe(true);
   });
 
-  it('offers trade at every living tier (earning always reachable)', () => {
+  it('offers trade and rebalance at every living tier (earning always reachable)', () => {
     for (const tier of ['CRITICAL', 'LOW', 'NORMAL', 'ABUNDANT', 'SOVEREIGN'] as const) {
       expect(policyForTier(tier, cfg).tools).toContain('trade');
+      expect(policyForTier(tier, cfg).tools).toContain('rebalance');
     }
   });
 

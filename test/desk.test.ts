@@ -5,6 +5,7 @@ import {
   equityUsd,
   grossExposureUsd,
   netPnlUsd,
+  weightsToOrders,
   type ApplyContext,
 } from '../src/trading/desk.js';
 
@@ -70,6 +71,23 @@ describe('trading desk', () => {
     expect(applyOrders(d, [{ asset: 'BTC', targetUsd: 100 }], ctx({}))[0]!.ok).toBe(false);
     const noShort: ApplyContext = { ...ctx({ BTC: 60000 }), allowShort: false };
     expect(applyOrders(d, [{ asset: 'BTC', targetUsd: -100 }], noShort)[0]!.ok).toBe(false);
+  });
+
+  it('weightsToOrders scales weights to USD targets and flattens the rest', () => {
+    const orders = weightsToOrders(['BTC', 'ETH', 'SOL'], { BTC: 0.5, ETH: -0.25 }, 400);
+    const byAsset = Object.fromEntries(orders.map((o) => [o.asset, o.targetUsd]));
+    expect(byAsset.BTC).toBeCloseTo(200, 6);
+    expect(byAsset.ETH).toBeCloseTo(-100, 6);
+    expect(byAsset.SOL).toBe(0); // omitted -> flat
+  });
+
+  it('a rebalance (weights -> orders -> apply) builds the intended book', () => {
+    const d = initDesk(500, 0);
+    const prices = { BTC: 50000, ETH: 2500, SOL: 100 };
+    const orders = weightsToOrders(['BTC', 'ETH', 'SOL'], { BTC: 0.4, SOL: 0.2 }, equityUsd(d, prices));
+    applyOrders(d, orders, { prices, tradableAssets: ['BTC', 'ETH', 'SOL'], maxGrossExposureUsd: 500, allowShort: true });
+    expect(grossExposureUsd(d, prices)).toBeCloseTo(300, 6); // 40% + 20% of $500
+    expect(equityUsd(d, prices)).toBeCloseTo(500, 6);
   });
 
   it('gross exposure counts both longs and shorts', () => {
