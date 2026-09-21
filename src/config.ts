@@ -2,9 +2,9 @@ import 'dotenv/config';
 import { clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 /**
- * Central configuration. Everything here is loaded once at process start.
+ * Central configuration. Loaded once at process start.
  *
- * The single most important invariant in this whole codebase lives in
+ * The single most important invariant in this codebase lives in
  * {@link assertDevnet}: there is NO code path that reaches mainnet-beta. Any
  * attempt to point the RPC at mainnet throws and the process exits.
  */
@@ -29,7 +29,8 @@ function envNum(name: string, fallback: number): number {
 function envBool(name: string, fallback = false): boolean {
   const raw = envStr(name);
   if (raw === undefined) return fallback;
-  return raw === '1' || raw.toLowerCase() === 'true' || raw.toLowerCase() === 'yes';
+  const l = raw.toLowerCase();
+  return l === '1' || l === 'true' || l === 'yes';
 }
 
 function requiredPubkey(name: string): string {
@@ -87,20 +88,24 @@ export interface Config {
   operatorPubkey: string | undefined;
 
   models: {
-    normal: string;
-    low: string;
-    critical: string;
+    cheapest: string;
+    cheaper: string;
+    frontier: string;
   };
 
   economy: {
     solPerUsd: number;
     marketTaskRewardSol: number;
+    estimatedMaxCycleCostUsd: number;
   };
 
+  /** Lower bound (inclusive) of each tier, in SOL. See tiers.ts. */
   tiers: {
-    normalMinSol: number;
-    lowMinSol: number;
     dustThresholdSol: number;
+    criticalMinSol: number;
+    normalMinSol: number;
+    abundantMinSol: number;
+    sovereignMinSol: number;
   };
 
   rails: {
@@ -112,12 +117,34 @@ export interface Config {
   };
 
   replication: {
-    fundSol: number;
-    minBalanceSol: number;
+    thresholdSol: number;
+    sustainedCycles: number;
+    childSeedSol: number;
+    maxPopulation: number;
   };
 
   seed: {
     airdropSol: number;
+  };
+
+  /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
+   * unless these are explicitly enabled. */
+  features: {
+    /** Phase 3: allow code-driven replication at the SOVEREIGN tier. */
+    replicationEnabled: boolean;
+    /** Phase 2: use the off-chain revenue adapter (still devnet-settled). */
+    offchainRevenueEnabled: boolean;
+    /** Phase 2: expose the extra value-moving tools (e.g. transfer). */
+    extraToolsEnabled: boolean;
+  };
+
+  /** Phase 2: optional Firestore state backend. Enabled when a project id is
+   * present; otherwise the committed file store is used. */
+  firestore: {
+    enabled: boolean;
+    projectId: string | undefined;
+    collection: string;
+    documentId: string;
   };
 }
 
@@ -132,20 +159,23 @@ export function loadConfig(): Config {
     operatorPubkey: envStr('OPERATOR_PUBKEY'),
 
     models: {
-      normal: envStr('MODEL_NORMAL') ?? 'claude-opus-5',
-      low: envStr('MODEL_LOW') ?? 'claude-sonnet-5',
-      critical: envStr('MODEL_CRITICAL') ?? 'claude-haiku-4-5',
+      cheapest: envStr('MODEL_CHEAPEST') ?? 'claude-haiku-4-5',
+      cheaper: envStr('MODEL_CHEAPER') ?? 'claude-sonnet-5',
+      frontier: envStr('MODEL_FRONTIER') ?? 'claude-opus-5',
     },
 
     economy: {
       solPerUsd: envNum('SOL_PER_USD', 1.0),
-      marketTaskRewardSol: envNum('MARKET_TASK_REWARD_SOL', 0.05),
+      marketTaskRewardSol: envNum('MARKET_TASK_REWARD_SOL', 0.2),
+      estimatedMaxCycleCostUsd: envNum('ESTIMATED_MAX_CYCLE_COST_USD', 0.08),
     },
 
     tiers: {
-      normalMinSol: envNum('TIER_NORMAL_MIN_SOL', 0.5),
-      lowMinSol: envNum('TIER_LOW_MIN_SOL', 0.1),
       dustThresholdSol: envNum('DUST_THRESHOLD_SOL', 0.001),
+      criticalMinSol: envNum('TIER_CRITICAL_MIN_SOL', 0.1),
+      normalMinSol: envNum('TIER_NORMAL_MIN_SOL', 0.5),
+      abundantMinSol: envNum('TIER_ABUNDANT_MIN_SOL', 2.0),
+      sovereignMinSol: envNum('TIER_SOVEREIGN_MIN_SOL', 5.0),
     },
 
     rails: {
@@ -157,22 +187,64 @@ export function loadConfig(): Config {
     },
 
     replication: {
-      fundSol: envNum('REPLICATION_FUND_SOL', 0.1),
-      minBalanceSol: envNum('REPLICATION_MIN_BALANCE_SOL', 0.75),
+      thresholdSol: envNum('REPLICATE_THRESHOLD_SOL', 5.0),
+      sustainedCycles: Math.trunc(envNum('REPLICATE_SUSTAINED_CYCLES', 5)),
+      // Default kept <= PER_TX_CAP_SOL so funding a child is a normal, capped
+      // transfer the signer will accept. Caps override replication, always.
+      childSeedSol: envNum('CHILD_SEED_SOL', 0.1),
+      maxPopulation: Math.trunc(envNum('MAX_POPULATION', 4)),
     },
 
     seed: {
       airdropSol: envNum('SEED_AIRDROP_SOL', 1.0),
     },
+
+    features: {
+      replicationEnabled: envBool('REPLICATION_ENABLED', false),
+      offchainRevenueEnabled: envBool('OFFCHAIN_REVENUE_ENABLED', false),
+      extraToolsEnabled: envBool('PHASE2_TOOLS_ENABLED', false),
+    },
+
+    firestore: {
+      enabled: envStr('FIRESTORE_PROJECT_ID') !== undefined,
+      projectId: envStr('FIRESTORE_PROJECT_ID'),
+      collection: envStr('FIRESTORE_COLLECTION') ?? 'automaton',
+      documentId: envStr('FIRESTORE_DOCUMENT_ID') ?? 'state',
+    },
   };
 
-  // Sanity: thresholds must be ordered dust < low < normal.
-  const { dustThresholdSol, lowMinSol, normalMinSol } = cfg.tiers;
-  if (!(dustThresholdSol < lowMinSol && lowMinSol < normalMinSol)) {
+  validateConfig(cfg);
+  return cfg;
+}
+
+/** Structural checks that must hold for the tier gradient to make sense. */
+export function validateConfig(cfg: Config): void {
+  const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =
+    cfg.tiers;
+  const ordered =
+    dustThresholdSol < criticalMinSol &&
+    criticalMinSol < normalMinSol &&
+    normalMinSol < abundantMinSol &&
+    abundantMinSol < sovereignMinSol;
+  if (!ordered) {
     throw new Error(
-      `Config error: tier thresholds must satisfy dust(${dustThresholdSol}) < ` +
-        `low(${lowMinSol}) < normal(${normalMinSol}).`,
+      `Config error: tier thresholds must be strictly increasing: dust(${dustThresholdSol}) < ` +
+        `critical(${criticalMinSol}) < normal(${normalMinSol}) < abundant(${abundantMinSol}) < ` +
+        `sovereign(${sovereignMinSol}).`,
     );
   }
-  return cfg;
+}
+
+/**
+ * The necessary condition for growth: one task must pay more than the worst-case
+ * cost of the cycle that decides to do it. This does NOT guarantee the agent
+ * will earn — only that earning is not mathematically self-defeating. The
+ * growth-guard test asserts this so a net-negative economy fails the build.
+ */
+export function worstCaseCycleBurnSol(cfg: Config): number {
+  return cfg.economy.solPerUsd * cfg.economy.estimatedMaxCycleCostUsd;
+}
+
+export function economyCanGrow(cfg: Config): boolean {
+  return cfg.economy.marketTaskRewardSol > worstCaseCycleBurnSol(cfg);
 }

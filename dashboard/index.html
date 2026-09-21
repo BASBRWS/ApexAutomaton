@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apex Automaton — dashboard</title>
+    <!--
+      Phase 3 scaffold. A static, dependency-free dashboard that reads the
+      committed /state files and shows balance over time, the score metrics, and
+      the population. Serve the repo root and open /dashboard/, e.g.:
+          npx serve .      (then visit http://localhost:3000/dashboard/)
+      It fetches ../state/state.json and ../state/journal.ndjson relative to
+      this file. No build step, no framework.
+    -->
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --fg: #e6edf3;
+        --muted: #8b98a5;
+        --accent: #5ad19b;
+        --line: #1f2933;
+      }
+      @media (prefers-color-scheme: light) {
+        :root { --bg: #ffffff; --fg: #0b0f14; --muted: #5a6672; --accent: #0a7f52; --line: #e2e8f0; }
+      }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .muted { color: var(--muted); }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+      .tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+      .tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+      .tile .v { font-size: 20px; font-weight: 600; margin-top: 4px; }
+      svg { width: 100%; height: 220px; border: 1px solid var(--line); border-radius: 10px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
+      code { color: var(--accent); }
+      .err { color: #e06c75; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Apex Automaton</h1>
+      <div class="muted">Growth-seeking agent on Solana devnet · balance is the life meter <em>and</em> the score.</div>
+
+      <div id="tiles" class="grid"></div>
+
+      <h2 style="font-size:16px">Balance over time</h2>
+      <svg id="chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="balance chart"></svg>
+
+      <h2 style="font-size:16px">Population (children)</h2>
+      <div id="population" class="muted">—</div>
+
+      <h2 style="font-size:16px">Recent cycles</h2>
+      <table id="cycles"><thead><tr><th>#</th><th>tier</th><th>action</th><th>balance</th><th>revenue</th><th>burn</th></tr></thead><tbody></tbody></table>
+
+      <p id="status" class="muted" style="margin-top:16px"></p>
+    </div>
+
+    <script>
+      const SOL = 1e9;
+      const fmt = (lamports) => (lamports / SOL).toFixed(4);
+
+      async function loadJson(path) {
+        const r = await fetch(path, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`${path}: ${r.status}`);
+        return r.json();
+      }
+      async function loadNdjson(path) {
+        const r = await fetch(path, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`${path}: ${r.status}`);
+        const text = await r.text();
+        return text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+      }
+
+      function tile(k, v) {
+        const el = document.createElement('div');
+        el.className = 'tile';
+        el.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>`;
+        return el;
+      }
+
+      function drawChart(entries) {
+        const svg = document.getElementById('chart');
+        svg.innerHTML = '';
+        const pts = entries.map((e, i) => ({ x: i, y: e.balanceSol ?? 0 }));
+        if (pts.length < 2) return;
+        const maxY = Math.max(...pts.map((p) => p.y), 0.001);
+        const W = 900, H = 220, pad = 10;
+        const sx = (x) => pad + (x / (pts.length - 1)) * (W - 2 * pad);
+        const sy = (y) => H - pad - (y / maxY) * (H - 2 * pad);
+        const d = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'var(--accent)');
+        path.setAttribute('stroke-width', '2');
+        svg.appendChild(path);
+      }
+
+      (async () => {
+        const status = document.getElementById('status');
+        try {
+          const [state, journal] = await Promise.all([
+            loadJson('../state/state.json'),
+            loadNdjson('../state/journal.ndjson').catch(() => []),
+          ]);
+
+          const s = state.score ?? {};
+          const tiles = document.getElementById('tiles');
+          tiles.append(
+            tile('cycle', state.cycle ?? 0),
+            tile('peak balance', `${fmt(s.peakBalanceLamports ?? 0)} SOL`),
+            tile('net growth', `${fmt(s.netGrowthLamports ?? 0)} SOL`),
+            tile('cumulative revenue', `${fmt(s.cumulativeRevenueLamports ?? 0)} SOL`),
+            tile('tasks completed', s.tasksCompleted ?? 0),
+            tile('margin / task', `${fmt(s.marginPerTaskLamports ?? 0)} SOL`),
+            tile('first earned at', s.firstDollarAtCycle ?? '—'),
+            tile('population', (state.children ?? []).length),
+          );
+
+          drawChart(journal);
+
+          const pop = document.getElementById('population');
+          const children = state.children ?? [];
+          pop.innerHTML = children.length
+            ? children.map((c) => `<code>${c.pubkey}</code> (cycle ${c.createdAtCycle}, mutated ${c.mutatedParam})`).join('<br>')
+            : 'no children yet (replication is Phase 3, SOVEREIGN-gated)';
+
+          const tbody = document.querySelector('#cycles tbody');
+          journal.slice(-15).reverse().forEach((e) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${e.cycle}</td><td>${e.tier}</td><td>${e.action}</td><td>${(e.balanceSol ?? 0).toFixed(4)}</td><td>${fmt(e.revenueLamports ?? 0)}</td><td>${fmt(e.burnLamports ?? 0)}</td>`;
+            tbody.appendChild(tr);
+          });
+
+          status.textContent = `Loaded ${journal.length} cycles. Last run: ${state.lastRunAt ?? 'never'}.`;
+        } catch (err) {
+          status.className = 'err';
+          status.textContent = `Could not load state (${err.message}). Run at least one cycle, then serve the repo root and open /dashboard/.`;
+        }
+      })();
+    </script>
+  </body>
+</html>
