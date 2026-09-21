@@ -42,8 +42,8 @@
     <div class="wrap">
       <h1>Apex Automaton</h1>
       <div class="muted">Growth-seeking agent on Solana devnet · balance is the life meter <em>and</em> the score.</div>
-      <div id="nav" class="muted" style="margin-top:6px;display:none">
-        <a href="../setup/">⚙ Setup wizard (local only)</a>
+      <div id="nav" class="muted" style="margin-top:6px">
+        <a href="../setup/">⚙ Setup wizard (build your .env)</a>
       </div>
 
       <div id="tiles" class="grid"></div>
@@ -99,12 +99,6 @@
         path.setAttribute('stroke', 'var(--accent)');
         path.setAttribute('stroke-width', '2');
         svg.appendChild(path);
-      }
-
-      // The setup wizard is local only (it handles secrets); show the link to it
-      // only when this dashboard is served locally, never on public GitHub Pages.
-      if (['localhost', '127.0.0.1'].includes(location.hostname)) {
-        document.getElementById('nav').style.display = '';
       }
 
       (async () => {
