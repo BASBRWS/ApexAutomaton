@@ -216,6 +216,34 @@ Run the tests (includes the growth guard and the signer-policy rails):
 npm test
 ```
 
+## Watch it — dashboard & setup wizard
+
+Two local pages, served without any dependency:
+
+```bash
+npm run setup       # the .env setup wizard  -> http://localhost:4173/setup/
+npm run dashboard   # balance/score/population -> http://localhost:4173/dashboard/
+```
+
+Both open your browser automatically. The **setup wizard is local only** — it
+handles secrets and is never published.
+
+## Publish the dashboard to GitHub Pages (no VPS needed)
+
+You don't need a server to watch the agent. Actions is your heartbeat; Pages is
+your dashboard.
+
+1. Repo **Settings → Pages → Source: “GitHub Actions.”** (Pages on a *private*
+   repo needs a paid plan; a public repo is free.)
+2. The `deploy-dashboard` workflow (`.github/workflows/pages.yml`) publishes the
+   dashboard at `https://<you>.github.io/<repo>/`. It redeploys on every push to
+   the default branch — **including the `/state` commits the heartbeat makes** —
+   so the public dashboard stays current.
+
+It publishes **only** the dashboard and the committed `/state` (both already
+public in the repo). The **setup wizard is excluded**, and child secrets are
+never committed in the first place. Nothing secret reaches Pages.
+
 ## Enable the heartbeat (GitHub Actions)
 
 `.github/workflows/heartbeat.yml` runs `npm run tick` on a cron and commits the
