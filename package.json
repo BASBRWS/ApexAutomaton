@@ -1,0 +1,28 @@
+{
+  "name": "apex-automaton",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A survival-pressured autonomous agent on Solana devnet. Mortality engineering: behaviour shaped by the conditions of the agent's death (its wallet balance), not by instructions in its prompt.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "cycle": "tsx src/index.ts",
+    "seed": "tsx scripts/seed.ts",
+    "keygen": "tsx scripts/keygen.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@solana/web3.js": "^1.95.4",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^20.16.0"
+  }
+}

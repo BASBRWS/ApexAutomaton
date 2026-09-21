@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / secrets — NEVER commit the keypair or API keys
+.env
+.env.local
+*.key
+*.keypair.json
+
+# Child agent secrets produced by replication.ts are secret material.
+# Only the PUBLIC key of a child is ever committed (in state/state.json).
+state/children/*.secret.json
+
+# Local test validator ledger
+test-ledger/
+
+# OS / editor noise
+.DS_Store
+*.log
