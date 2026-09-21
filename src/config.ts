@@ -83,7 +83,8 @@ export interface Config {
   rpcUrl: string;
 
   agentPubkey: string;
-  marketPubkey: string;
+  /** optional: only used by the legacy modeled market (seed:market). */
+  marketPubkey: string | undefined;
   computeProviderPubkey: string;
   operatorPubkey: string | undefined;
 
@@ -173,7 +174,8 @@ export function loadConfig(): Config {
     rpcUrl: resolveRpcUrl(),
 
     agentPubkey: requiredPubkey('AGENT_PUBKEY'),
-    marketPubkey: requiredPubkey('MARKET_PUBKEY'),
+    // Optional now — the trading loop does not use the modeled market.
+    marketPubkey: envStr('MARKET_PUBKEY'),
     computeProviderPubkey: requiredPubkey('COMPUTE_PROVIDER_PUBKEY'),
     operatorPubkey: envStr('OPERATOR_PUBKEY'),
 
