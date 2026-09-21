@@ -9,8 +9,9 @@ name: deploy-dashboard
 # One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
 # (Pages on a private repo requires a paid GitHub plan; a public repo is free.)
 #
-# After that, this redeploys on every push to the default branch — including the
-# state commits the heartbeat pushes — so the public dashboard stays current.
+# Redeploys on: a push to main that touches the dashboard/state/setup, AND after
+# every heartbeat run (the heartbeat's own state push does NOT trigger workflows
+# because it uses GITHUB_TOKEN, so we react to the heartbeat completing instead).
 
 on:
   push:
@@ -20,6 +21,9 @@ on:
       - 'setup/**'
       - 'state/**'
       - '.github/workflows/pages.yml'
+  workflow_run:
+    workflows: ["automaton-heartbeat"]
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:
@@ -36,7 +40,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Always publish the latest main: on workflow_run the default checkout is
+      # the heartbeat's starting SHA (before it committed state), so pin main.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Assemble the site (dashboard + state + setup wizard)
         run: |
