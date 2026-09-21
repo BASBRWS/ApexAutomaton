@@ -99,7 +99,7 @@ export class Market {
     private readonly cfg: Config,
   ) {
     this.keypair = loadMarketKeypair();
-    if (this.keypair.publicKey.toBase58() !== cfg.marketPubkey) {
+    if (cfg.marketPubkey && this.keypair.publicKey.toBase58() !== cfg.marketPubkey) {
       throw new Error(
         `MARKET_KEYPAIR does not match MARKET_PUBKEY ` +
           `(derived ${this.keypair.publicKey.toBase58()}, expected ${cfg.marketPubkey}).`,

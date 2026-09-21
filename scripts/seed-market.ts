@@ -13,6 +13,9 @@ import { makeConnection, getBalanceLamports, operatorAirdrop } from '../src/sola
  */
 async function main(): Promise<void> {
   const cfg = loadConfig();
+  if (!cfg.marketPubkey) {
+    throw new Error('MARKET_PUBKEY is not set. The trading loop does not need it; only set it if you use the legacy modeled market.');
+  }
   const connection = makeConnection(cfg);
 
   const before = await getBalanceLamports(connection, cfg.marketPubkey);

@@ -150,8 +150,11 @@
 
           status.textContent = `Loaded ${journal.length} cycles. Last run: ${state.lastRunAt ?? 'never'}.`;
         } catch (err) {
-          status.className = 'err';
-          status.textContent = `Could not load state (${err.message}). Run at least one cycle, then serve the repo root and open /dashboard/.`;
+          const notYet = /404/.test(String(err.message));
+          status.className = notYet ? 'muted' : 'err';
+          status.textContent = notYet
+            ? 'Waiting for the first cycle — no state committed yet. The agent fills this once it ticks: enable the Actions heartbeat (repo secrets + seed the wallet), or run `npm run tick` locally and commit /state.'
+            : `Could not load state (${err.message}).`;
         }
       })();
     </script>

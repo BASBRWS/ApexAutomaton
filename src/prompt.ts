@@ -73,6 +73,7 @@ export function buildUserPrompt(args: {
   equityUsd: number;
   equitySol: number;
   prices: PriceMap;
+  prevPrices: PriceMap;
   deskSummary: string;
   score: Score;
   journalDigest: string;
@@ -80,14 +81,21 @@ export function buildUserPrompt(args: {
 }): string {
   const s = args.score;
   const priceLines = Object.entries(args.prices)
-    .map(([k, v]) => `${k}=$${v}`)
-    .join('  ');
+    .map(([k, v]) => {
+      const prev = args.prevPrices[k];
+      if (typeof prev === 'number' && prev > 0) {
+        const chg = ((v - prev) / prev) * 100;
+        return `${k}=$${v} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% vs last)`;
+      }
+      return `${k}=$${v}`;
+    })
+    .join('\n');
   return [
     `## Situation — cycle ${args.cycle}`,
     `Book equity: $${args.equityUsd.toFixed(2)} (${args.equitySol.toFixed(4)} SOL)`,
     `Tier: ${args.tier} — ${args.policy.description}`,
     '',
-    '## Live market prices (USD)',
+    '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',
     '',
     '## Your book right now',

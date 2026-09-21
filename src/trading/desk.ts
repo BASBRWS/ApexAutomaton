@@ -156,6 +156,27 @@ export function applyOrders(desk: Desk, orders: Order[], ctx: ApplyContext): Ord
   return outcomes;
 }
 
+/**
+ * Convert target portfolio WEIGHTS (fractions of equity, signed) into absolute
+ * target-USD orders for every tradable asset. Assets not named get weight 0, so
+ * a rebalance also flattens what you dropped. e.g. { BTC: 0.5, ETH: -0.25 }.
+ */
+export function weightsToOrders(
+  tradableAssets: string[],
+  weights: Record<string, number>,
+  equityUsd: number,
+): Order[] {
+  const w: Record<string, number> = {};
+  for (const [k, v] of Object.entries(weights)) {
+    const n = Number(v);
+    if (Number.isFinite(n)) w[k.toUpperCase()] = n;
+  }
+  return tradableAssets.map((a) => ({
+    asset: a.toUpperCase(),
+    targetUsd: (w[a.toUpperCase()] ?? 0) * equityUsd,
+  }));
+}
+
 /** A compact, human/LLM-readable snapshot of the book at the given prices. */
 export function summarizeDesk(desk: Desk, prices: PriceMap): string {
   const lines: string[] = [];

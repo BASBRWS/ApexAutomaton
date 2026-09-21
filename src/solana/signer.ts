@@ -172,7 +172,7 @@ export class Signer {
       this.cfg.computeProviderPubkey,
       this.cfg.marketPubkey,
       ...this.state.children.map((c) => c.pubkey),
-    ];
+    ].filter((k): k is string => typeof k === 'string' && k.length > 0);
   }
 
   private buildPolicyInput(proposal: TransferProposal): PolicyInput {

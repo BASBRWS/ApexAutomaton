@@ -23,14 +23,54 @@ export interface PriceSource {
   getPrices(symbols: string[]): Promise<PriceSnapshot>;
 }
 
-/** Map trading symbols to CoinGecko ids. Extend as you add assets. */
+/** Map trading symbols to CoinGecko ids — a broad, liquid universe. Add any
+ * CoinGecko id here and the symbol to TRADING_ASSETS to let the agent trade it. */
 export const COINGECKO_IDS: Record<string, string> = {
+  // majors
   BTC: 'bitcoin',
   ETH: 'ethereum',
   SOL: 'solana',
   BNB: 'binancecoin',
+  XRP: 'ripple',
+  ADA: 'cardano',
+  DOGE: 'dogecoin',
+  AVAX: 'avalanche-2',
+  TRX: 'tron',
+  LINK: 'chainlink',
+  DOT: 'polkadot',
+  LTC: 'litecoin',
+  MATIC: 'matic-network',
+  BCH: 'bitcoin-cash',
+  ATOM: 'cosmos',
+  UNI: 'uniswap',
+  AAVE: 'aave',
+  ETC: 'ethereum-classic',
+  XLM: 'stellar',
+  ALGO: 'algorand',
+  FIL: 'filecoin',
+  // L2 / newer L1s
+  ARB: 'arbitrum',
+  OP: 'optimism',
+  APT: 'aptos',
+  SUI: 'sui',
+  NEAR: 'near',
+  INJ: 'injective-protocol',
+  TIA: 'celestia',
+  SEI: 'sei-network',
+  RENDER: 'render-token',
+  HBAR: 'hedera-hashgraph',
+  // Solana ecosystem
   JUP: 'jupiter-exchange-solana',
   BONK: 'bonk',
+  WIF: 'dogwifcoin',
+  PYTH: 'pyth-network',
+  JTO: 'jito-governance-token',
+  RAY: 'raydium',
+  ORCA: 'orca',
+  // non-crypto-ish diversifiers (tokenised gold)
+  PAXG: 'pax-gold',
+  XAUT: 'tether-gold',
+  // stablecoins (a place to sit; price ~1)
   USDC: 'usd-coin',
   USDT: 'tether',
 };
