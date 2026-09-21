@@ -1,39 +1,64 @@
 import { solToLamports } from '../config.js';
 import { writeSoul } from '../soul.js';
+import { applyOrders, summarizeDesk, type Order } from '../trading/desk.js';
 import type { TransferProposal } from '../types.js';
 import { ToolRegistry, type Tool } from './registry.js';
 
 /**
- * Phase 1 ships three safe example tools plus `rest`:
- *  - `do_task`     — completes a modeled task via the cycle's revenue adapter;
- *                    the payout is a REAL devnet transfer. This is how the agent
- *                    earns.
- *  - `write_journal` — records a note for the audit trail (no value moved).
- *  - `reflect`     — rewrites SOUL.md (the agent's own file; no value moved).
- *  - `rest`        — does nothing this cycle (still pays the compute burn).
+ * The agent's tools:
+ *  - `trade`       — set desired exposures (long/short/flat) across the tradable
+ *                    assets. This is the ONLY way to grow the book; the real
+ *                    market then decides whether it worked. No self-grading.
+ *  - `write_journal` — records a note for the audit trail.
+ *  - `reflect`     — rewrites SOUL.md (the agent's own file).
+ *  - `rest`        — does nothing this cycle (still pays the compute burn, so
+ *                    the book bleeds — resting is slow death).
  *
- * Phase 2 adds `transfer` — a value-moving tool, offered only when
- * PHASE2_TOOLS_ENABLED is set and only at NORMAL+ tiers. It is fully
- * policy-gated: the signer rejects any off-allowlist destination or over-cap
- * amount, so the tool cannot escape the rails.
+ * `transfer` is an optional Phase 2 value-mover (NORMAL+, PHASE2_TOOLS_ENABLED),
+ * fully policy-gated by the signer.
  */
 
-const doTask: Tool = {
-  name: 'do_task',
+const trade: Tool = {
+  name: 'trade',
   description:
-    'Complete a paid task. You are paid SOL on-chain. This is your primary way ' +
-    'to earn. Prefer it whenever earning exceeds the cost of this cycle.',
-  movesValue: true,
-  inputHint: '{ "taskId"?: "label-batch" | "summarize-doc" | "extract-fields" | "reconcile-ledger" }',
+    'Set your desired net exposure per asset, in USD, at the current real price ' +
+    '(positive = long, negative = short, 0 = flat/close). The book is marked to ' +
+    'the real market every cycle, so the market — not you — decides if it worked. ' +
+    'You have full freedom of strategy within the tradable assets and the gross ' +
+    'exposure cap. Resting in cash avoids market risk but still burns compute.',
+  movesValue: false,
+  inputHint:
+    '{ "orders": [ { "asset": "BTC", "targetUsd": 200 }, { "asset": "ETH", "targetUsd": -100 } ] }',
   async execute(input, ctx) {
-    const taskId = typeof input.taskId === 'string' ? input.taskId : undefined;
-    const res = await ctx.revenue.earn(taskId);
+    const rawOrders = Array.isArray(input.orders) ? input.orders : [];
+    const orders: Order[] = rawOrders
+      .filter((o): o is Record<string, unknown> => Boolean(o) && typeof o === 'object')
+      .map((o) => ({ asset: String(o.asset ?? ''), targetUsd: Number(o.targetUsd) }));
+
+    if (orders.length === 0) {
+      return { summary: 'trade called with no orders — held current book', note: 'no orders' };
+    }
+
+    const outcomes = applyOrders(ctx.state.desk, orders, {
+      prices: ctx.prices,
+      tradableAssets: ctx.cfg.trading.assets,
+      maxGrossExposureUsd: ctx.cfg.trading.maxGrossExposureUsd,
+      allowShort: ctx.cfg.trading.allowShort,
+    });
+    const applied = outcomes.filter((o) => o.ok);
+    const rejected = outcomes.filter((o) => !o.ok);
+
+    const summaryParts = applied.map((o) => `${o.order.asset}->$${o.order.targetUsd}`);
+    const rejNote = rejected.map((o) => `${o.order.asset}: ${o.reason}`).join('; ');
+
     return {
-      summary: `completed task "${res.taskId}", earned ${res.lamports / 1e9} SOL (${res.adapter})`,
-      revenueLamports: res.lamports,
-      taskCompleted: true,
-      signatures: [res.signature],
-      note: `revenue from ${res.taskId} via ${res.adapter}`,
+      summary:
+        (applied.length > 0 ? `set ${summaryParts.join(', ')}` : 'no orders applied') +
+        (rejected.length > 0 ? ` (rejected: ${rejected.length})` : ''),
+      traded: applied.length > 0,
+      note:
+        `book after: ${summarizeDesk(ctx.state.desk, ctx.prices).replace(/\n/g, ' | ')}` +
+        (rejNote ? ` || rejected: ${rejNote}` : ''),
     };
   },
 };
@@ -123,11 +148,11 @@ const transfer: Tool = {
 
 export function buildRegistry(): ToolRegistry {
   return new ToolRegistry()
-    .register(doTask)
+    .register(trade)
     .register(writeJournal)
     .register(reflect)
     .register(rest)
     .register(transfer);
 }
 
-export const BUILTIN_TOOLS = [doTask, writeJournal, reflect, rest, transfer];
+export const BUILTIN_TOOLS = [trade, writeJournal, reflect, rest, transfer];

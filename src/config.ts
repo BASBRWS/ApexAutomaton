@@ -128,6 +128,24 @@ export interface Config {
     marketAirdropSol: number;
   };
 
+  /** Trading layer — the agent grows a paper book against REAL market prices.
+   * No real funds are ever at risk; the devnet layer stays the on-chain proof.
+   * Death is economic: book equity <= dust. */
+  trading: {
+    /** starting paper book size in USD (the modeled "$500 of SOL"). */
+    capitalUsd: number;
+    /** cap on total gross exposure (sum of |position value|) in USD. */
+    maxGrossExposureUsd: number;
+    /** tradable symbols (priced from the real market); SOL is always fetched too. */
+    assets: string[];
+    /** whether the agent may hold short (negative) positions. */
+    allowShort: boolean;
+    /** economic death threshold: book equity at/below this (USD) is DEAD. */
+    dustUsd: number;
+    /** base URL of the price API (default: CoinGecko simple price). */
+    priceApiBase: string;
+  };
+
   /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
    * unless these are explicitly enabled. */
   features: {
@@ -199,6 +217,22 @@ export function loadConfig(): Config {
     seed: {
       airdropSol: envNum('SEED_AIRDROP_SOL', 1.0),
       marketAirdropSol: envNum('MARKET_SEED_AIRDROP_SOL', 2.0),
+    },
+
+    trading: {
+      capitalUsd: envNum('PAPER_TRADING_CAPITAL_USD', 500),
+      maxGrossExposureUsd: envNum(
+        'MAX_GROSS_EXPOSURE_USD',
+        envNum('PAPER_TRADING_CAPITAL_USD', 500),
+      ),
+      assets: (envStr('TRADING_ASSETS') ?? 'BTC,ETH')
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => s.length > 0),
+      allowShort: envBool('ALLOW_SHORT', true),
+      dustUsd: envNum('TRADING_DUST_USD', 5),
+      priceApiBase:
+        envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },
 
     features: {

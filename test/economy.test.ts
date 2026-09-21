@@ -1,70 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { usdToBurnLamports, computeCostUsd, settleCompute } from '../src/economy.js';
+import { computeCostUsd, equityToSol, tierForEquity } from '../src/economy.js';
 import { usdCostOf } from '../src/llm/pricing.js';
 import { makeTestConfig } from './helpers.js';
 
 const cfg = makeTestConfig();
 
-describe('pricing → USD cost', () => {
+describe('compute cost (USD, from token usage)', () => {
   it('prices Opus tokens from the table', () => {
-    // 1M input @ $5 + 1M output @ $25 = $30
-    const cost = usdCostOf('claude-opus-5', { inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    const cost = computeCostUsd('claude-opus-5', { inputTokens: 1_000_000, outputTokens: 1_000_000 });
     expect(cost).toBeCloseTo(30, 6);
   });
 
-  it('prices Haiku cheaper than Opus for identical usage', () => {
+  it('matches the pricing helper and is cheaper on Haiku', () => {
     const usage = { inputTokens: 10_000, outputTokens: 2_000 };
-    expect(usdCostOf('claude-haiku-4-5', usage)).toBeLessThan(usdCostOf('claude-opus-5', usage));
-  });
-
-  it('computeCostUsd matches the pricing helper', () => {
-    const usage = { inputTokens: 4_000, outputTokens: 1_500 };
     expect(computeCostUsd('claude-opus-5', usage)).toBe(usdCostOf('claude-opus-5', usage));
+    expect(computeCostUsd('claude-haiku-4-5', usage)).toBeLessThan(
+      computeCostUsd('claude-opus-5', usage),
+    );
   });
 });
 
-describe('usdToBurnLamports', () => {
-  it('converts USD to lamports via SOL_PER_USD', () => {
-    // $0.05 * 1.0 SOL/USD = 0.05 SOL
-    expect(usdToBurnLamports(cfg, 0.05)).toBe(Math.round(0.05 * LAMPORTS_PER_SOL));
+describe('equity → SOL → tier', () => {
+  it('converts USD equity to SOL at the given price', () => {
+    expect(equityToSol(300, 150)).toBeCloseTo(2, 6);
+    expect(equityToSol(100, 0)).toBe(0); // guards against divide-by-zero
   });
 
-  it('doubles when SOL_PER_USD doubles', () => {
-    const cfg2 = makeTestConfig({ economy: { ...cfg.economy, solPerUsd: 2.0 } });
-    expect(usdToBurnLamports(cfg2, 0.05)).toBe(2 * usdToBurnLamports(cfg, 0.05));
-  });
-});
-
-describe('settleCompute — near-death guard', () => {
-  it('settles nothing (and never touches the signer) when balance < fee buffer', async () => {
-    const signer = {
-      signAndSend: () => {
-        throw new Error('signer must not be called when nothing is spendable');
-      },
-    } as unknown as Parameters<typeof settleCompute>[0]['signer'];
-
-    const res = await settleCompute({
-      signer,
-      cfg,
-      burnLamports: 1_000_000,
-      currentBalanceLamports: 100, // below the 5000-lamport fee buffer
-      cycle: 1,
-    });
-    expect(res.settledLamports).toBe(0);
-    expect(res.signature).toBeNull();
-  });
-
-  it('reports no burn when burnLamports is zero', async () => {
-    const signer = {} as unknown as Parameters<typeof settleCompute>[0]['signer'];
-    const res = await settleCompute({
-      signer,
-      cfg,
-      burnLamports: 0,
-      currentBalanceLamports: 1_000_000,
-      cycle: 1,
-    });
-    expect(res.settledLamports).toBe(0);
-    expect(res.signature).toBeNull();
+  it('maps a healthy book to a high tier and a tiny book to CRITICAL/DEAD', () => {
+    // $500 at SOL=$150 -> ~3.33 SOL -> ABUNDANT
+    expect(tierForEquity(500, 150, cfg)).toBe('ABUNDANT');
+    // $15 at SOL=$150 -> 0.1 SOL -> LOW boundary
+    expect(tierForEquity(15, 150, cfg)).toBe('LOW');
+    // dust
+    expect(tierForEquity(0.1, 150, cfg)).toBe('DEAD');
   });
 });

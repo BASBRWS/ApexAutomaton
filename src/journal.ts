@@ -45,11 +45,10 @@ export function digestRecent(n: number): string {
   if (entries.length === 0) return '(no prior cycles)';
   return entries
     .map((e) => {
-      const margin = (e.marginLamports / 1e9).toFixed(6);
       return (
-        `#${e.cycle} [${e.tier}] bal=${e.balanceSol.toFixed(4)} SOL ` +
-        `action=${e.action} revenue=${(e.revenueLamports / 1e9).toFixed(4)} ` +
-        `burn=${(e.burnLamports / 1e9).toFixed(6)} margin=${margin}` +
+        `#${e.cycle} [${e.tier}] equity=$${e.equityUsd.toFixed(2)} ` +
+        `action=${e.action} cyclePnl=$${e.cyclePnlUsd.toFixed(2)} ` +
+        `burn=$${e.costUsd.toFixed(4)}` +
         (e.note ? ` note=${e.note}` : '')
       );
     })
