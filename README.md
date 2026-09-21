@@ -240,9 +240,12 @@ your dashboard.
    the default branch — **including the `/state` commits the heartbeat makes** —
    so the public dashboard stays current.
 
-It publishes **only** the dashboard and the committed `/state` (both already
-public in the repo). The **setup wizard is excluded**, and child secrets are
-never committed in the first place. Nothing secret reaches Pages.
+It publishes the dashboard, the committed `/state`, and the setup wizard. Child
+secrets are never committed, so they never reach Pages. The setup wizard makes
+**no network calls**, so anything typed into it stays in the visitor's browser;
+it is also served `noindex`. (If you'd rather keep the wizard off the public
+site, drop the `setup/**` copy step from `.github/workflows/pages.yml` — it then
+stays local-only via `npm run setup`.)
 
 ## Enable the heartbeat (GitHub Actions)
 

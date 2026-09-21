@@ -1,9 +1,10 @@
 name: deploy-dashboard
 
-# Publishes the dashboard to GitHub Pages — a VPS-free way to watch the agent.
-# It serves ONLY the dashboard and the committed /state (both already public in
-# the repo). The setup wizard is deliberately NOT published: it handles secrets
-# and must stay local.
+# Publishes the dashboard (and, by the owner's choice, the setup wizard) to
+# GitHub Pages — a VPS-free way to watch the agent. It serves the dashboard, the
+# committed /state, and the setup wizard. Child secrets are never committed, so
+# they never reach Pages. The setup wizard makes NO network calls, so anything
+# typed into it stays in the visitor's browser — but it is marked noindex.
 #
 # One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
 # (Pages on a private repo requires a paid GitHub plan; a public repo is free.)
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - 'dashboard/**'
+      - 'setup/**'
       - 'state/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch: {}
@@ -36,13 +38,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble the site (dashboard + state only)
+      - name: Assemble the site (dashboard + state + setup wizard)
         run: |
-          mkdir -p _site/dashboard _site/state
+          mkdir -p _site/dashboard _site/state _site/setup
           cp dashboard/index.html _site/dashboard/index.html
+          cp setup/index.html _site/setup/index.html
           # Copy committed state (may be just a README before the first tick).
           cp -r state/. _site/state/ 2>/dev/null || true
-          # Do NOT publish the secret-handling setup wizard, or child secrets.
+          # Child secrets are gitignored and never committed, but be defensive.
           rm -rf _site/state/children
           # Root redirect to the dashboard.
           cat > _site/index.html <<'HTML'
@@ -51,8 +54,8 @@ jobs:
           <title>Apex Automaton</title>
           <a href="./dashboard/">Go to the dashboard</a>
           HTML
-          # Discourage indexing of the state snapshot.
-          printf 'User-agent: *\nDisallow: /state/\n' > _site/robots.txt
+          # Discourage indexing of the state snapshot and the setup wizard.
+          printf 'User-agent: *\nDisallow: /state/\nDisallow: /setup/\n' > _site/robots.txt
 
       - uses: actions/upload-pages-artifact@v3
         with:

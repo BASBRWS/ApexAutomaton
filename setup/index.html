@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Apex Automaton — setup</title>
     <!--
       LOCAL setup wizard. Fill in your keys step by step; it assembles a correct
@@ -76,10 +77,12 @@
         sent anywhere. · <a href="../dashboard/">View dashboard →</a></div>
 
       <div class="banner">
-        <b>DEVNET ONLY — no real value.</b> These keys control devnet SOL, which is
-        free and worthless. Still: <b>never commit your <code>.env</code></b> (the
-        repo's <code>.gitignore</code> already blocks it), and never paste secrets
-        into a chat. A mainnet RPC URL is refused by this page and by the code.
+        <b>DEVNET ONLY — no real value.</b> The Solana keys control devnet SOL,
+        which is free and worthless. But your <b><code>ANTHROPIC_API_KEY</code> is
+        a real secret</b> — this page never transmits it (no network calls at
+        all), yet only type it on a screen you trust. <b>Never commit your
+        <code>.env</code></b> (the repo's <code>.gitignore</code> already blocks
+        it). A mainnet RPC URL is refused by this page and by the code.
       </div>
 
       <!-- STEP 1 -->
