@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import { STATE_DIR, STATE_FILE } from './paths.js';
-import { solToLamports, type Config } from './config.js';
+import type { Config } from './config.js';
 import { initialScore } from './score.js';
+import { initDesk } from './trading/desk.js';
 import type { AutomatonState, DailyCaps, TxRecord } from './types.js';
 
 /**
@@ -19,16 +20,17 @@ function freshCaps(): DailyCaps {
 }
 
 export function freshState(cfg: Config): AutomatonState {
-  const seedLamports = solToLamports(cfg.seed.airdropSol);
   const now = new Date().toISOString();
   return {
     bornAt: now,
     cycle: 0,
     lastRunAt: null,
+    desk: initDesk(cfg.trading.capitalUsd, 0),
+    lastPrices: {},
     children: [],
     caps: freshCaps(),
     recentSignatures: [],
-    score: initialScore(seedLamports),
+    score: initialScore(cfg.trading.capitalUsd),
     sustainedSovereignCycles: 0,
     dead: false,
   };

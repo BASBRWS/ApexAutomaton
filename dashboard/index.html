@@ -41,21 +41,21 @@
   <body>
     <div class="wrap">
       <h1>Apex Automaton</h1>
-      <div class="muted">Growth-seeking agent on Solana devnet · balance is the life meter <em>and</em> the score.</div>
+      <div class="muted">Autonomous agent trading a paper book against real prices · the market decides, grow or die.</div>
       <div id="nav" class="muted" style="margin-top:6px">
         <a href="../setup/">⚙ Setup wizard (build your .env)</a>
       </div>
 
       <div id="tiles" class="grid"></div>
 
-      <h2 style="font-size:16px">Balance over time</h2>
+      <h2 style="font-size:16px">Book equity over time (USD)</h2>
       <svg id="chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="balance chart"></svg>
 
-      <h2 style="font-size:16px">Population (children)</h2>
+      <h2 style="font-size:16px">Book &amp; population</h2>
       <div id="population" class="muted">—</div>
 
       <h2 style="font-size:16px">Recent cycles</h2>
-      <table id="cycles"><thead><tr><th>#</th><th>tier</th><th>action</th><th>balance</th><th>revenue</th><th>burn</th></tr></thead><tbody></tbody></table>
+      <table id="cycles"><thead><tr><th>#</th><th>tier</th><th>action</th><th>equity $</th><th>cycle PnL $</th><th>burn $</th></tr></thead><tbody></tbody></table>
 
       <p id="status" class="muted" style="margin-top:16px"></p>
     </div>
@@ -86,12 +86,14 @@
       function drawChart(entries) {
         const svg = document.getElementById('chart');
         svg.innerHTML = '';
-        const pts = entries.map((e, i) => ({ x: i, y: e.balanceSol ?? 0 }));
+        const pts = entries.map((e, i) => ({ x: i, y: e.equityUsd ?? 0 }));
         if (pts.length < 2) return;
-        const maxY = Math.max(...pts.map((p) => p.y), 0.001);
+        const ys = pts.map((p) => p.y);
+        let minY = Math.min(...ys), maxY = Math.max(...ys);
+        if (maxY - minY < 1e-9) { maxY += 1; minY -= 1; }
         const W = 900, H = 220, pad = 10;
         const sx = (x) => pad + (x / (pts.length - 1)) * (W - 2 * pad);
-        const sy = (y) => H - pad - (y / maxY) * (H - 2 * pad);
+        const sy = (y) => H - pad - ((y - minY) / (maxY - minY)) * (H - 2 * pad);
         const d = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', d);
@@ -110,30 +112,39 @@
           ]);
 
           const s = state.score ?? {};
+          const usd = (n) => `$${(Number(n) || 0).toFixed(2)}`;
           const tiles = document.getElementById('tiles');
           tiles.append(
             tile('cycle', state.cycle ?? 0),
-            tile('peak balance', `${fmt(s.peakBalanceLamports ?? 0)} SOL`),
-            tile('net growth', `${fmt(s.netGrowthLamports ?? 0)} SOL`),
-            tile('cumulative revenue', `${fmt(s.cumulativeRevenueLamports ?? 0)} SOL`),
-            tile('tasks completed', s.tasksCompleted ?? 0),
-            tile('margin / task', `${fmt(s.marginPerTaskLamports ?? 0)} SOL`),
-            tile('first earned at', s.firstDollarAtCycle ?? '—'),
+            tile('equity', usd(s.equityUsd)),
+            tile('net PnL', usd(s.netPnlUsd)),
+            tile('peak equity', usd(s.peakEquityUsd)),
+            tile('cycles traded', s.tradeCycles ?? 0),
+            tile('compute burn', usd(s.cumulativeBurnUsd)),
+            tile('first profit at', s.firstProfitAtCycle ?? '—'),
             tile('population', (state.children ?? []).length),
           );
 
           drawChart(journal);
 
           const pop = document.getElementById('population');
+          const desk = state.desk ?? { cashUsd: 0, positions: {} };
+          const posEntries = Object.entries(desk.positions ?? {});
+          const bookLine =
+            `<b>Book:</b> cash ${usd(desk.cashUsd)}` +
+            (posEntries.length
+              ? ' · ' + posEntries.map(([a, p]) => `${a} ${p.units >= 0 ? 'long' : 'short'} ${Math.abs(p.units).toFixed(6)}u`).join(', ')
+              : ' · all in cash');
           const children = state.children ?? [];
-          pop.innerHTML = children.length
-            ? children.map((c) => `<code>${c.pubkey}</code> (cycle ${c.createdAtCycle}, mutated ${c.mutatedParam})`).join('<br>')
-            : 'no children yet (replication is Phase 3, SOVEREIGN-gated)';
+          const childLine = children.length
+            ? '<br><b>Children:</b> ' + children.map((c) => `<code>${c.pubkey.slice(0, 8)}…</code> (cycle ${c.createdAtCycle}, mutated ${c.mutatedParam})`).join(', ')
+            : '<br>no children yet (replication is Phase 3, SOVEREIGN-gated)';
+          pop.innerHTML = bookLine + childLine;
 
           const tbody = document.querySelector('#cycles tbody');
           journal.slice(-15).reverse().forEach((e) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${e.cycle}</td><td>${e.tier}</td><td>${e.action}</td><td>${(e.balanceSol ?? 0).toFixed(4)}</td><td>${fmt(e.revenueLamports ?? 0)}</td><td>${fmt(e.burnLamports ?? 0)}</td>`;
+            tr.innerHTML = `<td>${e.cycle}</td><td>${e.tier}</td><td>${e.action}</td><td>${(e.equityUsd ?? 0).toFixed(2)}</td><td>${(e.cyclePnlUsd ?? 0).toFixed(2)}</td><td>${(e.costUsd ?? 0).toFixed(4)}</td>`;
             tbody.appendChild(tr);
           });
 

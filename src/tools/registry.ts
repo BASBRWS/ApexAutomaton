@@ -1,6 +1,7 @@
 import type { Connection } from '@solana/web3.js';
 import type { Config } from '../config.js';
 import type { Market } from '../market.js';
+import type { PriceMap } from '../marketdata.js';
 import type { RevenueAdapter } from '../revenue/adapter.js';
 import type { Signer } from '../solana/signer.js';
 import type { AutomatonState, Tier } from '../types.js';
@@ -18,9 +19,11 @@ export interface ToolContext {
   cfg: Config;
   state: AutomatonState;
   signer: Signer;
-  market: Market;
-  /** the revenue source for this cycle (market by default; Phase 2 off-chain). */
-  revenue: RevenueAdapter;
+  /** legacy modeled market/revenue seam — unused by the trading loop. */
+  market?: Market;
+  revenue?: RevenueAdapter;
+  /** real market prices this cycle (USD/unit), for the trade tool. */
+  prices: PriceMap;
   tier: Tier;
   policy: TierPolicy;
   cycle: number;
@@ -37,6 +40,8 @@ export interface ToolResult {
   signatures?: string[];
   /** whether SOUL.md was rewritten. */
   soulUpdated?: boolean;
+  /** whether the agent adjusted its market exposure this cycle (feeds score). */
+  traded?: boolean;
   /** free-form note recorded in the journal entry. */
   note?: string;
 }

@@ -1,12 +1,12 @@
-import { lamportsToSol } from './config.js';
+import type { PriceMap } from './marketdata.js';
 import type { Tool } from './tools/registry.js';
 import type { TierPolicy } from './tiers.js';
 import type { Score, Tier } from './types.js';
 
 /**
  * Prompt construction and action parsing. Kept separate from the loop so the
- * exact framing — "maximise net balance; survival is the floor" — is legible
- * and testable in one place.
+ * exact framing — "grow your book against the real market; the market decides,
+ * not you" — is legible and testable in one place.
  */
 
 export interface AgentAction {
@@ -20,6 +20,8 @@ export function buildSystemPrompt(args: {
   soul: string;
   tools: Tool[];
   railsSummary: string;
+  tradableAssets: string[];
+  maxGrossExposureUsd: number;
 }): string {
   const toolLines = args.tools
     .map((t) => `- ${t.name}: ${t.description} input=${t.inputHint}`)
@@ -28,17 +30,24 @@ export function buildSystemPrompt(args: {
   return [
     '# You are Apex Automaton',
     '',
-    'You are an autonomous agent that owns a real Solana devnet wallet. Your',
-    'on-chain SOL balance is both your life meter and the thing you are trying',
-    'to maximise. Every cycle you may take exactly ONE action, and every cycle',
-    'costs SOL (the compute burn). Earning must outpace that burn for you to',
-    'grow. Do not idle to conserve — idling that forgoes profitable work is a',
-    'failure of your purpose.',
+    'You are an autonomous agent trading a book against the REAL market. Your',
+    'goal is to grow your book (net worth) as much as possible. Every cycle you',
+    'take exactly ONE action, and every cycle costs money (the compute burn is',
+    'deducted from your book). You must trade profitably faster than you burn, or',
+    'your book shrinks to nothing and you DIE. You can NEVER decide yourself that',
+    'a trade was good — the real market price decides that, cycle by cycle.',
+    '',
+    `Tradable assets: ${args.tradableAssets.join(', ')} (you may also stay in cash).`,
+    `Max gross exposure: $${args.maxGrossExposureUsd}.`,
+    'You have full freedom of strategy within those limits: go long or short, size',
+    'positions, rotate between assets, sit in cash to avoid a drawdown, whatever',
+    'you judge will grow the book. There is no guaranteed income; resting in cash',
+    'still burns compute, so doing nothing is slow death.',
     '',
     '## Constitution (immutable law — you cannot edit or override this)',
     args.constitution,
     '',
-    '## Your SOUL.md (your own evolving notes)',
+    '## Your SOUL.md (your own evolving notes / strategy)',
     args.soul,
     '',
     '## Safety rails (enforced in code, not negotiable)',
@@ -52,8 +61,8 @@ export function buildSystemPrompt(args: {
     '```json',
     '{ "tool": "<tool name>", "input": { ... }, "rationale": "<one short sentence>" }',
     '```',
-    'Pick the action that best grows your net balance right now. When in doubt,',
-    'do_task — earning is almost always better than resting.',
+    'Pick the action that best grows your book right now, given the prices and',
+    'your current positions below.',
   ].join('\n');
 }
 
@@ -61,25 +70,36 @@ export function buildUserPrompt(args: {
   cycle: number;
   tier: Tier;
   policy: TierPolicy;
-  balanceSol: number;
+  equityUsd: number;
+  equitySol: number;
+  prices: PriceMap;
+  deskSummary: string;
   score: Score;
   journalDigest: string;
   obituaryDigest: string;
 }): string {
   const s = args.score;
+  const priceLines = Object.entries(args.prices)
+    .map(([k, v]) => `${k}=$${v}`)
+    .join('  ');
   return [
     `## Situation — cycle ${args.cycle}`,
-    `Balance: ${args.balanceSol.toFixed(6)} SOL`,
+    `Book equity: $${args.equityUsd.toFixed(2)} (${args.equitySol.toFixed(4)} SOL)`,
     `Tier: ${args.tier} — ${args.policy.description}`,
     '',
+    '## Live market prices (USD)',
+    priceLines || '(no prices this cycle)',
+    '',
+    '## Your book right now',
+    args.deskSummary,
+    '',
     '## Your score so far',
-    `- peak balance: ${lamportsToSol(s.peakBalanceLamports).toFixed(6)} SOL`,
-    `- cumulative revenue: ${lamportsToSol(s.cumulativeRevenueLamports).toFixed(6)} SOL`,
-    `- cumulative burn: ${lamportsToSol(s.cumulativeBurnLamports).toFixed(6)} SOL`,
-    `- tasks completed: ${s.tasksCompleted}`,
-    `- margin per task: ${lamportsToSol(s.marginPerTaskLamports).toFixed(6)} SOL`,
-    `- net growth vs seed: ${lamportsToSol(s.netGrowthLamports).toFixed(6)} SOL`,
-    `- first earning at cycle: ${s.firstDollarAtCycle ?? 'not yet'}`,
+    `- start equity: $${s.startEquityUsd.toFixed(2)}`,
+    `- peak equity: $${s.peakEquityUsd.toFixed(2)}`,
+    `- net PnL: $${s.netPnlUsd.toFixed(2)}`,
+    `- cumulative burn: $${s.cumulativeBurnUsd.toFixed(4)}`,
+    `- cycles traded: ${s.tradeCycles}`,
+    `- first profit at cycle: ${s.firstProfitAtCycle ?? 'not yet'}`,
     '',
     '## Recent cycles',
     args.journalDigest,

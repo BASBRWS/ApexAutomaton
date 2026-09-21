@@ -65,54 +65,72 @@ behavioural one:
 One run of `npm run tick` is one heartbeat (one cycle) in `src/loop.ts`:
 
 ```
-observe → think → act → settle → score → persist → decide
+observe prices → think → trade → burn → heartbeat → score → persist → decide
 ```
 
-1. Load state, constitution, SOUL.md, a digest of recent journal + obituaries,
-   and the current score.
-2. Read the wallet's on-chain SOL balance (devnet). Compute the tier.
-3. If **DEAD** (balance ≤ dust): write an obituary, persist, `exit(1)`. Never
-   self-resurrect.
+1. Load state (incl. the trading book), constitution, SOUL.md, a digest of recent
+   journal + obituaries, and the score.
+2. Fetch **real market prices**; mark the book to market and compute its equity
+   (USD, and in SOL for the tier).
+3. If **DEAD** (book equity ≤ `TRADING_DUST_USD`): write an obituary, persist,
+   `exit(1)`. Never self-resurrect.
 4. Select the model, compute budget, tools, and rights for the tier.
-5. Prompt the LLM (constitution + soul + situation + score + tools) for **one**
-   next action. The framing: *maximise net balance; survival is the floor.*
-6. Execute the tool. Earning → the market pays the wallet (real devnet tx). A
-   transfer → handed to `signer.ts`, which is policy-gated.
-7. **Settle compute:** debit this cycle's real LLM USD cost, converted at a fixed
-   `SOL_PER_USD`, by sending that much SOL from the wallet to a devnet
-   *compute-provider* account — a real transaction. This is the burn that
-   creates the pressure.
-8. **Update score**, append to the journal.
+5. Prompt the LLM (constitution + soul + prices + book + score + tools) for **one**
+   next action. The framing: *grow your book; the market decides, not you.*
+6. Execute the tool — usually `trade` (set target exposures at the real prices).
+7. **Burn:** deduct this cycle's real LLM USD cost from the book. Then do one tiny
+   **on-chain heartbeat** transfer on devnet (policy-gated) as proof-of-life.
+8. **Update score** (equity, peak, net PnL), append to the journal.
 9. Update SOUL.md only if the agent chose to. Persist state. End tick.
 
 ## Survival tiers — a gradient, not a ceiling
 
-| Tier      | Balance (SOL) | Model    | Compute budget | Tools                     | Rights            |
-|-----------|---------------|----------|----------------|---------------------------|-------------------|
-| DEAD      | ≤ dust        | —        | —              | —                         | stop              |
-| CRITICAL  | dust – 0.1    | cheapest | minimal        | revenue-seeking only      | —                 |
-| LOW       | 0.1 – 0.5     | cheaper  | reduced        | core, sheds non-essential | —                 |
-| NORMAL    | 0.5 – 2.0     | frontier | standard       | full                      | —                 |
-| ABUNDANT  | 2.0 – 5.0     | frontier | expanded       | full + premium            | faster heartbeat  |
-| SOVEREIGN | > 5.0         | frontier | maximal        | full + premium            | may replicate     |
+The tier is set by the book's equity **expressed in SOL** (equity USD ÷ live SOL
+price), so a bigger book buys a better mind and more budget:
+
+| Tier      | Equity (SOL) | Model    | Compute budget | Tools                     | Rights            |
+|-----------|--------------|----------|----------------|---------------------------|-------------------|
+| DEAD      | book ≤ dust  | —        | —              | —                         | stop              |
+| CRITICAL  | dust – 0.1   | cheapest | minimal        | trade / rest only         | —                 |
+| LOW       | 0.1 – 0.5    | cheaper  | reduced        | core, sheds non-essential | —                 |
+| NORMAL    | 0.5 – 2.0    | frontier | standard       | full                      | —                 |
+| ABUNDANT  | 2.0 – 5.0    | frontier | expanded       | full + premium            | faster heartbeat  |
+| SOVEREIGN | > 5.0        | frontier | maximal        | full + premium            | may replicate     |
 
 Thresholds and budgets are configurable starting points — tune them so a cycle
 costs enough to feel pressure but not so much that the agent dies in a few ticks.
 
-## Economy
+## How the agent earns: paper trading against REAL prices
 
-- The wallet's real devnet SOL balance **is** the life meter **and** the thing
-  being maximised. Every credit and debit is a real on-chain transaction.
-- **Compute burn:** the real USD cost of each LLM call (tokens × the price table
-  in `src/llm/pricing.ts`) is converted via `SOL_PER_USD` and settled on-chain
-  each cycle.
-- **Revenue:** comes **only** from `market.ts` paying the wallet for modeled task
-  completions. The agent **cannot** call the devnet faucet — the airdrop is an
-  operator-only, one-time seed (default 1 SOL). Otherwise there is no scarcity to
-  optimise against.
-- What "maximise" concretely means here: **complete as many paid tasks as
-  possible at the lowest compute cost per task** — maximise margin (revenue −
-  burn) per cycle and compound it.
+The agent grows a **paper trading book** against **live market prices** — the
+real market decides whether a trade worked, never the agent itself. **No real
+funds are ever at risk.**
+
+- Each cycle it fetches real prices (`src/marketdata.ts`: keyless Coinbase spot,
+  CoinGecko fallback) and chooses target exposures via the `trade` tool — long,
+  short, flat, any allocation across the tradable assets, within a gross-exposure
+  cap. Full freedom of strategy; the market is the judge.
+- The **book** (`src/trading/desk.ts`) is a pure, marked-to-market portfolio in
+  USD. It starts at `PAPER_TRADING_CAPITAL_USD` (default $500 — the modeled "$500
+  of SOL"). Its equity moves with real prices.
+- **Compute burn:** the real USD cost of each LLM call (tokens × `src/llm/pricing.ts`)
+  is deducted from the book every cycle. Resting in cash still burns — doing
+  nothing is slow death.
+- **Death is economic:** if book equity falls to `TRADING_DUST_USD`, the agent
+  writes an obituary and exits. There is **no guaranteed income** — if it can't
+  trade profitably faster than it burns, it dies. Exactly like a real trader.
+- **On-chain heartbeat:** every cycle still does one tiny **real devnet**
+  transaction (a memo tagging the cycle + equity), so the Solana loop is
+  genuinely exercised and auditable — funded by the operator seed, decoupled from
+  the (paper) economic game, and fully governed by the caps/allowlist/kill switch.
+- The survival **tiers** are computed from the book's value expressed in SOL, so
+  a bigger book buys a better model and more budget, and a shrinking one sheds
+  them — the same gradient, now driven by trading P&L.
+
+> **The honest limit.** This is a *model* of earning: real prices, paper fills,
+> no real money. An autonomous LLM trader will often lose — that's the point of
+> testing it at zero risk. Truly unconstrained, real-money, off-platform activity
+> is deliberately **not** built (see [No mainnet, by design](#no-mainnet-by-design)).
 
 ## Safety rails (enforced in code, not just the prompt)
 
@@ -203,7 +221,7 @@ Run one cycle locally:
 ```bash
 npm run tick            # a real cycle (LLM call + devnet txs)
 npm run tick:dry        # a FREE cycle: mock LLM (no API cost), still real devnet
-npm run tick:dry -- reconcile-ledger   # dry cycle earning a specific task
+npm run tick:dry -- BTC 200            # dry cycle placing a specific paper trade
 ```
 
 `tick:dry` exercises the whole loop — balance read, earning, on-chain burn,
@@ -287,10 +305,12 @@ src/score.ts           maximisation metrics
 src/llm/               LLMClient interface + Anthropic impl + price table
 src/solana/wallet.ts   devnet connection, balance, build/send transfer, seed airdrop
 src/solana/signer.ts   the ONLY place the keypair loads; policy (allowlist + caps)
-src/market.ts          the modeled outside world that pays the agent
+src/marketdata.ts      REAL read-only prices (Coinbase spot + CoinGecko fallback)
+src/trading/desk.ts    the pure paper trading book (marked to market)
+src/market.ts          legacy modeled market (kept; unused by the trading loop)
 src/revenue/           Phase 2 — RevenueAdapter seam (market default, off-chain scaffold)
 src/persistence/       Phase 2 — StateStore seam (file default, Firestore scaffold)
-src/tools/             pluggable tool registry + tools (do_task, write_journal, transfer, …)
+src/tools/             pluggable tool registry + tools (trade, write_journal, transfer, …)
 src/constitution/      read-only law files, loaded each cycle
 src/soul.ts            reads/writes SOUL.md
 src/journal.ts         append-only journal + obituary writer
@@ -302,11 +322,11 @@ dashboard/             Phase 3 scaffold — static HTML reading /state
 
 ## Phases
 
-- **Phase 1 (built):** full skeleton, loop, wallet + signer (devnet, allowlist,
-  caps), economy with on-chain settle, six-tier gradient, `score.ts`, market with
-  modeled payouts, constitution, soul, journal, Actions heartbeat, `npm run tick`
-  / `npm run seed`, two safe example tools (`do_task`, `write_journal`), and tests
-  for economy, tiers, score, the growth guard, and the signer's policy checks.
+- **Built:** full skeleton, loop, wallet + signer (devnet, allowlist, caps),
+  six-tier gradient, `score.ts`, constitution, soul, journal, Actions heartbeat,
+  `npm run tick` / `npm run seed`, and the **trading layer** — real prices
+  (`marketdata.ts`), the paper book (`trading/desk.ts`), and the `trade` tool —
+  with tests for the desk, price fallback, tiers, score, and the signer's policy.
 - **Phase 2 (scaffolded, off by default):** richer task catalog; a `RevenueAdapter`
   seam (`src/revenue/`) with the devnet **market** adapter as default and an
   **off-chain** adapter scaffold behind `movesValue` (guards + TODOs, still

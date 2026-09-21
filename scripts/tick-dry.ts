@@ -14,17 +14,20 @@ import type { LLMClient, LLMRequest, LLMResponse } from '../src/llm/client.js';
  * `do_task` with a small modeled token usage, so the burn is tiny and the agent
  * earns — a clean happy-path run.
  *
- * Pass a task id to earn a different task, e.g.:
- *   npm run tick:dry -- reconcile-ledger
+ * Pass an asset and USD target to place a specific paper trade, e.g.:
+ *   npm run tick:dry -- BTC 200
  */
 class MockLLM implements LLMClient {
-  constructor(private readonly taskId: string) {}
+  constructor(
+    private readonly asset: string,
+    private readonly targetUsd: number,
+  ) {}
 
   async generate(req: LLMRequest): Promise<LLMResponse> {
     const action = {
-      tool: 'do_task',
-      input: { taskId: this.taskId },
-      rationale: 'dry-run: earning is the highest-margin action',
+      tool: 'trade',
+      input: { orders: [{ asset: this.asset, targetUsd: this.targetUsd }] },
+      rationale: 'dry-run: take a modest long to exercise the trading loop',
     };
     return {
       text: '```json\n' + JSON.stringify(action) + '\n```',
@@ -37,9 +40,10 @@ class MockLLM implements LLMClient {
 }
 
 async function main(): Promise<void> {
-  const taskId = process.argv[2] ?? 'label-batch';
-  console.log(`DRY tick — mock LLM, no Anthropic API call (task: ${taskId}).`);
-  const outcome = await runCycle({ llm: new MockLLM(taskId) });
+  const asset = (process.argv[2] ?? 'BTC').toUpperCase();
+  const targetUsd = Number(process.argv[3] ?? 100);
+  console.log(`DRY tick — mock LLM, no Anthropic API call (trade ${asset} -> $${targetUsd}).`);
+  const outcome = await runCycle({ llm: new MockLLM(asset, targetUsd) });
   console.log(outcome.summary);
   process.exit(outcome.exitCode);
 }

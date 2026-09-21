@@ -1,5 +1,7 @@
 /** Shared types used across the automaton. */
 
+import type { Desk } from './trading/desk.js';
+
 export type Tier = 'DEAD' | 'CRITICAL' | 'LOW' | 'NORMAL' | 'ABUNDANT' | 'SOVEREIGN';
 
 /** Tiers ordered from least to most alive, for comparisons. */
@@ -38,7 +40,7 @@ export interface SignedTxResult {
 
 /** A recorded on-chain action for the persisted state / journal. */
 export interface TxRecord {
-  kind: 'burn' | 'revenue' | 'replication' | 'transfer';
+  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'heartbeat';
   signature: string;
   lamports: number;
   from: string;
@@ -67,32 +69,35 @@ export interface DailyCaps {
 }
 
 /**
- * Maximisation score — the honest read on whether the agent is earning or just
- * surviving. Recomputed and journalled every cycle (score.ts).
+ * Trading score — the honest read on whether the agent is actually growing its
+ * book against the real market, or just bleeding compute. All in USD (the book's
+ * unit); the SOL value is derived for the survival tiers. Journalled each cycle.
  */
 export interface Score {
-  /** highest balance ever observed, in lamports. */
-  peakBalanceLamports: number;
-  /** total SOL earned from market.ts, in lamports. */
-  cumulativeRevenueLamports: number;
-  /** total compute burned, in lamports. */
-  cumulativeBurnLamports: number;
-  /** number of paid tasks completed. */
-  tasksCompleted: number;
-  /** revenue minus burn, per completed task, rolling average (lamports). */
-  marginPerTaskLamports: number;
-  /** cycle index of first non-zero earning; null until then. */
-  firstDollarAtCycle: number | null;
-  /** current balance minus the operator seed (lamports; may be negative). */
-  netGrowthLamports: number;
-  /** the seed amount used as the net-growth baseline (lamports). */
-  seedLamports: number;
+  /** book value at birth (the modeled starting capital), USD. */
+  startEquityUsd: number;
+  /** latest book equity, USD. */
+  equityUsd: number;
+  /** highest book equity ever observed, USD. */
+  peakEquityUsd: number;
+  /** equity minus start (may be negative), USD. */
+  netPnlUsd: number;
+  /** number of cycles the agent actually traded (adjusted exposure). */
+  tradeCycles: number;
+  /** total compute burned since birth, USD. */
+  cumulativeBurnUsd: number;
+  /** cycle index at which net PnL first went positive; null until then. */
+  firstProfitAtCycle: number | null;
 }
 
 export interface AutomatonState {
   bornAt: string;
   cycle: number;
   lastRunAt: string | null;
+  /** the paper trading book (grown against real prices). */
+  desk: Desk;
+  /** last observed prices (USD/unit), used as a fallback when a fetch fails. */
+  lastPrices: Record<string, number>;
   children: ChildRecord[];
   caps: DailyCaps;
   recentSignatures: TxRecord[];
@@ -106,15 +111,18 @@ export interface JournalEntry {
   cycle: number;
   at: string;
   tier: Tier;
-  balanceSol: number;
+  /** book equity in SOL terms (for the survival tiers). */
+  equitySol: number;
+  /** book equity in USD. */
+  equityUsd: number;
   model: string;
   action: string;
   actionSummary: string;
   rationale?: string;
+  /** real USD cost of this cycle's LLM call (deducted from the book). */
   costUsd: number;
-  burnLamports: number;
-  revenueLamports: number;
-  marginLamports: number;
+  /** change in book equity this cycle, USD (market move minus burn). */
+  cyclePnlUsd: number;
   signatures: string[];
   score: Score;
   note?: string;

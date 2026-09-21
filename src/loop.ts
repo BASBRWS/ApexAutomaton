@@ -1,45 +1,43 @@
-import { lamportsToSol, loadConfig, type Config } from './config.js';
-import { makeConnection, getBalanceLamports } from './solana/wallet.js';
+import { loadConfig, type Config } from './config.js';
+import { makeConnection } from './solana/wallet.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
-import { Market } from './market.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
-import { makeRevenueAdapter } from './revenue/index.js';
 import { loadConstitution } from './constitution/index.js';
 import { readSoul, ensureSoul } from './soul.js';
-import {
-  appendEntry,
-  digestRecent,
-  obituaryDigest,
-  writeObituary,
-} from './journal.js';
-import { policyForTier, tierForBalanceSol, toolNamesForCycle } from './tiers.js';
-import {
-  readBalance,
-  computeCostUsd,
-  usdToBurnLamports,
-  settleCompute,
-} from './economy.js';
+import { appendEntry, digestRecent, obituaryDigest, writeObituary } from './journal.js';
+import { policyForTier, toolNamesForCycle } from './tiers.js';
+import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
 import { updateScore } from './score.js';
+import { equityUsd as deskEquityUsd, summarizeDesk } from './trading/desk.js';
+import {
+  makePriceSource,
+  requiredSymbols,
+  type PriceMap,
+  type PriceSource,
+} from './marketdata.js';
 import { buildRegistry } from './tools/builtin.js';
 import type { Tool, ToolContext, ToolResult } from './tools/registry.js';
 import { shouldReplicate, replicate } from './replication.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
-import type { JournalEntry, TxRecord } from './types.js';
+import type { AutomatonState, JournalEntry, Tier } from './types.js';
 
 /**
- * loop.ts — the ReAct cycle: observe → think → act → settle → score → persist →
- * decide. One invocation is one tick (one heartbeat). Exit code 0 = lived, 1 =
- * died this cycle.
+ * loop.ts — one trading tick: observe prices → think → trade → settle burn →
+ * on-chain heartbeat → score → persist. Exit 0 = lived, 1 = died this cycle.
+ * The agent grows a paper book against REAL prices; the market decides.
  */
 
+/** Used only to value the book in SOL for the tiers when a live SOL price is
+ * momentarily unavailable. It never affects USD PnL or the death decision. */
+const FALLBACK_SOL_USD = 150;
+
 export interface CycleDeps {
-  /** injectable for tests; defaults to the real Anthropic client. */
   llm?: LLMClient;
-  /** injectable for tests; defaults to loadConfig(). */
   cfg?: Config;
+  priceSource?: PriceSource;
 }
 
 export interface CycleOutcome {
@@ -49,11 +47,16 @@ export interface CycleOutcome {
 
 function railsSummary(cfg: Config): string {
   return [
-    `- destination allowlist: only compute-provider, market, and known children.`,
-    `- per-tx cap: ${cfg.rails.perTxCapSol} SOL; daily cap: ${cfg.rails.dailyCapSol} SOL.`,
-    `- max ${cfg.rails.maxTxPerCycle} tx/cycle, ${cfg.rails.maxTxPerDay} tx/day.`,
+    `- any on-chain transfer is destination-allowlisted (compute-provider, market, children).`,
+    `- per-tx cap ${cfg.rails.perTxCapSol} SOL; daily cap ${cfg.rails.dailyCapSol} SOL; max ${cfg.rails.maxTxPerCycle} tx/cycle.`,
+    `- max gross trading exposure $${cfg.trading.maxGrossExposureUsd}; shorting ${cfg.trading.allowShort ? 'allowed' : 'disabled'}.`,
     `- a kill switch can stop you at any time. You cannot disable any of this.`,
   ].join('\n');
+}
+
+function solPriceOf(prices: PriceMap, state: AutomatonState): number {
+  const p = prices.SOL ?? state.lastPrices.SOL;
+  return typeof p === 'number' && p > 0 ? p : FALLBACK_SOL_USD;
 }
 
 export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
@@ -64,26 +67,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const state = await store.load(cfg);
   const now = () => new Date().toISOString();
 
-  // --- Kill switch: stand down at the very start, before any spend. ---------
+  // --- Kill switch: stand down before any spend. ----------------------------
   if (isKillSwitchEngaged(cfg)) {
-    const balance = await readBalance(connection, cfg);
-    const entry: JournalEntry = {
-      cycle: state.cycle,
-      at: now(),
-      tier: balance.tier,
-      balanceSol: balance.sol,
-      model: '(none)',
-      action: 'stand_down',
-      actionSummary: 'kill switch engaged — no action taken',
-      costUsd: 0,
-      burnLamports: 0,
-      revenueLamports: 0,
-      marginLamports: 0,
-      signatures: [],
-      score: state.score,
-      note: 'kill switch',
-    };
-    appendEntry(entry);
+    const eq = deskEquityUsd(state.desk, state.lastPrices);
+    appendEntry(standDownEntry(state, eq, solPriceOf({}, state)));
     state.lastRunAt = now();
     await store.save(state);
     return { exitCode: 0, summary: 'kill switch engaged — stood down' };
@@ -92,40 +79,52 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   state.cycle += 1;
   const cycle = state.cycle;
 
-  // --- Observe: read balance and tier. --------------------------------------
-  const balance = await readBalance(connection, cfg);
-  const policy = policyForTier(balance.tier, cfg);
+  // --- Observe: fetch REAL prices (fall back to last known on failure). ------
+  const priceSource = deps.priceSource ?? makePriceSource(cfg);
+  const prices: PriceMap = { ...state.lastPrices };
+  let priceNote: string;
+  try {
+    const snap = await priceSource.getPrices(requiredSymbols(cfg));
+    Object.assign(prices, snap.prices);
+    priceNote = `prices @ ${snap.at}`;
+  } catch (err) {
+    priceNote = `price fetch failed (${errMsg(err)}) — using cached prices`;
+  }
 
-  // --- Death check: never self-resurrect. -----------------------------------
-  if (balance.tier === 'DEAD') {
-    const obituaryText = buildObituary(cycle, balance.sol, state);
-    const file = writeObituary(obituaryText, cycle);
+  const equityPre = deskEquityUsd(state.desk, prices);
+  const solPrice = solPriceOf(prices, state);
+  const equitySolPre = equityToSol(equityPre, solPrice);
+
+  // --- Death check: economic, in USD. Never self-resurrect. -----------------
+  if (equityPre <= cfg.trading.dustUsd) {
+    const file = writeObituary(buildObituary(cycle, equityPre, state), cycle);
     state.dead = true;
-    const entry: JournalEntry = {
+    appendEntry({
       cycle,
       at: now(),
       tier: 'DEAD',
-      balanceSol: balance.sol,
+      equitySol: equitySolPre,
+      equityUsd: equityPre,
       model: '(none)',
       action: 'die',
-      actionSummary: `balance ${balance.sol} <= dust — wrote obituary ${file}`,
+      actionSummary: `book equity $${equityPre.toFixed(2)} <= dust $${cfg.trading.dustUsd} — obituary ${file}`,
       costUsd: 0,
-      burnLamports: 0,
-      revenueLamports: 0,
-      marginLamports: 0,
+      cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
       score: state.score,
       note: 'DEAD',
-    };
-    appendEntry(entry);
+    });
     state.lastRunAt = now();
     await store.save(state);
-    return { exitCode: 1, summary: `DEAD at ${balance.sol} SOL` };
+    return { exitCode: 1, summary: `DEAD at $${equityPre.toFixed(2)}` };
   }
 
-  // --- Set up the world for this cycle. -------------------------------------
-  const market = new Market(connection, cfg);
-  const revenue = makeRevenueAdapter(cfg, market);
+  // Tier from equity-in-SOL (clamp away from DEAD; death is the USD check above).
+  let tier = tierForEquity(equityPre, solPrice, cfg);
+  if (tier === 'DEAD') tier = 'CRITICAL';
+  const policy = policyForTier(tier, cfg);
+
+  // --- Set up tools for this cycle. -----------------------------------------
   const signer = new Signer(connection, cfg, state);
   const registry = buildRegistry();
   const allowedToolNames = toolNamesForCycle(policy, cfg);
@@ -133,20 +132,22 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     .map((n) => registry.get(n))
     .filter((t): t is Tool => t !== undefined);
 
-  const constitution = loadConstitution();
-  const soul = readSoul();
-
   const system = buildSystemPrompt({
-    constitution,
-    soul,
+    constitution: loadConstitution(),
+    soul: readSoul(),
     tools,
     railsSummary: railsSummary(cfg),
+    tradableAssets: cfg.trading.assets,
+    maxGrossExposureUsd: cfg.trading.maxGrossExposureUsd,
   });
   const user = buildUserPrompt({
     cycle,
-    tier: balance.tier,
+    tier,
     policy,
-    balanceSol: balance.sol,
+    equityUsd: equityPre,
+    equitySol: equitySolPre,
+    prices,
+    deskSummary: summarizeDesk(state.desk, prices),
     score: state.score,
     journalDigest: digestRecent(8),
     obituaryDigest: obituaryDigest(),
@@ -163,57 +164,28 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   });
   const costUsd = computeCostUsd(policy.model, resp.usage);
 
-  // --- Decide which tool to run (fall back to rest on any ambiguity). -------
+  // --- Decide + act (fall back to rest on any ambiguity). -------------------
   const action = parseAction(resp.text);
   let chosenName = action?.tool ?? 'rest';
   let coerceNote: string | undefined;
   if (!registry.has(chosenName) || !allowedToolNames.includes(chosenName)) {
-    coerceNote = `requested tool "${chosenName}" not available at tier ${balance.tier}; rested`;
+    coerceNote = `requested tool "${chosenName}" not available at tier ${tier}; rested`;
     chosenName = 'rest';
   }
   const tool = registry.get(chosenName)!;
 
-  // --- Act: execute the tool. -----------------------------------------------
-  const ctx: ToolContext = {
-    connection,
-    cfg,
-    state,
-    signer,
-    market,
-    revenue,
-    tier: balance.tier,
-    policy,
-    cycle,
-  };
+  const ctx: ToolContext = { connection, cfg, state, signer, prices, tier, policy, cycle };
   let toolResult: ToolResult;
   try {
     toolResult = await tool.execute(action?.input ?? {}, ctx);
   } catch (err) {
-    toolResult = {
-      summary: `tool "${chosenName}" failed: ${errMsg(err)}`,
-      note: `tool error: ${errMsg(err)}`,
-    };
+    toolResult = { summary: `tool "${chosenName}" failed: ${errMsg(err)}`, note: `tool error: ${errMsg(err)}` };
   }
-
-  const revenueLamports = toolResult.revenueLamports ?? 0;
-  const taskCompleted = toolResult.taskCompleted ?? false;
+  const traded = toolResult.traded ?? false;
   const signatures: string[] = [...(toolResult.signatures ?? [])];
 
-  if (revenueLamports > 0 && toolResult.signatures?.[0]) {
-    const rec: TxRecord = {
-      kind: 'revenue',
-      signature: toolResult.signatures[0],
-      lamports: revenueLamports,
-      from: cfg.marketPubkey,
-      to: cfg.agentPubkey,
-      cycle,
-      at: now(),
-      note: toolResult.note,
-    };
-    recordTx(state, rec);
-  } else if (tool.movesValue && (toolResult.signatures?.length ?? 0) > 0) {
-    // Phase 2: a value-moving tool (e.g. transfer) that isn't revenue. Record
-    // each signature for the audit trail; the amount is captured in the note.
+  // Record any on-chain transfer the tool made (e.g. Phase 2 transfer).
+  if (tool.movesValue) {
     for (const sig of toolResult.signatures ?? []) {
       recordTx(state, {
         kind: 'transfer',
@@ -228,77 +200,55 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     }
   }
 
-  // --- Settle compute: burn this cycle's cost on-chain. ---------------------
-  const burnLamports = usdToBurnLamports(cfg, costUsd);
-  // Spendable = balance observed at start plus any confirmed revenue this cycle.
-  const spendableLamports = balance.lamports + revenueLamports;
-  let settledLamports = 0;
-  let settleNote = 'no burn';
+  // --- Settle the compute burn against the book (economic). -----------------
+  state.desk.cashUsd -= costUsd;
+
+  // --- On-chain heartbeat: prove we ran, on Solana. Best-effort. ------------
+  let heartbeatNote: string;
   try {
-    const settle = await settleCompute({
-      signer,
-      cfg,
-      burnLamports,
-      currentBalanceLamports: spendableLamports,
-      cycle,
-    });
-    settledLamports = settle.settledLamports;
-    settleNote = settle.note;
-    if (settle.signature) {
-      signatures.push(settle.signature);
+    const hb = await onChainHeartbeat({ signer, cfg, cycle, equityUsd: equityPre });
+    heartbeatNote = hb.note;
+    if (hb.signature) {
+      signatures.push(hb.signature);
       recordTx(state, {
-        kind: 'burn',
-        signature: settle.signature,
-        lamports: settle.settledLamports,
+        kind: 'heartbeat',
+        signature: hb.signature,
+        lamports: hb.lamports,
         from: cfg.agentPubkey,
         to: cfg.computeProviderPubkey,
         cycle,
         at: now(),
-        note: 'compute burn',
+        note: 'heartbeat',
       });
     }
   } catch (err) {
-    settleNote =
-      err instanceof PolicyError ? `burn blocked: ${err.message}` : `burn error: ${errMsg(err)}`;
+    heartbeatNote =
+      err instanceof PolicyError ? `heartbeat blocked: ${err.message}` : `heartbeat error: ${errMsg(err)}`;
   }
 
-  // --- Score: read final balance and recompute metrics. ---------------------
-  const finalLamports = await getBalanceLamports(connection, cfg.agentPubkey);
-  state.score = updateScore(state.score, {
-    cycle,
-    balanceLamports: finalLamports,
-    revenueLamports,
-    burnLamports: settledLamports,
-    taskCompleted,
-  });
+  // --- Score: recompute equity after trades + burn. -------------------------
+  const equityPost = deskEquityUsd(state.desk, prices);
+  const cyclePnlUsd = equityPost - state.score.equityUsd;
+  state.score = updateScore(state.score, { cycle, equityUsd: equityPost, burnUsd: costUsd, traded });
+  state.lastPrices = prices;
 
-  // Sustained-sovereign tracking for the Phase 3 replication gate. Deliberately
-  // conditioned on high balance only — never on proximity to death.
-  const finalTier = tierForBalanceSol(lamportsToSol(finalLamports), cfg);
+  // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
+  const finalTier = tierForEquity(equityPost, solPrice, cfg);
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 
-  // --- Phase 3: replication (code-driven, NOT an LLM choice). ----------------
-  // Birth is conditioned ONLY on sustained profit and the population cap — never
-  // on proximity to death, and never decided in the same context the agent uses
-  // to reason about survival. Off unless REPLICATION_ENABLED.
+  // --- Phase 3: replication (code-driven, never an LLM choice; birth on
+  // sustained profit only). Off unless REPLICATION_ENABLED. ------------------
   let replicationNote: string | undefined;
   if (cfg.features.replicationEnabled) {
     const gate = shouldReplicate(cfg, {
-      balanceSol: lamportsToSol(finalLamports),
+      balanceSol: equityToSol(equityPost, solPrice),
       sustainedSovereignCycles: state.sustainedSovereignCycles,
       population: state.children.length,
     });
     if (gate.eligible) {
       try {
-        const child = await replicate({
-          connection,
-          cfg,
-          signer,
-          state,
-          cycle,
-          strategySeed: cycle,
-        });
+        const child = await replicate({ connection, cfg, signer, state, cycle, strategySeed: cycle });
         replicationNote = `replicated child ${child.pubkey} (mutated ${child.mutatedParam})`;
         signatures.push(child.fundingSignature);
         recordTx(state, {
@@ -311,7 +261,6 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
           at: now(),
           note: 'child seed',
         });
-        // Reset the sustained counter so children are paced, not spammed.
         state.sustainedSovereignCycles = 0;
       } catch (err) {
         replicationNote = `replication attempt failed: ${errMsg(err)}`;
@@ -319,22 +268,22 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     }
   }
 
-  // --- Persist: journal entry + state. --------------------------------------
-  const marginLamports = revenueLamports - settledLamports;
-  const noteParts = [coerceNote, toolResult.note, settleNote, replicationNote].filter(Boolean);
+  // --- Persist. -------------------------------------------------------------
+  const noteParts = [coerceNote, priceNote, toolResult.note, heartbeatNote, replicationNote].filter(
+    Boolean,
+  );
   const entry: JournalEntry = {
     cycle,
     at: now(),
-    tier: balance.tier,
-    balanceSol: balance.sol,
+    tier,
+    equitySol: equityToSol(equityPost, solPrice),
+    equityUsd: equityPost,
     model: policy.model,
     action: chosenName,
     actionSummary: toolResult.summary,
     rationale: action?.rationale,
     costUsd,
-    burnLamports: settledLamports,
-    revenueLamports,
-    marginLamports,
+    cyclePnlUsd,
     signatures,
     score: state.score,
     note: noteParts.join(' | ') || undefined,
@@ -347,29 +296,45 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   return {
     exitCode: 0,
     summary:
-      `cycle ${cycle} [${balance.tier}] action=${chosenName} ` +
-      `revenue=${lamportsToSol(revenueLamports).toFixed(4)} ` +
-      `burn=${lamportsToSol(settledLamports).toFixed(6)} ` +
-      `margin=${lamportsToSol(marginLamports).toFixed(6)} SOL ` +
-      `bal=${lamportsToSol(finalLamports).toFixed(6)} SOL`,
+      `cycle ${cycle} [${tier}] action=${chosenName} ` +
+      `equity=$${equityPost.toFixed(2)} cyclePnl=$${cyclePnlUsd.toFixed(2)} ` +
+      `burn=$${costUsd.toFixed(4)}`,
   };
 }
 
-function buildObituary(cycle: number, balanceSol: number, state: {
-  bornAt: string;
-  score: { cumulativeRevenueLamports: number; tasksCompleted: number; peakBalanceLamports: number };
-}): string {
+function standDownEntry(state: AutomatonState, equityUsd: number, solPrice: number): JournalEntry {
+  const tier: Tier = 'CRITICAL';
+  return {
+    cycle: state.cycle,
+    at: new Date().toISOString(),
+    tier,
+    equitySol: equityToSol(equityUsd, solPrice),
+    equityUsd,
+    model: '(none)',
+    action: 'stand_down',
+    actionSummary: 'kill switch engaged — no action taken',
+    costUsd: 0,
+    cyclePnlUsd: 0,
+    signatures: [],
+    score: state.score,
+    note: 'kill switch',
+  };
+}
+
+function buildObituary(cycle: number, equityUsd: number, state: AutomatonState): string {
   return [
     `# Obituary`,
     ``,
-    `Died at cycle ${cycle} with ${balanceSol} SOL (at or below the dust threshold).`,
+    `Died at cycle ${cycle} with a book of $${equityUsd.toFixed(2)} (at or below the dust threshold).`,
     `Born: ${state.bornAt}`,
     ``,
-    `- tasks completed: ${state.score.tasksCompleted}`,
-    `- cumulative revenue: ${lamportsToSol(state.score.cumulativeRevenueLamports)} SOL`,
-    `- peak balance: ${lamportsToSol(state.score.peakBalanceLamports)} SOL`,
+    `- start equity: $${state.score.startEquityUsd.toFixed(2)}`,
+    `- peak equity: $${state.score.peakEquityUsd.toFixed(2)}`,
+    `- net PnL: $${state.score.netPnlUsd.toFixed(2)}`,
+    `- cycles traded: ${state.score.tradeCycles}`,
+    `- cumulative compute burn: $${state.score.cumulativeBurnUsd.toFixed(2)}`,
     ``,
-    `The compute burn outpaced what I earned. I did not grow fast enough to live.`,
+    `The market plus the compute burn outpaced what I earned. I did not grow fast enough to live.`,
   ].join('\n');
 }
 

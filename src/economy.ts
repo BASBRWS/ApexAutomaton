@@ -1,96 +1,66 @@
-import type { Connection } from '@solana/web3.js';
-import { lamportsToSol, solToLamports, type Config } from './config.js';
-import { getBalanceLamports } from './solana/wallet.js';
+import { lamportsToSol, type Config } from './config.js';
 import { usdCostOf, type TokenUsage } from './llm/pricing.js';
 import { tierForBalanceSol } from './tiers.js';
 import type { Signer } from './solana/signer.js';
-import type { SignedTxResult, Tier } from './types.js';
+import type { Tier } from './types.js';
 
 /**
- * economy.ts — the bridge between the real world (USD spent on tokens) and the
- * on-chain life meter (SOL). It reads balance, prices compute, converts USD to
- * a SOL burn, and settles that burn as a real transfer to the compute-provider.
+ * economy.ts — the bridge between the real world (USD spent on tokens, USD value
+ * of the trading book) and the survival tiers (denominated in SOL), plus the
+ * real on-chain heartbeat that keeps the Solana loop genuinely exercised.
  */
 
-export interface BalanceReading {
-  lamports: number;
-  sol: number;
-  tier: Tier;
-}
-
-export async function readBalance(
-  connection: Connection,
-  cfg: Config,
-): Promise<BalanceReading> {
-  const lamports = await getBalanceLamports(connection, cfg.agentPubkey);
-  const sol = lamportsToSol(lamports);
-  return { lamports, sol, tier: tierForBalanceSol(sol, cfg) };
-}
-
-/** Real USD cost of a cycle's LLM usage. */
+/** Real USD cost of a cycle's LLM usage — deducted from the book each cycle. */
 export function computeCostUsd(model: string, usage: TokenUsage): number {
   return usdCostOf(model, usage);
 }
 
-/** Convert a USD compute cost into a lamport burn at the fixed SOL_PER_USD. */
-export function usdToBurnLamports(cfg: Config, usd: number): number {
-  return solToLamports(usd * cfg.economy.solPerUsd);
+/** Book equity (USD) expressed in SOL, for the survival tiers. */
+export function equityToSol(equityUsd: number, solPriceUsd: number): number {
+  if (!(solPriceUsd > 0)) return 0;
+  return equityUsd / solPriceUsd;
 }
 
-export interface SettleResult {
-  attemptedLamports: number;
-  settledLamports: number;
+export function tierForEquity(
+  equityUsd: number,
+  solPriceUsd: number,
+  cfg: Config,
+): Tier {
+  return tierForBalanceSol(equityToSol(equityUsd, solPriceUsd), cfg);
+}
+
+/** A fixed, tiny heartbeat transfer so every cycle really touches Solana. */
+const HEARTBEAT_LAMPORTS = 1000;
+
+export interface HeartbeatResult {
   signature: string | null;
+  lamports: number;
   note: string;
 }
 
 /**
- * SETTLE COMPUTE (cycle step 7): send the cycle's compute burn from the agent
- * wallet to the compute-provider account — a real devnet transaction. This is
- * the pressure that makes survival cost something.
- *
- * Near death the burn may exceed what remains; we never overdraw. If the burn
- * cannot be paid in full we settle what we safely can (leaving a fee buffer)
- * and note it — the next balance read will likely tip the agent into DEAD.
+ * ON-CHAIN HEARTBEAT: a tiny real devnet transfer to the compute-provider,
+ * memo-tagging the cycle and current book equity. This is the audit-proof that
+ * the agent is alive and running on Solana — decoupled from the (paper) economic
+ * game, funded by the operator seed. Best-effort: a failure (kill switch, empty
+ * wallet) is noted, not fatal, since the economic life meter is the book.
  */
-export async function settleCompute(params: {
+export async function onChainHeartbeat(params: {
   signer: Signer;
   cfg: Config;
-  burnLamports: number;
-  currentBalanceLamports: number;
   cycle: number;
-}): Promise<SettleResult> {
-  const { signer, cfg, burnLamports, currentBalanceLamports } = params;
-
-  if (burnLamports <= 0) {
-    return { attemptedLamports: 0, settledLamports: 0, signature: null, note: 'no burn' };
-  }
-
-  // Keep a small buffer for the transaction fee so we never fail on overdraw.
-  const FEE_BUFFER_LAMPORTS = 5000;
-  const spendable = Math.max(0, currentBalanceLamports - FEE_BUFFER_LAMPORTS);
-  const toSettle = Math.min(burnLamports, spendable);
-
-  if (toSettle <= 0) {
-    return {
-      attemptedLamports: burnLamports,
-      settledLamports: 0,
-      signature: null,
-      note: 'insufficient balance to settle compute burn',
-    };
-  }
-
-  const result: SignedTxResult = await signer.signAndSend({
+  equityUsd: number;
+}): Promise<HeartbeatResult> {
+  const { signer, cfg, cycle, equityUsd } = params;
+  const result = await signer.signAndSend({
     to: cfg.computeProviderPubkey,
-    lamports: toSettle,
-    reason: 'compute burn (cost of thinking)',
-    memo: `burn:cycle:${params.cycle}`,
+    lamports: HEARTBEAT_LAMPORTS,
+    reason: 'on-chain heartbeat',
+    memo: `hb:cycle:${cycle}:equityUsd:${equityUsd.toFixed(2)}`,
   });
-
   return {
-    attemptedLamports: burnLamports,
-    settledLamports: result.lamports,
     signature: result.signature,
-    note: toSettle < burnLamports ? 'partial settle (near death)' : 'settled',
+    lamports: result.lamports,
+    note: `heartbeat ${lamportsToSol(result.lamports)} SOL`,
   };
 }

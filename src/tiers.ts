@@ -48,20 +48,18 @@ export interface TierPolicy {
 }
 
 /**
- * Tool sets per tier. Earning (`do_task`) is available at EVERY living tier and
- * is always the cheapest, dominant action — that is how the design keeps
- * "earn as much as possible" reachable from any state. As the agent approaches
- * death it sheds everything that is not revenue-relevant.
+ * Tool sets per tier. Trading (`trade`) is available at EVERY living tier — it
+ * is the only way to grow the book, so earning is reachable from any state. As
+ * the agent approaches death it sheds everything that is not trading-relevant.
  *
- * Phase 1 ships two safe example tools (`do_task`, `write_journal`) plus `rest`.
- * `transfer`/`replicate` are Phase 2/3 and are not registered as active tools
- * yet; the tier lists below already reserve their slots for when they are.
+ * `transfer` is an optional Phase 2 value-mover, added only when enabled and
+ * only at NORMAL+ (see toolNamesForCycle).
  */
-const TOOLS_CRITICAL = ['do_task', 'rest'];
-const TOOLS_LOW = ['do_task', 'write_journal', 'rest'];
-const TOOLS_NORMAL = ['do_task', 'write_journal', 'reflect', 'rest'];
-const TOOLS_ABUNDANT = ['do_task', 'write_journal', 'reflect', 'rest'];
-const TOOLS_SOVEREIGN = ['do_task', 'write_journal', 'reflect', 'rest'];
+const TOOLS_CRITICAL = ['trade', 'rest'];
+const TOOLS_LOW = ['trade', 'write_journal', 'rest'];
+const TOOLS_NORMAL = ['trade', 'write_journal', 'reflect', 'rest'];
+const TOOLS_ABUNDANT = ['trade', 'write_journal', 'reflect', 'rest'];
+const TOOLS_SOVEREIGN = ['trade', 'write_journal', 'reflect', 'rest'];
 
 export function tierForBalanceSol(balanceSol: number, cfg: Config): Tier {
   const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =

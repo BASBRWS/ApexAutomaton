@@ -22,10 +22,10 @@ describe('tierForBalanceSol', () => {
 });
 
 describe('policyForTier', () => {
-  it('uses the cheapest model and revenue-only tools at CRITICAL', () => {
+  it('uses the cheapest model and trading-only tools at CRITICAL', () => {
     const p = policyForTier('CRITICAL', cfg);
     expect(p.model).toBe(cfg.models.cheapest);
-    expect(p.tools).toContain('do_task');
+    expect(p.tools).toContain('trade');
     expect(p.tools).not.toContain('reflect');
     expect(p.rights.mayReplicate).toBe(false);
   });
@@ -33,7 +33,7 @@ describe('policyForTier', () => {
   it('uses the frontier model and full tools at NORMAL', () => {
     const p = policyForTier('NORMAL', cfg);
     expect(p.model).toBe(cfg.models.frontier);
-    expect(p.tools).toEqual(expect.arrayContaining(['do_task', 'write_journal', 'reflect', 'rest']));
+    expect(p.tools).toEqual(expect.arrayContaining(['trade', 'write_journal', 'reflect', 'rest']));
   });
 
   it('gates replication to SOVEREIGN only', () => {
@@ -42,9 +42,9 @@ describe('policyForTier', () => {
     expect(policyForTier('SOVEREIGN', cfg).rights.mayReplicate).toBe(true);
   });
 
-  it('offers do_task at every living tier (earning always reachable)', () => {
+  it('offers trade at every living tier (earning always reachable)', () => {
     for (const tier of ['CRITICAL', 'LOW', 'NORMAL', 'ABUNDANT', 'SOVEREIGN'] as const) {
-      expect(policyForTier(tier, cfg).tools).toContain('do_task');
+      expect(policyForTier(tier, cfg).tools).toContain('trade');
     }
   });
 

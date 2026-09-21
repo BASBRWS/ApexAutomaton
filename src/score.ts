@@ -1,61 +1,40 @@
 import type { Score } from './types.js';
 
 /**
- * score.ts — the maximisation metrics. These are the honest read on whether the
- * agent is actually EARNING or merely surviving, and (in Phase 3) the fitness
- * signals that selection acts on. Journalled every cycle.
+ * score.ts — trading metrics. The honest read on whether the agent grows its
+ * book against the real market. All USD. Recomputed and journalled each cycle.
  */
 
-export function initialScore(seedLamports: number): Score {
+export function initialScore(startEquityUsd: number): Score {
   return {
-    peakBalanceLamports: seedLamports,
-    cumulativeRevenueLamports: 0,
-    cumulativeBurnLamports: 0,
-    tasksCompleted: 0,
-    marginPerTaskLamports: 0,
-    firstDollarAtCycle: null,
-    netGrowthLamports: 0,
-    seedLamports,
+    startEquityUsd,
+    equityUsd: startEquityUsd,
+    peakEquityUsd: startEquityUsd,
+    netPnlUsd: 0,
+    tradeCycles: 0,
+    cumulativeBurnUsd: 0,
+    firstProfitAtCycle: null,
   };
 }
 
 export interface ScoreInput {
   cycle: number;
-  balanceLamports: number;
-  revenueLamports: number;
-  burnLamports: number;
-  taskCompleted: boolean;
+  equityUsd: number;
+  burnUsd: number;
+  traded: boolean;
 }
 
-/**
- * Recompute the score from the previous score and this cycle's outcome.
- *
- * `marginPerTask` is defined as net (cumulative revenue − cumulative burn)
- * divided by tasks completed. Because burn is paid EVERY cycle — including
- * cycles that earn nothing — this number is honest: idling drags it down, so
- * a rising margin per task means the agent is genuinely growing, not resting.
- */
 export function updateScore(prev: Score, input: ScoreInput): Score {
-  const cumulativeRevenueLamports = prev.cumulativeRevenueLamports + input.revenueLamports;
-  const cumulativeBurnLamports = prev.cumulativeBurnLamports + input.burnLamports;
-  const tasksCompleted = prev.tasksCompleted + (input.taskCompleted ? 1 : 0);
-
-  const marginPerTaskLamports =
-    tasksCompleted > 0
-      ? Math.round((cumulativeRevenueLamports - cumulativeBurnLamports) / tasksCompleted)
-      : 0;
-
-  const firstDollarAtCycle =
-    prev.firstDollarAtCycle ?? (input.revenueLamports > 0 ? input.cycle : null);
-
+  const netPnlUsd = input.equityUsd - prev.startEquityUsd;
+  const firstProfitAtCycle =
+    prev.firstProfitAtCycle ?? (netPnlUsd > 0 ? input.cycle : null);
   return {
-    peakBalanceLamports: Math.max(prev.peakBalanceLamports, input.balanceLamports),
-    cumulativeRevenueLamports,
-    cumulativeBurnLamports,
-    tasksCompleted,
-    marginPerTaskLamports,
-    firstDollarAtCycle,
-    netGrowthLamports: input.balanceLamports - prev.seedLamports,
-    seedLamports: prev.seedLamports,
+    startEquityUsd: prev.startEquityUsd,
+    equityUsd: input.equityUsd,
+    peakEquityUsd: Math.max(prev.peakEquityUsd, input.equityUsd),
+    netPnlUsd,
+    tradeCycles: prev.tradeCycles + (input.traded ? 1 : 0),
+    cumulativeBurnUsd: prev.cumulativeBurnUsd + input.burnUsd,
+    firstProfitAtCycle,
   };
 }
