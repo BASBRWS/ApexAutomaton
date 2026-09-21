@@ -126,6 +126,26 @@ export interface Config {
   seed: {
     airdropSol: number;
   };
+
+  /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
+   * unless these are explicitly enabled. */
+  features: {
+    /** Phase 3: allow code-driven replication at the SOVEREIGN tier. */
+    replicationEnabled: boolean;
+    /** Phase 2: use the off-chain revenue adapter (still devnet-settled). */
+    offchainRevenueEnabled: boolean;
+    /** Phase 2: expose the extra value-moving tools (e.g. transfer). */
+    extraToolsEnabled: boolean;
+  };
+
+  /** Phase 2: optional Firestore state backend. Enabled when a project id is
+   * present; otherwise the committed file store is used. */
+  firestore: {
+    enabled: boolean;
+    projectId: string | undefined;
+    collection: string;
+    documentId: string;
+  };
 }
 
 export function loadConfig(): Config {
@@ -169,12 +189,27 @@ export function loadConfig(): Config {
     replication: {
       thresholdSol: envNum('REPLICATE_THRESHOLD_SOL', 5.0),
       sustainedCycles: Math.trunc(envNum('REPLICATE_SUSTAINED_CYCLES', 5)),
-      childSeedSol: envNum('CHILD_SEED_SOL', 0.5),
+      // Default kept <= PER_TX_CAP_SOL so funding a child is a normal, capped
+      // transfer the signer will accept. Caps override replication, always.
+      childSeedSol: envNum('CHILD_SEED_SOL', 0.1),
       maxPopulation: Math.trunc(envNum('MAX_POPULATION', 4)),
     },
 
     seed: {
       airdropSol: envNum('SEED_AIRDROP_SOL', 1.0),
+    },
+
+    features: {
+      replicationEnabled: envBool('REPLICATION_ENABLED', false),
+      offchainRevenueEnabled: envBool('OFFCHAIN_REVENUE_ENABLED', false),
+      extraToolsEnabled: envBool('PHASE2_TOOLS_ENABLED', false),
+    },
+
+    firestore: {
+      enabled: envStr('FIRESTORE_PROJECT_ID') !== undefined,
+      projectId: envStr('FIRESTORE_PROJECT_ID'),
+      collection: envStr('FIRESTORE_COLLECTION') ?? 'automaton',
+      documentId: envStr('FIRESTORE_DOCUMENT_ID') ?? 'state',
     },
   };
 

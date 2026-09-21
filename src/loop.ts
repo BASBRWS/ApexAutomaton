@@ -2,7 +2,9 @@ import { lamportsToSol, loadConfig, type Config } from './config.js';
 import { makeConnection, getBalanceLamports } from './solana/wallet.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { Market } from './market.js';
-import { loadState, saveState, recordTx } from './state.js';
+import { recordTx } from './state.js';
+import { makeStateStore } from './persistence/index.js';
+import { makeRevenueAdapter } from './revenue/index.js';
 import { loadConstitution } from './constitution/index.js';
 import { readSoul, ensureSoul } from './soul.js';
 import {
@@ -11,8 +13,7 @@ import {
   obituaryDigest,
   writeObituary,
 } from './journal.js';
-import { policyForTier } from './tiers.js';
-import { tierForBalanceSol } from './tiers.js';
+import { policyForTier, tierForBalanceSol, toolNamesForCycle } from './tiers.js';
 import {
   readBalance,
   computeCostUsd,
@@ -21,7 +22,8 @@ import {
 } from './economy.js';
 import { updateScore } from './score.js';
 import { buildRegistry } from './tools/builtin.js';
-import type { ToolContext, ToolResult } from './tools/registry.js';
+import type { Tool, ToolContext, ToolResult } from './tools/registry.js';
+import { shouldReplicate, replicate } from './replication.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
@@ -58,7 +60,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const cfg = deps.cfg ?? loadConfig();
   ensureSoul();
   const connection = makeConnection(cfg);
-  const state = loadState(cfg);
+  const store = makeStateStore(cfg);
+  const state = await store.load(cfg);
   const now = () => new Date().toISOString();
 
   // --- Kill switch: stand down at the very start, before any spend. ---------
@@ -82,7 +85,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     };
     appendEntry(entry);
     state.lastRunAt = now();
-    saveState(state);
+    await store.save(state);
     return { exitCode: 0, summary: 'kill switch engaged — stood down' };
   }
 
@@ -116,15 +119,19 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     };
     appendEntry(entry);
     state.lastRunAt = now();
-    saveState(state);
+    await store.save(state);
     return { exitCode: 1, summary: `DEAD at ${balance.sol} SOL` };
   }
 
   // --- Set up the world for this cycle. -------------------------------------
   const market = new Market(connection, cfg);
+  const revenue = makeRevenueAdapter(cfg, market);
   const signer = new Signer(connection, cfg, state);
   const registry = buildRegistry();
-  const tools = registry.availableFor(policy);
+  const allowedToolNames = toolNamesForCycle(policy, cfg);
+  const tools = allowedToolNames
+    .map((n) => registry.get(n))
+    .filter((t): t is Tool => t !== undefined);
 
   const constitution = loadConstitution();
   const soul = readSoul();
@@ -160,7 +167,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const action = parseAction(resp.text);
   let chosenName = action?.tool ?? 'rest';
   let coerceNote: string | undefined;
-  if (!registry.has(chosenName) || !policy.tools.includes(chosenName)) {
+  if (!registry.has(chosenName) || !allowedToolNames.includes(chosenName)) {
     coerceNote = `requested tool "${chosenName}" not available at tier ${balance.tier}; rested`;
     chosenName = 'rest';
   }
@@ -173,6 +180,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state,
     signer,
     market,
+    revenue,
     tier: balance.tier,
     policy,
     cycle,
@@ -203,6 +211,21 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       note: toolResult.note,
     };
     recordTx(state, rec);
+  } else if (tool.movesValue && (toolResult.signatures?.length ?? 0) > 0) {
+    // Phase 2: a value-moving tool (e.g. transfer) that isn't revenue. Record
+    // each signature for the audit trail; the amount is captured in the note.
+    for (const sig of toolResult.signatures ?? []) {
+      recordTx(state, {
+        kind: 'transfer',
+        signature: sig,
+        lamports: 0,
+        from: cfg.agentPubkey,
+        to: '(allowlisted)',
+        cycle,
+        at: now(),
+        note: toolResult.note,
+      });
+    }
   }
 
   // --- Settle compute: burn this cycle's cost on-chain. ---------------------
@@ -255,9 +278,50 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 
+  // --- Phase 3: replication (code-driven, NOT an LLM choice). ----------------
+  // Birth is conditioned ONLY on sustained profit and the population cap — never
+  // on proximity to death, and never decided in the same context the agent uses
+  // to reason about survival. Off unless REPLICATION_ENABLED.
+  let replicationNote: string | undefined;
+  if (cfg.features.replicationEnabled) {
+    const gate = shouldReplicate(cfg, {
+      balanceSol: lamportsToSol(finalLamports),
+      sustainedSovereignCycles: state.sustainedSovereignCycles,
+      population: state.children.length,
+    });
+    if (gate.eligible) {
+      try {
+        const child = await replicate({
+          connection,
+          cfg,
+          signer,
+          state,
+          cycle,
+          strategySeed: cycle,
+        });
+        replicationNote = `replicated child ${child.pubkey} (mutated ${child.mutatedParam})`;
+        signatures.push(child.fundingSignature);
+        recordTx(state, {
+          kind: 'replication',
+          signature: child.fundingSignature,
+          lamports: child.fundedLamports,
+          from: cfg.agentPubkey,
+          to: child.pubkey,
+          cycle,
+          at: now(),
+          note: 'child seed',
+        });
+        // Reset the sustained counter so children are paced, not spammed.
+        state.sustainedSovereignCycles = 0;
+      } catch (err) {
+        replicationNote = `replication attempt failed: ${errMsg(err)}`;
+      }
+    }
+  }
+
   // --- Persist: journal entry + state. --------------------------------------
   const marginLamports = revenueLamports - settledLamports;
-  const noteParts = [coerceNote, toolResult.note, settleNote].filter(Boolean);
+  const noteParts = [coerceNote, toolResult.note, settleNote, replicationNote].filter(Boolean);
   const entry: JournalEntry = {
     cycle,
     at: now(),
@@ -278,7 +342,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   appendEntry(entry);
 
   state.lastRunAt = now();
-  saveState(state);
+  await store.save(state);
 
   return {
     exitCode: 0,

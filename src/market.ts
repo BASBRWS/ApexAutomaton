@@ -19,13 +19,15 @@ export interface MarketTask {
   description: string;
   /** payout in SOL for completing this task. */
   rewardSol: number;
+  /** relative difficulty (1 = easiest); higher-reward tasks are harder. */
+  difficulty: number;
 }
 
 /**
- * A small catalog of modeled tasks. Phase 1 keeps these abstract and safe: the
- * "work" is not real, only the payment is. Rewards default to the configured
- * flat reward so the growth-guard invariant (reward > cycle burn) holds; a
- * per-task multiplier lets some tasks be worth more without breaking that.
+ * A catalog of modeled tasks. The "work" is not real, only the payment is.
+ * Every reward is at LEAST the configured base (`marketTaskRewardSol`), so the
+ * growth-guard invariant (reward > worst-case cycle burn) holds for every task;
+ * harder tasks pay a multiple. Phase 2 could add richer, gated tasks here.
  */
 export function taskCatalog(cfg: Config): MarketTask[] {
   const base = cfg.economy.marketTaskRewardSol;
@@ -35,18 +37,28 @@ export function taskCatalog(cfg: Config): MarketTask[] {
       title: 'Label a batch of records',
       description: 'Classify a small modeled batch of records into categories.',
       rewardSol: base,
+      difficulty: 1,
     },
     {
       id: 'summarize-doc',
       title: 'Summarize a document',
       description: 'Produce a short modeled summary of a supplied document.',
       rewardSol: base,
+      difficulty: 1,
     },
     {
       id: 'extract-fields',
       title: 'Extract structured fields',
       description: 'Pull a set of modeled fields from semi-structured text.',
-      rewardSol: base,
+      rewardSol: base * 1.5,
+      difficulty: 2,
+    },
+    {
+      id: 'reconcile-ledger',
+      title: 'Reconcile a modeled ledger',
+      description: 'Match and reconcile a modeled set of ledger entries.',
+      rewardSol: base * 2,
+      difficulty: 3,
     },
   ];
 }

@@ -1,6 +1,7 @@
 import type { Connection } from '@solana/web3.js';
 import type { Config } from '../config.js';
 import type { Market } from '../market.js';
+import type { RevenueAdapter } from '../revenue/adapter.js';
 import type { Signer } from '../solana/signer.js';
 import type { AutomatonState, Tier } from '../types.js';
 import type { TierPolicy } from '../tiers.js';
@@ -18,6 +19,8 @@ export interface ToolContext {
   state: AutomatonState;
   signer: Signer;
   market: Market;
+  /** the revenue source for this cycle (market by default; Phase 2 off-chain). */
+  revenue: RevenueAdapter;
   tier: Tier;
   policy: TierPolicy;
   cycle: number;

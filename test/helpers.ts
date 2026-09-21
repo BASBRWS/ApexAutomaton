@@ -37,10 +37,21 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
     replication: {
       thresholdSol: 5.0,
       sustainedCycles: 5,
-      childSeedSol: 0.5,
+      childSeedSol: 0.1,
       maxPopulation: 4,
     },
     seed: { airdropSol: 1.0 },
+    features: {
+      replicationEnabled: false,
+      offchainRevenueEnabled: false,
+      extraToolsEnabled: false,
+    },
+    firestore: {
+      enabled: false,
+      projectId: undefined,
+      collection: 'automaton',
+      documentId: 'state',
+    },
   };
   return { ...base, ...overrides };
 }

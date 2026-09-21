@@ -236,11 +236,13 @@ src/llm/               LLMClient interface + Anthropic impl + price table
 src/solana/wallet.ts   devnet connection, balance, build/send transfer, seed airdrop
 src/solana/signer.ts   the ONLY place the keypair loads; policy (allowlist + caps)
 src/market.ts          the modeled outside world that pays the agent
-src/tools/             pluggable tool registry + Phase 1 tools (do_task, write_journal, …)
+src/revenue/           Phase 2 — RevenueAdapter seam (market default, off-chain scaffold)
+src/persistence/       Phase 2 — StateStore seam (file default, Firestore scaffold)
+src/tools/             pluggable tool registry + tools (do_task, write_journal, transfer, …)
 src/constitution/      read-only law files, loaded each cycle
 src/soul.ts            reads/writes SOUL.md
 src/journal.ts         append-only journal + obituary writer
-src/replication.ts     Phase 3 scaffold — child funded by a real devnet transfer
+src/replication.ts     Phase 3 — code-driven child funded by a real devnet transfer
 state/                 committed runtime state (cycle, children, journal, score, sigs)
 dashboard/             Phase 3 scaffold — static HTML reading /state
 .github/workflows/heartbeat.yml   the cron heartbeat
@@ -253,13 +255,28 @@ dashboard/             Phase 3 scaffold — static HTML reading /state
   modeled payouts, constitution, soul, journal, Actions heartbeat, `npm run tick`
   / `npm run seed`, two safe example tools (`do_task`, `write_journal`), and tests
   for economy, tiers, score, the growth guard, and the signer's policy checks.
-- **Phase 2 (scaffold, off by default):** richer tasks/tools and a real off-chain
-  revenue adapter behind `movesValue` — TODOs and guards only, still
-  devnet-settled; Firestore state backend.
-- **Phase 3 (scaffold):** replication (`src/replication.ts`) + the static
-  dashboard (`dashboard/`). Replication is SOVEREIGN-gated and conditioned only on
-  **sustained profit** — never on population size, and never decidable in the same
-  context as death.
+- **Phase 2 (scaffolded, off by default):** richer task catalog; a `RevenueAdapter`
+  seam (`src/revenue/`) with the devnet **market** adapter as default and an
+  **off-chain** adapter scaffold behind `movesValue` (guards + TODOs, still
+  devnet-settled — no real-value path); a value-moving `transfer` tool exposed
+  only at NORMAL+ when `PHASE2_TOOLS_ENABLED=1` and fully policy-gated; a
+  `StateStore` seam (`src/persistence/`) with the committed **file** store as
+  default and a **Firestore** scaffold selected when `FIRESTORE_PROJECT_ID` is set.
+- **Phase 3 (scaffolded):** code-driven replication (`src/replication.ts`, enabled
+  by `REPLICATION_ENABLED=1`) + the static dashboard (`dashboard/`). Replication is
+  SOVEREIGN-gated and conditioned only on **sustained profit** and the population
+  cap — never on population size as a driver, never an LLM choice, and never
+  decidable in the same context the agent uses to reason about death. Funding a
+  child is an ordinary capped transfer (keep `CHILD_SEED_SOL` ≤ `PER_TX_CAP_SOL`).
+
+### Enabling Phase 2/3
+
+Everything above is **off by default** — Phase 1 behaviour is unchanged unless
+you opt in via env flags: `PHASE2_TOOLS_ENABLED`, `OFFCHAIN_REVENUE_ENABLED`,
+`FIRESTORE_PROJECT_ID`, `REPLICATION_ENABLED` (see `.env.example`). The Firestore
+and off-chain adapters are scaffolds: they carry the interface and guards but
+throw/TODO where the real integration goes, so they can't be mistaken for
+finished backends.
 
 ## No mainnet, by design
 

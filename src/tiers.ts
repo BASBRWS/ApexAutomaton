@@ -2,6 +2,21 @@ import type { Config } from './config.js';
 import type { Tier } from './types.js';
 
 /**
+ * The tool names actually offered this cycle: the tier's Phase 1 set, plus any
+ * Phase 2 extras that are enabled. Extras (e.g. `transfer`) are only offered at
+ * NORMAL and above — never when the agent is fighting to survive. This is the
+ * single source of truth the loop uses to filter and validate the LLM's choice.
+ */
+export function toolNamesForCycle(policy: TierPolicy, cfg: Config): string[] {
+  const names = [...policy.tools];
+  const survivalTiers: Tier[] = ['CRITICAL', 'LOW'];
+  if (cfg.features.extraToolsEnabled && !survivalTiers.includes(policy.tier)) {
+    names.push('transfer');
+  }
+  return names;
+}
+
+/**
  * Survival tiers as a GRADIENT, not a ceiling. The wallet's on-chain SOL
  * balance is the ONLY input. Tiers extend well above the comfortable zone so
  * that more money buys more capability and agency — surplus is instrumentally
