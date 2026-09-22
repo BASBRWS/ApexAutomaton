@@ -1,9 +1,9 @@
 {
   "bornAt": "2026-09-22T07:04:41.917Z",
-  "cycle": 2,
-  "lastRunAt": "2026-09-22T08:56:46.344Z",
+  "cycle": 3,
+  "lastRunAt": "2026-09-22T09:18:08.580Z",
   "desk": {
-    "cashUsd": 150.10625285993174,
+    "cashUsd": 150.09589685993174,
     "positions": {
       "BTC": {
         "units": 0.00013600983839890039,
@@ -31,31 +31,32 @@
       }
     },
     "capitalUsd": 117.565,
-    "openedAtCycle": 0
+    "openedAtCycle": 0,
+    "stakedUsd": 0
   },
   "lastPrices": {
-    "ETH": 2751.525,
-    "XRP": 1.5538,
-    "ADA": 0.25034,
-    "BTC": 86241.595,
-    "AVAX": 10.9155,
-    "MATIC": 0.110205,
-    "PAXG": 4331.025,
-    "SOL": 117.725,
-    "DOT": 1.18095,
-    "PYTH": 0.063595,
-    "BNB": 788.3,
-    "ARB": 0.22142,
-    "DOGE": 0.099615,
-    "SUI": 1.02555,
-    "BONK": 0.000003485,
-    "WIF": 0.258015,
-    "UNI": 8.9507,
-    "LTC": 61.0535,
-    "JUP": 0.00034658525250611297,
-    "RENDER": 1.8383,
-    "ATOM": 1.7936,
-    "LINK": 13.0615
+    "ETH": 2740.385,
+    "XRP": 1.53485,
+    "ADA": 0.248455,
+    "BTC": 85932.445,
+    "AVAX": 10.846,
+    "MATIC": 0.10932,
+    "PAXG": 4320.255,
+    "SOL": 117.085,
+    "DOT": 1.1687,
+    "PYTH": 0.06261,
+    "BNB": 785.655,
+    "ARB": 0.21911,
+    "DOGE": 0.09869,
+    "SUI": 1.017,
+    "BONK": 0.00000346,
+    "WIF": 0.25681,
+    "UNI": 8.76125,
+    "LTC": 60.458,
+    "JUP": 0.00041191985811221606,
+    "RENDER": 1.81125,
+    "ATOM": 1.7711,
+    "LINK": 12.9035
   },
   "children": [],
   "caps": {
@@ -66,12 +67,12 @@
   "recentSignatures": [],
   "score": {
     "startEquityUsd": 117.565,
-    "equityUsd": 117.26307774213419,
-    "peakEquityUsd": 117.565,
-    "netPnlUsd": -0.3019222578658116,
+    "equityUsd": 117.7292839123661,
+    "peakEquityUsd": 117.7292839123661,
+    "netPnlUsd": 0.16428391236610196,
     "tradeCycles": 2,
-    "cumulativeBurnUsd": 0.0635975,
-    "firstProfitAtCycle": null
+    "cumulativeBurnUsd": 0.0739535,
+    "firstProfitAtCycle": 3
   },
   "sustainedSovereignCycles": 0,
   "dead": false
