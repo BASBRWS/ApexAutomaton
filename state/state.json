@@ -1,36 +1,53 @@
 {
   "bornAt": "2026-09-22T07:04:41.917Z",
-  "cycle": 0,
-  "lastRunAt": null,
+  "cycle": 1,
+  "lastRunAt": "2026-09-22T08:39:17.983Z",
   "desk": {
-    "cashUsd": 117.565,
-    "positions": {},
+    "cashUsd": 146.92662875000002,
+    "positions": {
+      "BTC": {
+        "units": 0.0004796613347519184,
+        "entryPriceUsd": 85785.005
+      },
+      "SOL": {
+        "units": -0.20137889688249402,
+        "entryPriceUsd": 116.76
+      },
+      "AVAX": {
+        "units": -2.169396134151405,
+        "entryPriceUsd": 10.8385
+      },
+      "DOT": {
+        "units": -19.991497683118652,
+        "entryPriceUsd": 1.17615
+      }
+    },
     "capitalUsd": 117.565,
     "openedAtCycle": 0
   },
   "lastPrices": {
-    "ETH": 2747.245,
-    "XRP": 1.51375,
-    "ADA": 0.245705,
-    "BTC": 85658.015,
-    "AVAX": 11.114,
-    "MATIC": 0.110325,
-    "PAXG": 4343.565,
-    "SOL": 117.565,
-    "DOT": 1.2069,
-    "PYTH": 0.06358,
-    "BNB": 788.635,
-    "ARB": 0.22165,
-    "DOGE": 0.0999,
-    "SUI": 1.0403,
-    "BONK": 0.000003435,
-    "WIF": 0.24743,
-    "UNI": 9.11245,
-    "LTC": 61.2565,
-    "JUP": 0.0003501360142698036,
-    "RENDER": 1.84275,
-    "ATOM": 1.80575,
-    "LINK": 12.9815
+    "ETH": 2735.405,
+    "XRP": 1.52795,
+    "ADA": 0.247765,
+    "BTC": 85785.005,
+    "AVAX": 10.8385,
+    "MATIC": 0.110085,
+    "PAXG": 4306.295,
+    "SOL": 116.76,
+    "DOT": 1.17615,
+    "PYTH": 0.06329,
+    "BNB": 787.835,
+    "ARB": 0.221775,
+    "DOGE": 0.098955,
+    "SUI": 1.0226,
+    "BONK": 0.000003465,
+    "WIF": 0.253795,
+    "UNI": 8.997,
+    "LTC": 60.6915,
+    "JUP": 0.00034658525250611297,
+    "RENDER": 1.8145,
+    "ATOM": 1.78425,
+    "LINK": 12.96
   },
   "children": [],
   "caps": {
@@ -41,11 +58,11 @@
   "recentSignatures": [],
   "score": {
     "startEquityUsd": 117.565,
-    "equityUsd": 117.565,
+    "equityUsd": 117.53537875,
     "peakEquityUsd": 117.565,
-    "netPnlUsd": 0,
-    "tradeCycles": 0,
-    "cumulativeBurnUsd": 0,
+    "netPnlUsd": -0.02962124999999105,
+    "tradeCycles": 1,
+    "cumulativeBurnUsd": 0.02962125,
     "firstProfitAtCycle": null
   },
   "sustainedSovereignCycles": 0,
