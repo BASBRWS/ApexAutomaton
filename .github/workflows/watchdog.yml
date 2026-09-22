@@ -1,0 +1,91 @@
+name: automaton-watchdog
+
+# Redundancy for the coarse, best-effort GitHub Actions cron. Runs on its own
+# schedule (offset from the heartbeat) and ONLY ticks when the last cycle is
+# stale — so it fills in skipped/delayed heartbeats without double-ticking a
+# healthy one. Shares the concurrency lane with the heartbeat, so the two never
+# run a cycle at the same time.
+
+on:
+  schedule:
+    # Offset from the heartbeat's */5 (fires at :02, :07, :12, ...), so the two
+    # schedules cover different moments and are less likely to both be skipped.
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: automaton-tick
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+# Tick only if the last cycle is older than this many seconds (10 min).
+env:
+  STALE_SECONDS: '600'
+
+jobs:
+  tick-if-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether the last cycle is stale
+        id: check
+        run: |
+          last=$(jq -r '.lastRunAt // empty' state/state.json 2>/dev/null || true)
+          if [ -z "$last" ]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            echo "No state yet -> stale."
+            exit 0
+          fi
+          now=$(date +%s)
+          then_ts=$(date -d "$last" +%s 2>/dev/null || echo 0)
+          age=$(( now - then_ts ))
+          echo "Last cycle ${age}s ago (threshold ${STALE_SECONDS}s)."
+          if [ "$age" -ge "$STALE_SECONDS" ]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.stale == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        if: steps.check.outputs.stale == 'true'
+        run: npm ci
+
+      - name: Run one cycle (catch-up)
+        id: tick
+        if: steps.check.outputs.stale == 'true'
+        env:
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          AGENT_PUBKEY: ${{ secrets.AGENT_PUBKEY }}
+          AGENT_KEYPAIR: ${{ secrets.AGENT_KEYPAIR }}
+          MARKET_PUBKEY: ${{ secrets.MARKET_PUBKEY }}
+          MARKET_KEYPAIR: ${{ secrets.MARKET_KEYPAIR }}
+          COMPUTE_PROVIDER_PUBKEY: ${{ secrets.COMPUTE_PROVIDER_PUBKEY }}
+          OPERATOR_PUBKEY: ${{ secrets.OPERATOR_PUBKEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        continue-on-error: true
+        run: |
+          set +e
+          npm run --silent tick
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated state
+        if: steps.check.outputs.stale == 'true'
+        run: |
+          git config user.name "automaton-bot"
+          git config user.email "automaton-bot@users.noreply.github.com"
+          git add state/ SOUL.md || true
+          if git diff --cached --quiet; then
+            echo "No state changes to commit."
+          else
+            git commit -m "watchdog: catch-up cycle state update"
+            git push
+          fi
