@@ -1,34 +1,13 @@
 {
-  "bornAt": "2026-09-22T07:04:41.917Z",
-  "cycle": 20,
-  "lastRunAt": "2026-09-22T13:41:25.320Z",
+  "bornAt": "2026-09-22T13:45:53.557Z",
+  "cycle": 0,
+  "lastRunAt": null,
   "desk": {
-    "cashUsd": 74.65104214125863,
-    "positions": {
-      "BNB": {
-        "units": -0.022466705272154636,
-        "entryPriceUsd": 788.3
-      },
-      "XRP": {
-        "units": 15.365344843692615,
-        "entryPriceUsd": 1.5538
-      },
-      "MATIC": {
-        "units": -185.86496909994887,
-        "entryPriceUsd": 0.110205
-      },
-      "ARB": {
-        "units": -139.0852824590278,
-        "entryPriceUsd": 0.22142
-      },
-      "WIF": {
-        "units": -58.3373845405931,
-        "entryPriceUsd": 0.257125
-      }
-    },
-    "capitalUsd": 117.565,
-    "openedAtCycle": 0,
-    "stakedUsd": 100.00220660043585
+    "cashUsd": 233.92,
+    "positions": {},
+    "stakedUsd": 0,
+    "capitalUsd": 233.92,
+    "openedAtCycle": 0
   },
   "lastPrices": {
     "ETH": 2744.87,
@@ -54,92 +33,22 @@
     "ATOM": 1.75175,
     "LINK": 12.931
   },
+  "genesisSolPriceUsd": 116.96,
   "children": [],
   "caps": {
     "date": "2026-09-22",
     "lamportsSpentToday": 0,
     "txCountToday": 0
   },
-  "recentSignatures": [
-    {
-      "kind": "heartbeat",
-      "signature": "2JjCazmvB2zAufXyALDyakXQ2RPYcG4UpcUfGgkpKFoAyVCC6tcax3o95nN14CAfePcGLzRqgn3sxds2zLFwyyzQ",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 14,
-      "at": "2026-09-22T12:10:14.641Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "42qdvhD9KXQBAVwRWFsavCRveDjWtjppoxL6f8eV294wVUNJ7AN5gaLd9p7pQ13hv6DjLMhvWPfZo16QMRxLnxS8",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 15,
-      "at": "2026-09-22T12:25:22.492Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "66Wm9VRHtqbfAirRRsmSH8SDBBC8S8a7kbJhgxSTsfhM9cvTdrfYuquJdJzDb3jeZKRqT4HEgR1cEyFpctjhzSjV",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 16,
-      "at": "2026-09-22T12:40:30.204Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "2v3U6sDjjMhHbPLBptgGorAiqy6Lb7eBCjVB3WUqjKoK6kbsWQYvcM4AKq9LGRiRxERR5BaRY3WzBE676YBQXERe",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 17,
-      "at": "2026-09-22T12:55:39.383Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "wEFgLNURLqTRsfoRJXtCUDEr3X2PBjZHhnEoPL9fY6TrsYeUWRDxVMLgA8CdHzFq64pm6eao83SPDXdoYWCbdYF",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 18,
-      "at": "2026-09-22T13:10:50.740Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "YKvZg721TrSyaxV5BhDjRHHVn9XFE2iN9saSNFT9kjmW3f52FBJiWE3xcuopwSCHXZnPZgQvUoH2HLf3XKNQafR",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 19,
-      "at": "2026-09-22T13:26:00.094Z",
-      "note": "heartbeat (memo)"
-    },
-    {
-      "kind": "heartbeat",
-      "signature": "56rJxAfBhUFwNojJ6svjYpkMQJR2gN7dPzVBJUebm1yg7LL2LFMF7zQ9SYjp1XdihUPYQfPWpWcB2ces8p1vSGsR",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 20,
-      "at": "2026-09-22T13:41:25.319Z",
-      "note": "heartbeat (memo)"
-    }
-  ],
+  "recentSignatures": [],
   "score": {
-    "startEquityUsd": 117.565,
-    "equityUsd": 115.76954326530787,
-    "peakEquityUsd": 118.03763177571055,
-    "netPnlUsd": -1.7954567346921237,
-    "tradeCycles": 6,
-    "cumulativeBurnUsd": 0.330873,
-    "firstProfitAtCycle": 3
+    "startEquityUsd": 233.92,
+    "equityUsd": 233.92,
+    "peakEquityUsd": 233.92,
+    "netPnlUsd": 0,
+    "tradeCycles": 0,
+    "cumulativeBurnUsd": 0,
+    "firstProfitAtCycle": null
   },
   "sustainedSovereignCycles": 0,
   "dead": false
