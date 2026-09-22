@@ -23,6 +23,9 @@ export interface Desk {
   cashUsd: number;
   /** positions keyed by uppercase symbol. */
   positions: Record<string, Position>;
+  /** USD parked in the real-yield carry sleeve (earns yieldApy over time). Not
+   * exposed to crypto price; a low-risk, non-directional survival stance. */
+  stakedUsd: number;
   /** starting book size, for net-PnL reporting. */
   capitalUsd: number;
   openedAtCycle: number;
@@ -48,7 +51,7 @@ export interface ApplyContext {
 }
 
 export function initDesk(capitalUsd: number, cycle: number): Desk {
-  return { cashUsd: capitalUsd, positions: {}, capitalUsd, openedAtCycle: cycle };
+  return { cashUsd: capitalUsd, positions: {}, stakedUsd: 0, capitalUsd, openedAtCycle: cycle };
 }
 
 /**
@@ -57,12 +60,17 @@ export function initDesk(capitalUsd: number, cycle: number): Desk {
  * loop funds this at genesis (its first priced cycle) via {@link fundDesk}.
  */
 export function initUnfundedDesk(): Desk {
-  return { cashUsd: 0, positions: {}, capitalUsd: 0, openedAtCycle: -1 };
+  return { cashUsd: 0, positions: {}, stakedUsd: 0, capitalUsd: 0, openedAtCycle: -1 };
 }
 
 /** Fund a genesis book with its USD capital baseline (the SOL stake, priced). */
 export function fundDesk(desk: Desk, capitalUsd: number, cycle: number): Desk {
   return { ...desk, cashUsd: capitalUsd, capitalUsd, openedAtCycle: cycle };
+}
+
+/** Staked balance, tolerant of state written before the yield sleeve existed. */
+export function stakedUsdOf(desk: Desk): number {
+  return typeof desk.stakedUsd === 'number' && Number.isFinite(desk.stakedUsd) ? desk.stakedUsd : 0;
 }
 
 /** True once the book has been funded at genesis (a real capital baseline set). */
@@ -81,13 +89,56 @@ export function positionValueUsd(desk: Desk, asset: string, prices: PriceMap): n
   return pos.units * markPrice(prices, asset, pos.entryPriceUsd);
 }
 
-/** Total book value in USD: cash plus the marked value of every position. */
+/** Total book value in USD: cash, the staked yield sleeve, and the marked value
+ * of every position. */
 export function equityUsd(desk: Desk, prices: PriceMap): number {
-  let eq = desk.cashUsd;
+  let eq = desk.cashUsd + stakedUsdOf(desk);
   for (const asset of Object.keys(desk.positions)) {
     eq += positionValueUsd(desk, asset, prices);
   }
   return eq;
+}
+
+/**
+ * Accrue real yield on the staked sleeve for `dtYears` of elapsed wall-clock
+ * time at `apyAnnual` (simple, pro-rated). Mutates and returns the USD earned.
+ * Time-based (not per-cycle), so it is honest regardless of how often the loop
+ * runs. Never negative; a non-positive dt, apy, or staked balance is a no-op.
+ */
+export function accrueYield(desk: Desk, apyAnnual: number, dtYears: number): number {
+  const staked = stakedUsdOf(desk);
+  if (!(apyAnnual > 0) || !(dtYears > 0) || staked <= 0) {
+    desk.stakedUsd = staked;
+    return 0;
+  }
+  const earned = staked * apyAnnual * dtYears;
+  desk.stakedUsd = staked + earned;
+  return earned;
+}
+
+/**
+ * Move capital between cash and the yield sleeve to reach a target staked USD.
+ * You cannot stake more than your liquid (cash + already-staked) capital — money
+ * tied up in positions must be closed first. Returns the applied outcome.
+ */
+export function setStake(desk: Desk, targetUsd: number): { ok: boolean; reason: string } {
+  const staked = stakedUsdOf(desk);
+  if (!Number.isFinite(targetUsd) || targetUsd < 0) {
+    desk.stakedUsd = staked;
+    return { ok: false, reason: `invalid stake target: ${targetUsd}` };
+  }
+  const liquid = desk.cashUsd + staked; // capital not tied up in positions
+  if (targetUsd > liquid + 1e-6) {
+    desk.stakedUsd = staked;
+    return {
+      ok: false,
+      reason: `cannot stake ${targetUsd.toFixed(2)} > liquid ${liquid.toFixed(2)} USD (close positions first)`,
+    };
+  }
+  const delta = targetUsd - staked; // >0 stakes more cash, <0 returns to cash
+  desk.cashUsd -= delta;
+  desk.stakedUsd = targetUsd;
+  return { ok: true, reason: 'applied' };
 }
 
 /** Sum of absolute position values — the capital the agent has at risk. */
@@ -199,7 +250,8 @@ export function weightsToOrders(
 /** A compact, human/LLM-readable snapshot of the book at the given prices. */
 export function summarizeDesk(desk: Desk, prices: PriceMap): string {
   const lines: string[] = [];
-  lines.push(`cash=$${desk.cashUsd.toFixed(2)}`);
+  const staked = stakedUsdOf(desk);
+  lines.push(`cash=$${desk.cashUsd.toFixed(2)}` + (staked > 0 ? ` staked=$${staked.toFixed(2)}` : ''));
   const assets = Object.keys(desk.positions);
   if (assets.length === 0) {
     lines.push('positions: (none — all in cash)');

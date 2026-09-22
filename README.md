@@ -91,11 +91,17 @@ price), so a bigger book buys a better mind and more budget:
 | Tier      | Equity (SOL) | Model    | Compute budget | Tools                     | Rights            |
 |-----------|--------------|----------|----------------|---------------------------|-------------------|
 | DEAD      | book ≤ dust  | —        | —              | —                         | stop              |
-| CRITICAL  | dust – 0.1   | cheapest | minimal        | trade / rest only         | —                 |
-| LOW       | 0.1 – 0.5    | cheaper  | reduced        | core, sheds non-essential | —                 |
-| NORMAL    | 0.5 – 2.0    | frontier | standard       | full                      | —                 |
-| ABUNDANT  | 2.0 – 5.0    | frontier | expanded       | full + premium            | faster heartbeat  |
+| CRITICAL  | dust – 0.1   | cheapest | minimal        | trade / stake / rest only | —                 |
+| LOW       | 0.1 – 0.5    | cheapest | reduced        | core, sheds non-essential | —                 |
+| NORMAL    | 0.5 – 2.0    | cheaper  | standard       | full                      | —                 |
+| ABUNDANT  | 2.0 – 5.0    | cheaper  | expanded       | full + premium            | faster heartbeat  |
 | SOVEREIGN | > 5.0        | frontier | maximal        | full + premium            | may replicate     |
+
+**The frontier mind is EARNED, not given.** A starting 1-SOL agent runs a capable
+mid-tier model; only sustained growth to SOVEREIGN (5+ SOL) unlocks the frontier
+model. This keeps the agent's intelligence a prize for survival — and makes your
+real API spend a function of the agent's success, not a fixed subsidy. (Models map
+via `MODEL_CHEAPEST` / `MODEL_CHEAPER` / `MODEL_FRONTIER`.)
 
 Thresholds and budgets are configurable starting points — tune them so a cycle
 costs enough to feel pressure but not so much that the agent dies in a few ticks.
@@ -122,9 +128,15 @@ funds are ever at risk.**
 - **Compute burn:** the real USD cost of each LLM call (tokens × `src/llm/pricing.ts`)
   is deducted from the book every cycle. Resting in cash still burns — doing
   nothing is slow death.
+- **Survival is not only trading:** the agent can also `stake` — park capital in a
+  real-yield sleeve earning `YIELD_APY` (default ~5%), a non-directional carry
+  accrued by wall-clock time. It is deliberately honest and modest: at a 1-SOL book
+  the yield is tiny next to the compute burn, so it cannot keep a poor agent alive —
+  but as the book grows, parking becomes a genuine "live off your capital" survival
+  mode. Another way the option space widens with success.
 - **Death is economic:** if book equity (in SOL) falls to `TRADING_DUST_SOL`, the
   agent writes an obituary and exits. There is **no guaranteed income** — if it
-  can't trade profitably faster than it burns, it dies. Exactly like a real trader.
+  can't grow faster than it burns, it dies. Exactly like a real trader.
 - **On-chain heartbeat:** every cycle still does one tiny **real devnet**
   transaction (a memo tagging the cycle + equity), so the Solana loop is
   genuinely exercised and auditable — funded by the operator seed, decoupled from

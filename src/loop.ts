@@ -14,6 +14,7 @@ import {
   summarizeDesk,
   isFunded,
   fundDesk,
+  accrueYield,
 } from './trading/desk.js';
 import {
   makePriceSource,
@@ -108,6 +109,15 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state.score = initialScore(capUsd);
   }
 
+  // --- Real yield: accrue carry on the staked sleeve by elapsed wall-clock
+  // time (honest regardless of how irregular the cron is). Counts toward equity
+  // this cycle, so parking in yield is a genuine — if modest — survival stance. -
+  const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
+  const prevRunMs = state.lastRunAt ? Date.parse(state.lastRunAt) : NaN;
+  const dtYears = Number.isFinite(prevRunMs) ? Math.max(0, (Date.now() - prevRunMs) / MS_PER_YEAR) : 0;
+  const yieldEarnedUsd = accrueYield(state.desk, cfg.trading.yieldApy, dtYears);
+  const yieldNote = yieldEarnedUsd > 0 ? `yield +$${yieldEarnedUsd.toFixed(4)}` : undefined;
+
   // Gross-exposure cap for this cycle: the SOL cap priced at the live SOL price.
   const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
 
@@ -158,6 +168,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     railsSummary: railsSummary(cfg, maxGrossExposureUsd),
     tradableAssets: cfg.trading.assets,
     maxGrossExposureUsd,
+    yieldApy: cfg.trading.yieldApy,
   });
   const user = buildUserPrompt({
     cycle,
@@ -299,9 +310,14 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
 
   // --- Persist. -------------------------------------------------------------
-  const noteParts = [coerceNote, priceNote, toolResult.note, heartbeatNote, replicationNote].filter(
-    Boolean,
-  );
+  const noteParts = [
+    coerceNote,
+    priceNote,
+    yieldNote,
+    toolResult.note,
+    heartbeatNote,
+    replicationNote,
+  ].filter(Boolean);
   const entry: JournalEntry = {
     cycle,
     at: now(),

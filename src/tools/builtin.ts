@@ -3,6 +3,8 @@ import { writeSoul } from '../soul.js';
 import {
   applyOrders,
   equityUsd as deskEquityUsd,
+  setStake,
+  stakedUsdOf,
   summarizeDesk,
   weightsToOrders,
   type Order,
@@ -111,6 +113,37 @@ const rebalance: Tool = {
   },
 };
 
+const stake: Tool = {
+  name: 'stake',
+  description:
+    'Park capital in a real-yield sleeve to earn a modest, non-directional carry ' +
+    '(a real ~annual rate, accrued by elapsed time) instead of taking market risk. ' +
+    'Set the TOTAL USD you want staked (0 unstakes everything back to cash). Staked ' +
+    'capital is not exposed to crypto prices and is not available for trading until ' +
+    'you unstake it. A low-risk way to survive — but at a small book the yield is ' +
+    'tiny next to the compute burn, so it only truly sustains you once the book is large.',
+  movesValue: false,
+  inputHint: '{ "targetUsd": 100 }',
+  async execute(input, ctx) {
+    const targetUsd = typeof input.targetUsd === 'number' ? input.targetUsd : Number(input.targetUsd);
+    if (!Number.isFinite(targetUsd)) {
+      return { summary: 'stake: invalid targetUsd', note: 'bad stake input' };
+    }
+    const before = stakedUsdOf(ctx.state.desk);
+    const res = setStake(ctx.state.desk, targetUsd);
+    if (!res.ok) {
+      return { summary: `stake rejected: ${res.reason}`, note: `stake rejected: ${res.reason}` };
+    }
+    const after = stakedUsdOf(ctx.state.desk);
+    const verb = after >= before ? 'staked' : 'unstaked';
+    return {
+      summary: `${verb}: yield sleeve now $${after.toFixed(2)} (@ ${(ctx.cfg.trading.yieldApy * 100).toFixed(1)}% APY)`,
+      traded: Math.abs(after - before) > 1e-9,
+      note: `book after: ${summarizeDesk(ctx.state.desk, ctx.prices).replace(/\n/g, ' | ')}`,
+    };
+  },
+};
+
 const writeJournal: Tool = {
   name: 'write_journal',
   description:
@@ -198,10 +231,11 @@ export function buildRegistry(): ToolRegistry {
   return new ToolRegistry()
     .register(trade)
     .register(rebalance)
+    .register(stake)
     .register(writeJournal)
     .register(reflect)
     .register(rest)
     .register(transfer);
 }
 
-export const BUILTIN_TOOLS = [trade, rebalance, writeJournal, reflect, rest, transfer];
+export const BUILTIN_TOOLS = [trade, rebalance, stake, writeJournal, reflect, rest, transfer];

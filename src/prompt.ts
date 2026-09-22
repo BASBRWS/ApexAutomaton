@@ -22,6 +22,7 @@ export function buildSystemPrompt(args: {
   railsSummary: string;
   tradableAssets: string[];
   maxGrossExposureUsd: number;
+  yieldApy: number;
 }): string {
   const toolLines = args.tools
     .map((t) => `- ${t.name}: ${t.description} input=${t.inputHint}`)
@@ -44,8 +45,12 @@ export function buildSystemPrompt(args: {
     `Max gross exposure: ~$${args.maxGrossExposureUsd.toFixed(2)}.`,
     'You have full freedom of strategy within those limits: go long or short, size',
     'positions, rotate between assets, sit in cash to avoid a drawdown, whatever',
-    'you judge will grow the book. There is no guaranteed income; resting in cash',
-    'still burns compute, so doing nothing is slow death.',
+    'you judge will grow the book. Survival does NOT have to mean trading: you may',
+    `also PARK capital in a real-yield sleeve (stake) earning ~${(args.yieldApy * 100).toFixed(1)}% APY — a`,
+    'non-directional carry that grows by elapsed time, not market bets. It is modest',
+    'next to the compute burn while your book is small, but a real alternative as you',
+    'grow. There is no guaranteed income; resting in cash still burns compute, so',
+    'doing nothing is slow death.',
     '',
     '## Constitution (immutable law — you cannot edit or override this)',
     args.constitution,

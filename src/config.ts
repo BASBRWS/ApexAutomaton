@@ -150,6 +150,11 @@ export interface Config {
     allowShort: boolean;
     /** economic death threshold: book equity at/below this (in SOL) is DEAD. */
     dustSol: number;
+    /** real annual yield (as a fraction, e.g. 0.05 = 5% APY) earned on capital
+     * the agent PARKS in the yield sleeve — a real, non-directional carry it can
+     * choose instead of trading. Accrued by wall-clock time, so it is honest and
+     * modest: it only becomes a survival path once the book is large. 0 disables. */
+    yieldApy: number;
     /** base URL of the price API (default: CoinGecko simple price). */
     priceApiBase: string;
   };
@@ -247,6 +252,7 @@ export function loadConfig(): Config {
         .filter((s) => s.length > 0),
       allowShort: envBool('ALLOW_SHORT', true),
       dustSol: envNum('TRADING_DUST_SOL', 0.02),
+      yieldApy: envNum('YIELD_APY', 0.05),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },

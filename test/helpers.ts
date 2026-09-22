@@ -48,6 +48,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       assets: ['BTC', 'ETH'],
       allowShort: true,
       dustSol: 0.02,
+      yieldApy: 0.05,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
     features: {

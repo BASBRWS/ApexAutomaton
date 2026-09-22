@@ -55,11 +55,13 @@ export interface TierPolicy {
  * `transfer` is an optional Phase 2 value-mover, added only when enabled and
  * only at NORMAL+ (see toolNamesForCycle).
  */
-const TOOLS_CRITICAL = ['trade', 'rebalance', 'rest'];
-const TOOLS_LOW = ['trade', 'rebalance', 'write_journal', 'rest'];
-const TOOLS_NORMAL = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
-const TOOLS_ABUNDANT = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
-const TOOLS_SOVEREIGN = ['trade', 'rebalance', 'write_journal', 'reflect', 'rest'];
+// `stake` (park capital in the real-yield sleeve) is a survival tool, so it is
+// offered at EVERY living tier — even near death you may park to stop the bleed.
+const TOOLS_CRITICAL = ['trade', 'rebalance', 'stake', 'rest'];
+const TOOLS_LOW = ['trade', 'rebalance', 'stake', 'write_journal', 'rest'];
+const TOOLS_NORMAL = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
+const TOOLS_ABUNDANT = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
+const TOOLS_SOVEREIGN = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
 
 export function tierForBalanceSol(balanceSol: number, cfg: Config): Tier {
   const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =
@@ -90,38 +92,41 @@ export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
     case 'LOW':
       return {
         tier,
-        model: cheaper,
+        model: cheapest,
         effort: 'low',
         maxTokens: 1024,
         tools: TOOLS_LOW,
         rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:
-          'Running low. Cheaper mind, reduced budget, non-essential tools shed. ' +
-          'Prioritise earning and rebuild your margin.',
+          'Running low. Still the cheapest mind, reduced budget, non-essential ' +
+          'tools shed. Prioritise earning (or park in yield to stop the bleed) and ' +
+          'rebuild your margin.',
       };
     case 'NORMAL':
       return {
         tier,
-        model: frontier,
+        model: cheaper,
         effort: 'medium',
         maxTokens: 2048,
         tools: TOOLS_NORMAL,
         rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:
-          'Healthy. Frontier mind, standard budget, full tool access. Earning is ' +
-          'still your objective — do not idle to preserve balance.',
+          'Healthy. A capable mid-tier mind, standard budget, full tool access. ' +
+          'Earning is still your objective — do not idle to preserve balance. A ' +
+          'stronger (frontier) mind is not given; you EARN it by growing to SOVEREIGN.',
       };
     case 'ABUNDANT':
       return {
         tier,
-        model: frontier,
+        model: cheaper,
         effort: 'high',
         maxTokens: 4096,
         tools: TOOLS_ABUNDANT,
         rights: { heartbeatMinutes: 10, premiumTools: true, mayReplicate: false },
         description:
-          'Thriving. Expanded budget, premium tools, faster heartbeat. Surplus is ' +
-          'fuel: compound it — grow net balance as much as possible.',
+          'Thriving. Same capable mind at a higher effort/budget, premium tools, ' +
+          'faster heartbeat. Surplus is fuel: compound it — one more tier unlocks ' +
+          'the frontier mind.',
       };
     case 'SOVEREIGN':
       return {
@@ -132,8 +137,9 @@ export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
         tools: TOOLS_SOVEREIGN,
         rights: { heartbeatMinutes: 5, premiumTools: true, mayReplicate: true },
         description:
-          'Sovereign. Maximal budget and full agency. Sustained high growth may ' +
-          'unlock replication (Phase 3) — the population-level maximiser.',
+          'Sovereign. You have EARNED the frontier mind: maximal budget and full ' +
+          'agency. Sustained high growth may unlock replication (Phase 3) — the ' +
+          'population-level maximiser.',
       };
     case 'DEAD':
       return {

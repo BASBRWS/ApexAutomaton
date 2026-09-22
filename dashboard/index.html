@@ -197,7 +197,10 @@
         const tbody = document.querySelector('#book tbody');
         tbody.innerHTML = '';
         const cash = Number(desk.cashUsd) || 0;
-        document.getElementById('book-cash').innerHTML = `<b>Cash:</b> ${usd(cash)} uninvested`;
+        const staked = Number(desk.stakedUsd) || 0;
+        document.getElementById('book-cash').innerHTML =
+          `<b>Cash:</b> ${usd(cash)} uninvested` +
+          (staked > 0 ? ` &nbsp;|&nbsp; <b>Staked:</b> ${usd(staked)} <span class="pos">(real yield)</span>` : '');
         const entries = Object.entries(desk.positions ?? {});
         if (entries.length === 0) {
           const tr = document.createElement('tr');

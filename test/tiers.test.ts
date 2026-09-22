@@ -30,10 +30,25 @@ describe('policyForTier', () => {
     expect(p.rights.mayReplicate).toBe(false);
   });
 
-  it('uses the frontier model and full tools at NORMAL', () => {
+  it('uses a mid-tier (not frontier) mind and full tools at NORMAL', () => {
     const p = policyForTier('NORMAL', cfg);
-    expect(p.model).toBe(cfg.models.frontier);
+    expect(p.model).toBe(cfg.models.cheaper);
+    expect(p.model).not.toBe(cfg.models.frontier);
     expect(p.tools).toEqual(expect.arrayContaining(['trade', 'write_journal', 'reflect', 'rest']));
+  });
+
+  it('reserves the frontier mind for SOVEREIGN — it must be EARNED', () => {
+    expect(policyForTier('CRITICAL', cfg).model).toBe(cfg.models.cheapest);
+    expect(policyForTier('LOW', cfg).model).toBe(cfg.models.cheapest);
+    expect(policyForTier('NORMAL', cfg).model).toBe(cfg.models.cheaper);
+    expect(policyForTier('ABUNDANT', cfg).model).toBe(cfg.models.cheaper);
+    expect(policyForTier('SOVEREIGN', cfg).model).toBe(cfg.models.frontier);
+  });
+
+  it('offers the stake (real-yield) survival tool at every living tier', () => {
+    for (const tier of ['CRITICAL', 'LOW', 'NORMAL', 'ABUNDANT', 'SOVEREIGN'] as const) {
+      expect(policyForTier(tier, cfg).tools).toContain('stake');
+    }
   });
 
   it('gates replication to SOVEREIGN only', () => {
