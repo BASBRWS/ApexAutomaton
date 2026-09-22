@@ -210,7 +210,7 @@ export function loadConfig(): Config {
     models: {
       cheapest: envStr('MODEL_CHEAPEST') ?? 'claude-haiku-4-5',
       cheaper: envStr('MODEL_CHEAPER') ?? 'claude-sonnet-5',
-      frontier: envStr('MODEL_FRONTIER') ?? 'claude-opus-5',
+      frontier: envStr('MODEL_FRONTIER') ?? 'claude-opus-5-5',
     },
 
     economy: {
