@@ -98,16 +98,22 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     priceNote = `price fetch failed (${errMsg(err)}) — using cached prices`;
   }
 
-  const solPrice = solPriceOf(prices, state);
+  const liveSolPrice = solPriceOf(prices, state);
 
-  // --- Genesis: price the SOL-denominated stake to USD, once. ---------------
-  // The book is born unfunded; the first cycle that sees a real SOL price funds
-  // it with `capitalSol` SOL worth of USD. From then on it grows or dies in SOL.
+  // --- Genesis: price the SOL-denominated stake to USD, once, and FREEZE the
+  // SOL/USD rate. The book is born unfunded; the first cycle that sees a real SOL
+  // price funds it with `capitalSol` SOL worth of USD and records that price.
   if (!isFunded(state.desk)) {
-    const capUsd = genesisCapitalUsd(cfg, solPrice);
+    const capUsd = genesisCapitalUsd(cfg, liveSolPrice);
     state.desk = fundDesk(state.desk, capUsd, cycle);
     state.score = initialScore(capUsd);
+    state.genesisSolPriceUsd = liveSolPrice;
   }
+
+  // The FROZEN SOL/USD rate values everything from here on: equity-in-SOL, the
+  // tiers, the death check, and the gross-exposure cap. So the SOL/USD exchange
+  // rate never moves the survival game — only the agent's own trading does.
+  const solPrice = state.genesisSolPriceUsd > 0 ? state.genesisSolPriceUsd : liveSolPrice;
 
   // --- Real yield: accrue carry on the staked sleeve by elapsed wall-clock
   // time (honest regardless of how irregular the cron is). Counts toward equity
@@ -170,12 +176,22 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     maxGrossExposureUsd,
     yieldApy: cfg.trading.yieldApy,
   });
+  // --- Survival metrics: give the agent the numbers to weigh its own mortality.
+  const dustUsd = cfg.trading.dustSol * solPrice;
+  const priorCycles = Math.max(1, cycle - 1);
+  const avgBurnUsd = Math.max(state.score.cumulativeBurnUsd / priorCycles, 0.01);
+  const runwayCycles = Math.max(0, (equityPre - dustUsd) / avgBurnUsd);
+
   const user = buildUserPrompt({
     cycle,
     tier,
     policy,
     equityUsd: equityPre,
     equitySol: equitySolPre,
+    dustSol: cfg.trading.dustSol,
+    dustUsd,
+    avgBurnUsd,
+    runwayCycles,
     prices,
     prevPrices,
     deskSummary: summarizeDesk(state.desk, prices),

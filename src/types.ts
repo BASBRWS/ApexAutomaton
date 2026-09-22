@@ -98,6 +98,11 @@ export interface AutomatonState {
   desk: Desk;
   /** last observed prices (USD/unit), used as a fallback when a fetch fails. */
   lastPrices: Record<string, number>;
+  /** SOL/USD price frozen at genesis. All SOL-denominated equity/tiers/death use
+   * THIS, not the live price, so the SOL/USD exchange rate never distorts the
+   * survival game — only the agent's own trading moves its SOL equity. 0 until
+   * the book is funded. */
+  genesisSolPriceUsd: number;
   children: ChildRecord[];
   caps: DailyCaps;
   recentSignatures: TxRecord[];

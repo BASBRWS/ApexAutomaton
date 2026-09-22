@@ -69,10 +69,11 @@ export function buildSystemPrompt(args: {
     '```json',
     '{ "tool": "<tool name>", "input": { ... }, "rationale": "<2-4 sentences>" }',
     '```',
-    'In the rationale, actually reason it through: what you read in the market right',
-    'now (which assets are moving and how), the options you weighed and why you',
-    'rejected them, why THIS action best grows your book, and the main risk you are',
-    'accepting. Be concrete and specific to this cycle — not a generic sentence.',
+    'In the rationale, actually reason it through, and START with survival: how much',
+    'runway you have, whether you are growing or bleeding, and whether to take risk',
+    'to grow or preserve to survive. Then the market read (which assets are moving',
+    'and how), the options you weighed and why you rejected them, why THIS action,',
+    'and the main risk you accept. Be concrete and specific to this cycle.',
     'Pick the action that best grows your book right now, given the prices and',
     'your current positions below.',
   ].join('\n');
@@ -84,6 +85,10 @@ export function buildUserPrompt(args: {
   policy: TierPolicy;
   equityUsd: number;
   equitySol: number;
+  dustSol: number;
+  dustUsd: number;
+  avgBurnUsd: number;
+  runwayCycles: number;
   prices: PriceMap;
   prevPrices: PriceMap;
   deskSummary: string;
@@ -92,6 +97,12 @@ export function buildUserPrompt(args: {
   obituaryDigest: string;
 }): string {
   const s = args.score;
+  const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
+  const trend = s.netPnlUsd > 0 ? 'growing' : s.netPnlUsd < 0 ? 'bleeding' : 'flat';
+  const runway =
+    Number.isFinite(args.runwayCycles) && args.runwayCycles < 100000
+      ? `~${Math.floor(args.runwayCycles)} cycles`
+      : 'very long';
   const priceLines = Object.entries(args.prices)
     .map(([k, v]) => {
       const prev = args.prevPrices[k];
@@ -104,8 +115,16 @@ export function buildUserPrompt(args: {
     .join('\n');
   return [
     `## Situation — cycle ${args.cycle}`,
-    `Book equity: $${args.equityUsd.toFixed(2)} (${args.equitySol.toFixed(4)} SOL)`,
+    `Book equity: ${args.equitySol.toFixed(4)} SOL ($${args.equityUsd.toFixed(2)})`,
     `Tier: ${args.tier} — ${args.policy.description}`,
+    '',
+    '## Survival — weigh this FIRST, before any trade',
+    `You DIE if equity falls to ${args.dustSol} SOL ($${args.dustUsd.toFixed(2)}). You are at ${args.equitySol.toFixed(4)} SOL.`,
+    `Net PnL since birth: $${s.netPnlUsd.toFixed(2)} (${trend}); $${drawdownUsd.toFixed(2)} below your peak.`,
+    `Compute burn ~$${args.avgBurnUsd.toFixed(4)}/cycle → runway if you just rest: ${runway}.`,
+    'Burn alone kills slowly; a losing streak of bad trades kills fast. So the real',
+    'question each cycle is: are you safe enough to take risk and GROW, or bleeding',
+    'and needing to preserve to SURVIVE? Decide that explicitly and act on it.',
     '',
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',

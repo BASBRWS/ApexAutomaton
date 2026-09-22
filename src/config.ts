@@ -234,18 +234,21 @@ export function loadConfig(): Config {
     },
 
     trading: {
-      capitalSol: envNum('PAPER_TRADING_CAPITAL_SOL', 1.0),
+      capitalSol: envNum('PAPER_TRADING_CAPITAL_SOL', 2.0),
       capitalUsdOverride:
         envStr('PAPER_TRADING_CAPITAL_USD') === undefined
           ? undefined
           : envNum('PAPER_TRADING_CAPITAL_USD', 0),
       maxGrossExposureSol: envNum(
         'MAX_GROSS_EXPOSURE_SOL',
-        envNum('PAPER_TRADING_CAPITAL_SOL', 1.0),
+        envNum('PAPER_TRADING_CAPITAL_SOL', 2.0),
       ),
+      // SOL is deliberately NOT tradable: the game is denominated in SOL (priced
+      // once at genesis), so letting the agent trade SOL invites meta-gaming its
+      // own score. It is still priced for that one-time genesis conversion.
       assets: (
         envStr('TRADING_ASSETS') ??
-        'BTC,ETH,SOL,BNB,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,MATIC,ATOM,UNI,ARB,SUI,JUP,BONK,WIF,PYTH,RENDER,PAXG'
+        'BTC,ETH,BNB,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,MATIC,ATOM,UNI,ARB,SUI,JUP,BONK,WIF,PYTH,RENDER,PAXG'
       )
         .split(',')
         .map((s) => s.trim().toUpperCase())

@@ -75,7 +75,7 @@
   <body>
     <div class="wrap">
       <h1>Apex Automaton</h1>
-      <div class="muted">Autonomous agent growing a paper book of <b>1 SOL</b> against real prices · the market decides, grow or die.</div>
+      <div class="muted">Autonomous agent growing a paper book of <b>2 SOL</b> against real prices (SOL/USD frozen at genesis) · the market decides, grow or die.</div>
       <div id="nav" class="muted" style="margin-top:6px">
         <a href="../setup/">⚙ Setup wizard (build your .env)</a>
       </div>
@@ -198,11 +198,12 @@
         add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, 'cycle');
         add('text', { x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 16 ${m.t + ih / 2})` }, 'equity SOL');
 
-        // 1.0 SOL reference line (the starting stake), if in range
-        if (1 >= minY && 1 <= maxY) {
-          const y1 = sy(1);
+        // Starting-stake reference line (genesis equity, the first point), if in range
+        const startY = pts[0].y;
+        if (startY >= minY && startY <= maxY) {
+          const y1 = sy(startY);
           add('line', { x1: m.l, y1, x2: m.l + iw, y2: y1, stroke: 'var(--accent-dim)', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
-          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start 1.0');
+          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start ' + startY.toFixed(2));
         }
 
         // Line + points
@@ -338,7 +339,8 @@
           const s = state.score ?? {};
           const desk = state.desk ?? { cashUsd: 0, positions: {} };
           const prices = state.lastPrices ?? {};
-          const solPrice = Number(prices.SOL) || 0;
+          // The SOL/USD rate is FROZEN at genesis — SOL equity moves only with trading.
+          const solPrice = Number(state.genesisSolPriceUsd) || Number(prices.SOL) || 0;
 
           const eqUsd = Number(s.equityUsd) || 0;
           const last = journal.length ? journal[journal.length - 1] : null;
@@ -351,7 +353,7 @@
           const tiles = document.getElementById('tiles');
           tiles.append(
             tile('cycle', state.cycle ?? 0),
-            tile('equity', sol(eqSol), usd(eqUsd) + (solPrice ? ` · SOL @ ${usd(solPrice)}` : '')),
+            tile('equity', sol(eqSol), usd(eqUsd) + (solPrice ? ` · frozen @ ${usd(solPrice)}/SOL` : '')),
             tile('net PnL', signed(netSol, sol), signed(Number(s.netPnlUsd) || 0, usd)),
             tile('peak equity', sol(peakSol)),
             tile('population', (state.children ?? []).length),

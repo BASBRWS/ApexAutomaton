@@ -29,6 +29,7 @@ export function freshState(cfg: Config): AutomatonState {
     // real SOL price. Until then the book carries no cash and no baseline.
     desk: initUnfundedDesk(),
     lastPrices: {},
+    genesisSolPriceUsd: 0,
     children: [],
     caps: freshCaps(),
     recentSignatures: [],
