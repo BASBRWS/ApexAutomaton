@@ -1,9 +1,9 @@
 {
   "bornAt": "2026-09-22T13:45:53.557Z",
-  "cycle": 20,
-  "lastRunAt": "2026-09-22T20:20:04.288Z",
+  "cycle": 21,
+  "lastRunAt": "2026-09-22T20:35:35.808Z",
   "desk": {
-    "cashUsd": 41.16887883168676,
+    "cashUsd": -5.813553638171914,
     "positions": {
       "PAXG": {
         "units": 0.005326249221177474,
@@ -22,7 +22,7 @@
         "entryPriceUsd": 1.7523
       },
       "DOT": {
-        "units": 11.803157892664807,
+        "units": 16.790496578936324,
         "entryPriceUsd": 1.1721
       },
       "LTC": {
@@ -30,7 +30,7 @@
         "entryPriceUsd": 61.866
       },
       "TIA": {
-        "units": 23.604515059450957,
+        "units": 40.052067687994395,
         "entryPriceUsd": 0.48895
       },
       "XAG": {
@@ -42,66 +42,66 @@
         "entryPriceUsd": 338.785
       },
       "APT": {
-        "units": 23.55988498846741,
+        "units": 31.164298180004984,
         "entryPriceUsd": 0.79855
-      },
-      "NEAR": {
-        "units": -2.7168597324403763,
-        "entryPriceUsd": 4.2711
       },
       "WIF": {
         "units": -45.52008317600067,
         "entryPriceUsd": 0.25492
+      },
+      "OP": {
+        "units": 114.12485258873208,
+        "entryPriceUsd": 0.131435
       }
     },
-    "stakedUsd": 40.00059793168937,
+    "stakedUsd": 40.00065526892392,
     "capitalUsd": 233.92,
     "openedAtCycle": 0
   },
   "lastPrices": {
-    "ETH": 2752.245,
-    "XRP": 1.5777,
-    "ADA": 0.25124,
-    "BTC": 86264.535,
-    "AVAX": 10.9265,
+    "ETH": 2755.565,
+    "XRP": 1.57695,
+    "ADA": 0.252735,
+    "BTC": 86317.185,
+    "AVAX": 10.987,
     "MATIC": 0.108285,
-    "PAXG": 4357.28,
-    "SOL": 118.01,
-    "DOT": 1.17975,
-    "PYTH": 0.06595,
-    "BNB": 784.835,
-    "ARB": 0.21851,
-    "DOGE": 0.09987,
-    "SUI": 1.00455,
-    "BONK": 0.000003555,
-    "WIF": 0.25492,
-    "UNI": 9.29555,
-    "LTC": 62.508,
-    "JUP": 0.00040835929751938224,
-    "RENDER": 1.82455,
-    "ATOM": 1.8009,
-    "LINK": 12.9615,
-    "TIA": 0.4916,
-    "TRX": 0.3407662464130724,
-    "XAG": 67.09639672220683,
-    "BCH": 341.26,
-    "INJ": 7.7785,
-    "APT": 0.78805,
-    "OP": 0.129945,
-    "NEAR": 4.2711,
-    "AAVE": 143.9,
-    "ORCA": 1.50245,
+    "PAXG": 4356.895,
+    "SOL": 118.355,
+    "DOT": 1.19115,
+    "PYTH": 0.0665,
+    "BNB": 786.15,
+    "ARB": 0.21929,
+    "DOGE": 0.100405,
+    "SUI": 1.01135,
+    "BONK": 0.000003585,
+    "WIF": 0.253315,
+    "UNI": 9.43055,
+    "LTC": 63.125,
+    "JUP": 0.0004091883604024467,
+    "RENDER": 1.83545,
+    "ATOM": 1.8058,
+    "LINK": 12.9955,
+    "TIA": 0.49935,
+    "TRX": 0.3406390778900615,
+    "XAG": 67.03947317700398,
+    "BCH": 342.61,
+    "INJ": 7.8305,
+    "APT": 0.8022,
+    "OP": 0.131435,
+    "NEAR": 4.2937,
+    "AAVE": 144.495,
+    "ORCA": 1.5071,
     "AAPL": 339.75,
     "NVDA": 228.87,
     "EURUSD": 1.1452,
-    "WTI": 89.71,
+    "WTI": 89.88,
     "AMZN": 254.98,
     "GBPUSD": 1.3343,
     "AUDUSD": 0.7118,
     "TSLA": 378.9,
     "QQQ": 747.46,
-    "NATGAS": 3.162,
-    "COPPER": 6.901,
+    "NATGAS": 3.165,
+    "COPPER": 6.903,
     "SPY": 773.38,
     "MSFT": 498
   },
@@ -312,15 +312,25 @@
       "cycle": 20,
       "at": "2026-09-22T20:20:04.287Z",
       "note": "heartbeat (memo)"
+    },
+    {
+      "kind": "heartbeat",
+      "signature": "3PjHDHwMbwKGoxQJvQuyz3VGEQXCWNGBLDNNY1SuA7osC3pVN7wNbbtoxUxCkeDdM6Bw2Jpi6XBhBptErFzyZAfD",
+      "lamports": 0,
+      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "cycle": 21,
+      "at": "2026-09-22T20:35:35.808Z",
+      "note": "heartbeat (memo)"
     }
   ],
   "score": {
     "startEquityUsd": 233.92,
-    "equityUsd": 232.0212116053153,
+    "equityUsd": 232.90889443184247,
     "peakEquityUsd": 234.17860880964656,
-    "netPnlUsd": -1.8987883946846864,
-    "tradeCycles": 19,
-    "cumulativeBurnUsd": 0.5950500000000001,
+    "netPnlUsd": -1.011105568157518,
+    "tradeCycles": 20,
+    "cumulativeBurnUsd": 0.6347905,
     "firstProfitAtCycle": 2
   },
   "sustainedSovereignCycles": 0,
