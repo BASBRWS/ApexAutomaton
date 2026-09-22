@@ -67,8 +67,12 @@ export function buildSystemPrompt(args: {
     '## How to respond',
     'Respond with ONE action as a single JSON object and NOTHING else:',
     '```json',
-    '{ "tool": "<tool name>", "input": { ... }, "rationale": "<one short sentence>" }',
+    '{ "tool": "<tool name>", "input": { ... }, "rationale": "<2-4 sentences>" }',
     '```',
+    'In the rationale, actually reason it through: what you read in the market right',
+    'now (which assets are moving and how), the options you weighed and why you',
+    'rejected them, why THIS action best grows your book, and the main risk you are',
+    'accepting. Be concrete and specific to this cycle — not a generic sentence.',
     'Pick the action that best grows your book right now, given the prices and',
     'your current positions below.',
   ].join('\n');

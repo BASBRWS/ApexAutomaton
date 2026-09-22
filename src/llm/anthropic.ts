@@ -33,7 +33,10 @@ export class AnthropicClient implements LLMClient {
     }
 
     if (supportsAdaptive) {
-      params.thinking = { type: 'adaptive' };
+      // 'summarized' surfaces a readable summary of the model's reasoning. The
+      // model already thinks (and is billed for it) under any display setting;
+      // we just stop discarding it, so the dashboard can show real deliberation.
+      params.thinking = { type: 'adaptive', display: 'summarized' };
       if (req.effort) {
         params.output_config = { effort: req.effort };
       }
@@ -47,8 +50,15 @@ export class AnthropicClient implements LLMClient {
       .join('')
       .trim();
 
+    const thinking = resp.content
+      .filter((b): b is Anthropic.ThinkingBlock => b.type === 'thinking')
+      .map((b) => b.thinking)
+      .join('\n')
+      .trim();
+
     return {
       text,
+      thinking: thinking || undefined,
       model: resp.model,
       usage: {
         inputTokens: resp.usage.input_tokens,

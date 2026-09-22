@@ -118,7 +118,10 @@ export interface JournalEntry {
   model: string;
   action: string;
   actionSummary: string;
+  /** the agent's concise one-line justification (from its JSON action). */
   rationale?: string;
+  /** a summary of the model's own reasoning (thinking) this cycle, when available. */
+  reasoning?: string;
   /** real USD cost of this cycle's LLM call (deducted from the book). */
   costUsd: number;
   /** change in book equity this cycle, USD (market move minus burn). */

@@ -327,6 +327,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     action: chosenName,
     actionSummary: toolResult.summary,
     rationale: action?.rationale,
+    reasoning: resp.thinking,
     costUsd,
     cyclePnlUsd,
     signatures,

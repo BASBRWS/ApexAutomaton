@@ -106,8 +106,8 @@ export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
       return {
         tier,
         model: cheaper,
-        effort: 'medium',
-        maxTokens: 2048,
+        effort: 'high',
+        maxTokens: 4096,
         tools: TOOLS_NORMAL,
         rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:

@@ -20,6 +20,8 @@ export interface LLMRequest {
 
 export interface LLMResponse {
   text: string;
+  /** a readable summary of the model's own reasoning (thinking), when available. */
+  thinking?: string;
   model: string;
   usage: TokenUsage;
   stopReason: string | null;

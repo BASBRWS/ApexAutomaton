@@ -66,8 +66,9 @@
       .badge.rest { color: var(--muted); }
       .badge.reflect, .badge.write_journal { color: #b98be0; border-color: #b98be0; }
       .badge.die { color: #e06c75; border-color: #e06c75; }
-      .msg-why { font-size: 14px; line-height: 1.45; }
-      .msg-sum { font-size: 12px; color: var(--muted); margin-top: 5px; }
+      .msg-why { font-size: 14px; line-height: 1.45; font-weight: 600; }
+      .msg-think { font-size: 13px; line-height: 1.5; margin-top: 7px; white-space: pre-wrap; opacity: .95; border-left: 2px solid var(--accent-dim); padding-left: 10px; }
+      .msg-sum { font-size: 12px; color: var(--muted); margin-top: 6px; }
       .msg-note { font-size: 11px; color: var(--muted); margin-top: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
     </style>
   </head>
@@ -84,7 +85,7 @@
       <h2>Book equity over time (SOL)</h2>
       <svg id="chart" viewBox="0 0 900 260" aria-label="equity in SOL over cycles chart"></svg>
 
-      <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's own rationale, newest first</span></h2>
+      <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's decision + its full deliberation, newest first</span></h2>
       <div id="reasoning" class="feed"></div>
 
       <h2>Trade book</h2>
@@ -319,6 +320,7 @@
               `<span>equity ${(Number(e.equitySol) || 0).toFixed(4)} SOL</span>` +
             '</div>' +
             `<div class="msg-why">${why}</div>` +
+            (e.reasoning ? `<div class="msg-think">${escapeHtml(e.reasoning)}</div>` : '') +
             (e.actionSummary ? `<div class="msg-sum">→ ${escapeHtml(e.actionSummary)}</div>` : '') +
             (cleanNote(e.note) ? `<div class="msg-note">${escapeHtml(cleanNote(e.note))}</div>` : '');
           host.appendChild(div);
