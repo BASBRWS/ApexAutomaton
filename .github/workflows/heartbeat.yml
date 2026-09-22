@@ -10,13 +10,15 @@ name: automaton-heartbeat
 
 on:
   schedule:
-    # Every 15 minutes (subject to the coarseness/delay noted above).
-    - cron: '*/15 * * * *'
+    # Every 5 minutes (the GitHub minimum). Actions cron is still best-effort and
+    # often delayed/skipped — the automaton-watchdog workflow covers the gaps.
+    - cron: '*/5 * * * *'
   workflow_dispatch: {} # allow manual ticks from the Actions tab
 
-# Only one tick at a time; never overlap cycles.
+# One tick at a time across BOTH the heartbeat and the watchdog (shared group),
+# so they never run a cycle simultaneously.
 concurrency:
-  group: automaton-heartbeat
+  group: automaton-tick
   cancel-in-progress: false
 
 permissions:
