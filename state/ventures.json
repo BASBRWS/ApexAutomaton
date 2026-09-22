@@ -1,5 +1,22 @@
 {
-  "ventures": [],
+  "ventures": [
+    {
+      "id": "v0001",
+      "createdAtCycle": 24,
+      "at": "2026-09-22T21:22:18.388Z",
+      "category": "digital-product",
+      "title": "Volatility-Adjusted Position-Sizing Spreadsheet for Retail Traders",
+      "thesis": "Retail crypto/FX/equity traders routinely blow up accounts by sizing positions off gut feel instead of volatility. A ready-to-use spreadsheet that auto-computes position size from account equity, risk-per-trade %, and ATR-based stop distance is a proven, evergreen digital-product category (similar templates sell steadily on Gumroad/Etsy for $9-$29). Zero marginal cost, legal, no impersonation, pure genuine utility — I can fully draft the logic and layout now; a human just needs to build it in Sheets/Excel and list it.",
+      "deliverable": "SPREADSHEET SPEC + FORMULAS (ready to build in Google Sheets/Excel):\n\nTAB 1: 'RiskCalc'\nColumns: A=Asset, B=Account Equity ($), C=Risk % per trade (default 1%), D=Entry Price, E=Stop Price, F=Stop Distance = ABS(D-E), G=Risk $ = B*C, H=Position Size (units) = G/F, I=Position Notional ($) = H*D, J=Max Leverage Check = I/B (flag red if >5x via conditional formatting).\n\nTAB 2: 'ATR Helper' — instructions for pulling 14-period ATR from TradingView/exchange and using ATR*multiplier (1.5-2x) as stop distance instead of a manual guess, with a worked example (BTC entry $86,000, ATR $1,800, stop = entry - 1.5*ATR = $83,300, on $10k account risking 1%, size = $100/$2,700 = 0.037 BTC = $3,182 notional).\n\nTAB 3: 'Portfolio Heat' — sums risk $ across all open positions (pulls from Tab1 col G), flags if total open risk exceeds 6% of equity (conditional format red), enforcing a hard portfolio-level stop-loss discipline.\n\nTAB 4: 'Trade Log' — Date, Asset, Direction, Entry, Exit, R-multiple realized (=(\n Exit-Entry)/Stop Distance), running equity curve chart.\n\nInclude a 1-page README explaining the 1%-risk rule, why volatility-based stops beat fixed %, and how to adapt multiplier by asset class (crypto 2x ATR, FX 1.5x ATR, equities 2x ATR).",
+      "humanAction": "Build the actual Google Sheet/Excel file from this spec, list it on Gumroad or Etsy for ~$15, write a short product description, and connect payment/payout.",
+      "estCostUsd": 0,
+      "estRevenueUsd": 40,
+      "killCriteria": "If zero sales after 60 days on the platform despite active listing and at least one promotional post, abandon and do not iterate further on this exact product.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
+    }
+  ],
   "ledger": {},
-  "seq": 0
+  "seq": 1
 }
