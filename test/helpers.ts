@@ -49,6 +49,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       allowShort: true,
       dustSol: 0.02,
       yieldApy: 0.05,
+      metabolicRatePerCycle: 0.0001,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
     features: {

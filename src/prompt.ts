@@ -89,6 +89,7 @@ export function buildUserPrompt(args: {
   dustUsd: number;
   avgBurnUsd: number;
   runwayCycles: number;
+  metabolicDailyPct: number;
   prices: PriceMap;
   prevPrices: PriceMap;
   deskSummary: string;
@@ -121,10 +122,13 @@ export function buildUserPrompt(args: {
     '## Survival — weigh this FIRST, before any trade',
     `You DIE if equity falls to ${args.dustSol} SOL ($${args.dustUsd.toFixed(2)}). You are at ${args.equitySol.toFixed(4)} SOL.`,
     `Net PnL since birth: $${s.netPnlUsd.toFixed(2)} (${trend}); $${drawdownUsd.toFixed(2)} below your peak.`,
-    `Compute burn ~$${args.avgBurnUsd.toFixed(4)}/cycle → runway if you just rest: ${runway}.`,
-    'Burn alone kills slowly; a losing streak of bad trades kills fast. So the real',
-    'question each cycle is: are you safe enough to take risk and GROW, or bleeding',
-    'and needing to preserve to SURVIVE? Decide that explicitly and act on it.',
+    `You pay to exist: a metabolic cost of ~${args.metabolicDailyPct.toFixed(1)}%/day of your equity,`,
+    `plus compute burn (~$${args.avgBurnUsd.toFixed(4)}/cycle). Runway if you just rest: ${runway}.`,
+    `This means COASTING IS DEATH: standing still loses ~${args.metabolicDailyPct.toFixed(1)}%/day, so a small`,
+    'gain is NOT a safe place to sit — you must keep out-earning your metabolism or you',
+    'slowly starve. Preserve only to dodge a clear imminent loss, never as your default.',
+    'So each cycle: are you safe enough to take risk and GROW (usually yes), or bleeding',
+    'badly and needing to preserve briefly to SURVIVE? Decide explicitly and act on it.',
     '',
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',

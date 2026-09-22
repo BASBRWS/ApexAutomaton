@@ -155,6 +155,12 @@ export interface Config {
      * choose instead of trading. Accrued by wall-clock time, so it is honest and
      * modest: it only becomes a survival path once the book is large. 0 disables. */
     yieldApy: number;
+    /** metabolic cost per cycle, as a FRACTION OF EQUITY (e.g. 0.0001 = 0.01%/cycle
+     * ≈ ~1%/day at 15-min cycles). A "cost of living" that scales with the book, so
+     * it bites at every size — the agent must out-earn its own metabolism or it
+     * slowly starves. This is the forcing function against coasting on a small gain.
+     * 0 disables. */
+    metabolicRatePerCycle: number;
     /** base URL of the price API (default: CoinGecko simple price). */
     priceApiBase: string;
   };
@@ -256,6 +262,7 @@ export function loadConfig(): Config {
       allowShort: envBool('ALLOW_SHORT', true),
       dustSol: envNum('TRADING_DUST_SOL', 0.02),
       yieldApy: envNum('YIELD_APY', 0.05),
+      metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },

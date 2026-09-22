@@ -180,7 +180,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const dustUsd = cfg.trading.dustSol * solPrice;
   const priorCycles = Math.max(1, cycle - 1);
   const avgBurnUsd = Math.max(state.score.cumulativeBurnUsd / priorCycles, 0.01);
-  const runwayCycles = Math.max(0, (equityPre - dustUsd) / avgBurnUsd);
+  // Total drag if it just rests = compute burn + metabolic cost (the dominant one).
+  const dragPerCycle = avgBurnUsd + equityPre * cfg.trading.metabolicRatePerCycle;
+  const runwayCycles = Math.max(0, (equityPre - dustUsd) / dragPerCycle);
 
   const user = buildUserPrompt({
     cycle,
@@ -192,6 +194,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     dustUsd,
     avgBurnUsd,
     runwayCycles,
+    metabolicDailyPct: cfg.trading.metabolicRatePerCycle * 96 * 100, // ~cycles/day
     prices,
     prevPrices,
     deskSummary: summarizeDesk(state.desk, prices),
@@ -259,6 +262,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // --- Settle the compute burn against the book (economic). -----------------
   state.desk.cashUsd -= costUsd;
+
+  // --- Metabolic cost: a "cost of living" as a fraction of equity, so it bites
+  // at every book size. This is the forcing function against coasting: the agent
+  // must keep out-earning its own metabolism or it slowly starves toward death. --
+  const metabolicUsd = equityPre * cfg.trading.metabolicRatePerCycle;
+  state.desk.cashUsd -= metabolicUsd;
+  const metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
 
   // --- On-chain heartbeat: prove we ran, on Solana. Best-effort. ------------
   let heartbeatNote: string;
@@ -329,6 +339,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     coerceNote,
     priceNote,
     yieldNote,
+    metabolicNote,
     toolResult.note,
     heartbeatNote,
     replicationNote,

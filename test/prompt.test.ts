@@ -17,6 +17,7 @@ describe('buildUserPrompt — survival framing', () => {
       dustUsd: cfg.trading.dustSol * 117,
       avgBurnUsd: 0.015,
       runwayCycles: 15000,
+      metabolicDailyPct: 0.96,
       prices: { BTC: 60000 },
       prevPrices: { BTC: 59000 },
       deskSummary: 'cash=$234',
@@ -26,8 +27,11 @@ describe('buildUserPrompt — survival framing', () => {
     });
     expect(prompt).toContain('Survival');
     expect(prompt).toContain('You DIE');
-    expect(prompt).toContain('runway');
-    expect(prompt).toMatch(/preserve to SURVIVE/i);
+    expect(prompt).toMatch(/runway/i);
+    expect(prompt).toMatch(/preserve.*to SURVIVE/i);
+    // Growth pressure: the metabolic cost makes coasting a losing default.
+    expect(prompt).toMatch(/metabolic/i);
+    expect(prompt).toMatch(/COASTING IS DEATH/i);
   });
 });
 
