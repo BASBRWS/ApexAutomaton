@@ -127,6 +127,71 @@ export class CoinGeckoPriceSource implements PriceSource {
   }
 }
 
+/** Map trading symbols to Yahoo Finance tickers — the world BEYOND crypto:
+ * forex, commodities, equities and indices, all priced in USD. Keyless. NOTE:
+ * equities/indices only move during their market hours; outside them Yahoo
+ * returns the last close, so those positions sit flat (not a bug). Forex and
+ * commodity futures trade ~24/5; crypto (the other sources) is 24/7. */
+export const YAHOO_TICKERS: Record<string, string> = {
+  // Forex — USD per unit of the foreign currency
+  EURUSD: 'EURUSD=X',
+  GBPUSD: 'GBPUSD=X',
+  AUDUSD: 'AUDUSD=X',
+  // Commodities
+  WTI: 'CL=F', // crude oil
+  XAG: 'SI=F', // silver
+  COPPER: 'HG=F',
+  NATGAS: 'NG=F',
+  // Equities & ETFs (US market hours only)
+  AAPL: 'AAPL',
+  MSFT: 'MSFT',
+  NVDA: 'NVDA',
+  TSLA: 'TSLA',
+  AMZN: 'AMZN',
+  SPY: 'SPY', // S&P 500 ETF
+  QQQ: 'QQQ', // Nasdaq-100 ETF
+};
+
+/** Pure, testable parse of a Yahoo chart response → the current USD price. */
+export function parseYahooChartPrice(body: unknown): number | undefined {
+  const p = (body as { chart?: { result?: Array<{ meta?: { regularMarketPrice?: unknown } }> } })
+    ?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  return typeof p === 'number' && Number.isFinite(p) && p > 0 ? p : undefined;
+}
+
+/** Yahoo Finance chart endpoint: one keyless request per symbol. Covers forex,
+ * commodities, equities and indices — the non-crypto universe. */
+export class YahooPriceSource implements PriceSource {
+  readonly name = 'yahoo';
+  constructor(private readonly base = 'https://query1.finance.yahoo.com/v8/finance/chart') {}
+
+  async getPrices(symbols: string[]): Promise<PriceSnapshot> {
+    const wanted = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(
+      (s) => YAHOO_TICKERS[s],
+    );
+    if (wanted.length === 0) throw new Error('yahoo: no known tickers in request');
+    const prices: PriceMap = {};
+    await Promise.all(
+      wanted.map(async (sym) => {
+        try {
+          const ticker = YAHOO_TICKERS[sym]!;
+          const url = `${this.base}/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+          const res = await fetch(url, {
+            headers: { accept: 'application/json', 'user-agent': 'Mozilla/5.0 (ApexAutomaton)' },
+          });
+          if (!res.ok) return;
+          const price = parseYahooChartPrice(await res.json());
+          if (price !== undefined) prices[sym] = price;
+        } catch {
+          /* ignore one symbol; the composite handles the rest */
+        }
+      }),
+    );
+    if (Object.keys(prices).length === 0) throw new Error('yahoo: no usable prices');
+    return { at: new Date().toISOString(), prices };
+  }
+}
+
 /** Tries each source in order for the symbols still missing, merging results. */
 export class CompositePriceSource implements PriceSource {
   readonly name = 'composite';
@@ -160,7 +225,8 @@ export function requiredSymbols(cfg: Config): string[] {
 
 export function makePriceSource(cfg: Config): PriceSource {
   return new CompositePriceSource([
-    new CoinbasePriceSource(),
-    new CoinGeckoPriceSource(cfg.trading.priceApiBase),
+    new CoinbasePriceSource(), // crypto (per-symbol, keyless)
+    new CoinGeckoPriceSource(cfg.trading.priceApiBase), // crypto + tokenised gold
+    new YahooPriceSource(), // forex, commodities, equities, indices — beyond crypto
   ]);
 }

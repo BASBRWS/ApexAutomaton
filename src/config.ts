@@ -254,7 +254,10 @@ export function loadConfig(): Config {
       // own score. It is still priced for that one-time genesis conversion.
       assets: (
         envStr('TRADING_ASSETS') ??
-        'BTC,ETH,BNB,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,MATIC,ATOM,UNI,ARB,SUI,JUP,BONK,WIF,PYTH,RENDER,PAXG'
+        // A broad, multi-asset-class universe, all priced from REAL markets:
+        //   crypto (Coinbase/CoinGecko) · gold · forex · commodities · equities (Yahoo).
+        'BTC,ETH,BNB,XRP,ADA,DOGE,AVAX,TRX,LINK,DOT,LTC,BCH,ATOM,UNI,AAVE,ARB,OP,SUI,APT,NEAR,INJ,TIA,RENDER,JUP,BONK,WIF,PYTH,ORCA,' +
+        'PAXG,EURUSD,GBPUSD,AUDUSD,WTI,XAG,COPPER,NATGAS,AAPL,MSFT,NVDA,TSLA,AMZN,SPY,QQQ'
       )
         .split(',')
         .map((s) => s.trim().toUpperCase())

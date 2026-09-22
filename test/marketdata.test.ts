@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { CompositePriceSource, type PriceSnapshot, type PriceSource } from '../src/marketdata.js';
+import {
+  CompositePriceSource,
+  parseYahooChartPrice,
+  YAHOO_TICKERS,
+  type PriceSnapshot,
+  type PriceSource,
+} from '../src/marketdata.js';
+
+describe('Yahoo (beyond-crypto) price parsing', () => {
+  it('extracts regularMarketPrice from a chart response', () => {
+    const body = { chart: { result: [{ meta: { regularMarketPrice: 187.42 } }] } };
+    expect(parseYahooChartPrice(body)).toBe(187.42);
+  });
+
+  it('returns undefined for missing/invalid/zero prices', () => {
+    expect(parseYahooChartPrice({})).toBeUndefined();
+    expect(parseYahooChartPrice({ chart: { result: [] } })).toBeUndefined();
+    expect(parseYahooChartPrice({ chart: { result: [{ meta: { regularMarketPrice: 0 } }] } })).toBeUndefined();
+    expect(parseYahooChartPrice({ chart: { result: [{ meta: { regularMarketPrice: 'x' } }] } })).toBeUndefined();
+  });
+
+  it('covers forex, commodities and equities (distinct asset classes)', () => {
+    expect(YAHOO_TICKERS.EURUSD).toBe('EURUSD=X'); // forex
+    expect(YAHOO_TICKERS.WTI).toBe('CL=F'); // commodity
+    expect(YAHOO_TICKERS.AAPL).toBe('AAPL'); // equity
+  });
+});
 
 function fake(name: string, prices: Record<string, number>, fail = false): PriceSource {
   return {
