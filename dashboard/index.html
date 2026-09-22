@@ -53,6 +53,22 @@
       .err { color: #e06c75; }
       .empty { color: var(--muted); padding: 10px 2px; }
       .scroll { overflow-x: auto; }
+
+      /* Agent reasoning feed */
+      .feed { max-height: 460px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+      .msg { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .msg:last-child { border-bottom: 0; }
+      .msg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .msg-head .cyc { font-weight: 700; color: var(--fg); }
+      .badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+      .badge.trade, .badge.rebalance { color: var(--long); border-color: var(--long); }
+      .badge.stake { color: #59a7e0; border-color: #59a7e0; }
+      .badge.rest { color: var(--muted); }
+      .badge.reflect, .badge.write_journal { color: #b98be0; border-color: #b98be0; }
+      .badge.die { color: #e06c75; border-color: #e06c75; }
+      .msg-why { font-size: 14px; line-height: 1.45; }
+      .msg-sum { font-size: 12px; color: var(--muted); margin-top: 5px; }
+      .msg-note { font-size: 11px; color: var(--muted); margin-top: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
     </style>
   </head>
   <body>
@@ -67,6 +83,9 @@
 
       <h2>Book equity over time (SOL)</h2>
       <svg id="chart" viewBox="0 0 900 260" aria-label="equity in SOL over cycles chart"></svg>
+
+      <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's own rationale, newest first</span></h2>
+      <div id="reasoning" class="feed"></div>
 
       <h2>Trade book</h2>
       <div id="book-cash" class="muted"></div>
@@ -259,6 +278,53 @@
           `<tbody>${rows}</tbody></table></div>`;
       }
 
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+      function fmtTime(iso) {
+        try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+        catch { return ''; }
+      }
+      const shortModel = (m) => String(m || '').replace(/^claude-/, '');
+      function cleanNote(note) {
+        if (!note) return '';
+        // Drop the noisy on-chain heartbeat error; keep the useful head (prices/yield/book).
+        let n = String(note).split(/\s*\|\s*heartbeat/i)[0].trim();
+        if (n.length > 260) n = n.slice(0, 260) + '…';
+        return n;
+      }
+
+      function renderReasoning(journal) {
+        const host = document.getElementById('reasoning');
+        host.innerHTML = '';
+        if (!journal.length) {
+          host.innerHTML = '<div class="empty">No cycles yet — the agent’s reasoning appears here as it ticks.</div>';
+          return;
+        }
+        journal.slice(-60).reverse().forEach((e) => {
+          const div = document.createElement('div');
+          div.className = 'msg';
+          const action = String(e.action || '');
+          const why = e.rationale
+            ? escapeHtml(e.rationale)
+            : '<span class="muted">(no rationale given this cycle)</span>';
+          div.innerHTML =
+            '<div class="msg-head">' +
+              `<span class="cyc">#${e.cycle}</span>` +
+              `<span>${fmtTime(e.at)}</span>` +
+              `<span>${escapeHtml(e.tier)}</span>` +
+              `<span>${escapeHtml(shortModel(e.model))}</span>` +
+              `<span class="badge ${escapeHtml(action)}">${escapeHtml(action)}</span>` +
+              `<span>equity ${(Number(e.equitySol) || 0).toFixed(4)} SOL</span>` +
+            '</div>' +
+            `<div class="msg-why">${why}</div>` +
+            (e.actionSummary ? `<div class="msg-sum">→ ${escapeHtml(e.actionSummary)}</div>` : '') +
+            (cleanNote(e.note) ? `<div class="msg-note">${escapeHtml(cleanNote(e.note))}</div>` : '');
+          host.appendChild(div);
+        });
+      }
+
       (async () => {
         const status = document.getElementById('status');
         try {
@@ -293,6 +359,7 @@
           );
 
           drawChart(journal);
+          renderReasoning(journal);
           renderBook(desk, prices);
           renderPopulation(state.children);
 
