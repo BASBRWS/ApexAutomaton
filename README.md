@@ -285,19 +285,27 @@ stays local-only via `npm run setup`.)
 
 ## Enable the heartbeat (GitHub Actions)
 
-`.github/workflows/heartbeat.yml` runs `npm run tick` on a cron and commits the
-updated `/state` back to the repo. Add the same values as **repository secrets**
+`.github/workflows/heartbeat.yml` drives the cycles and commits the updated
+`/state` back to the repo. Add the same values as **repository secrets**
 (Settings → Secrets and variables → Actions): `AGENT_PUBKEY`, `AGENT_KEYPAIR`,
 `MARKET_PUBKEY`, `MARKET_KEYPAIR`, `COMPUTE_PROVIDER_PUBKEY`, `OPERATOR_PUBKEY`,
 `ANTHROPIC_API_KEY`, and optionally `SOLANA_RPC_URL`.
 
-### The Actions-cron limitation (important)
+### Burst mode (working around the flaky cron)
 
-GitHub Actions cron is **coarse and best-effort**: the finest practical cadence
-is ~5+ minutes, and scheduled runs are frequently **delayed** (sometimes by many
-minutes) or skipped under load. It is **not** a truly continuous loop.
+GitHub Actions cron is **coarse and best-effort**: scheduled runs are frequently
+**delayed** or skipped (we have seen multi-hour gaps). A naive "one trigger = one
+cycle" loop is therefore not continuous.
 
-**Continuous alternative:** run `npm run tick` on a timer on a small VPS, a
+So the heartbeat runs in **bursts** (`.github/scripts/burst.sh`): one trigger runs
+a cycle every `BURST_INTERVAL_SECONDS` (default 15 min) for up to `BURST_CYCLES`
+(default 8, ~2h), committing + pushing state after each. A **single** successful
+trigger then keeps cycles flowing for hours, surviving a cron drought. A shared
+`concurrency` group plus a stale-guard (`STALE_SECONDS`, default 13 min) means the
+heartbeat and the offset **watchdog** never double-tick — overlapping triggers are
+cheap no-ops. Tune the cadence/length by editing the `env:` block in the workflows.
+
+**Fully-continuous alternative:** run `npm run tick` on a timer on a small VPS, a
 `systemd` timer, or **Cloud Run** with Cloud Scheduler. Persist `/state` by
 committing to the repo (as the workflow does) or wire up Firestore — the code
 already reserves `FIRESTORE_*` for that (Phase 2).

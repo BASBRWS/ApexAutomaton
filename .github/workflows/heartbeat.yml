@@ -1,22 +1,30 @@
 name: automaton-heartbeat
 
-# The heartbeat. One scheduled run = one cycle (one tick).
+# The heartbeat — now BURST-based, to work around GitHub's flaky cron.
 #
-# NOTE: GitHub Actions cron is coarse and best-effort — it fires roughly every
-# 5+ minutes at the finest, and scheduled runs are frequently DELAYED (sometimes
-# by many minutes) or skipped under load. This is NOT a truly continuous loop.
-# For a real heartbeat, run `npm run tick` on a timer on a VPS / Cloud Run /
-# systemd timer instead (see the README).
+# GitHub Actions `schedule` is coarse and best-effort: runs are frequently
+# delayed by many minutes or skipped entirely (we have seen multi-hour gaps).
+# So instead of "one trigger = one cycle", ONE trigger starts a BURST: the job
+# runs a cycle every BURST_INTERVAL_SECONDS (15 min) for up to BURST_CYCLES
+# cycles (~2h), committing state after each. A single successful trigger then
+# keeps cycles flowing for hours, even through a cron drought.
+#
+# The shared `concurrency` group means only one burst runs at a time across the
+# heartbeat and the watchdog, and burst.sh's stale-guard makes any overlapping
+# trigger a cheap no-op — so they never double-tick.
+#
+# For a perfectly regular cadence, run `npm run tick` on a timer on a VPS /
+# Cloud Run / systemd timer instead (see the README).
 
 on:
   schedule:
-    # Every 5 minutes (the GitHub minimum). Actions cron is still best-effort and
-    # often delayed/skipped — the automaton-watchdog workflow covers the gaps.
-    - cron: '*/5 * * * *'
-  workflow_dispatch: {} # allow manual ticks from the Actions tab
+    # Every 15 minutes — the target cadence. Extra/late triggers are harmless:
+    # they queue behind a running burst (concurrency) or no-op via the stale-guard.
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {} # allow manual bursts from the Actions tab
 
-# One tick at a time across BOTH the heartbeat and the watchdog (shared group),
-# so they never run a cycle simultaneously.
+# One burst at a time across BOTH the heartbeat and the watchdog (shared group),
+# so they never run cycles simultaneously.
 concurrency:
   group: automaton-tick
   cancel-in-progress: false
@@ -24,9 +32,17 @@ concurrency:
 permissions:
   contents: write # to commit updated /state back to the repo
 
+env:
+  # Cadence + burst length (see .github/scripts/burst.sh for the semantics).
+  BURST_CYCLES: '8' # ~2h of autonomous cycles per trigger
+  BURST_INTERVAL_SECONDS: '900' # a cycle every 15 min
+  STALE_SECONDS: '780' # skip if a cycle ran < 13 min ago (a burst is already active)
+
 jobs:
   tick:
     runs-on: ubuntu-latest
+    # A burst is up to ~2h of cycles; cap generously below the 6h job limit.
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +53,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Run one cycle
-        id: tick
+      - name: Run a burst of cycles
         env:
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           AGENT_PUBKEY: ${{ secrets.AGENT_PUBKEY }}
@@ -53,27 +68,4 @@ jobs:
           # success, never scarcity). Safe on devnet; a funding failure is noted,
           # not fatal.
           REPLICATION_ENABLED: 'true'
-        # exit 1 means the agent died this cycle; we still want to persist state,
-        # so don't fail the job on a death — capture the code and continue.
-        continue-on-error: true
-        run: |
-          set +e
-          npm run --silent tick
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-
-      - name: Commit updated state
-        run: |
-          git config user.name "automaton-bot"
-          git config user.email "automaton-bot@users.noreply.github.com"
-          git add state/ SOUL.md || true
-          if git diff --cached --quiet; then
-            echo "No state changes to commit."
-          else
-            git commit -m "heartbeat: cycle state update"
-            git push
-          fi
-
-      - name: Surface death
-        if: steps.tick.outputs.exit_code == '1'
-        run: |
-          echo "::warning::The automaton died this cycle (balance <= dust). See state/obituaries."
+        run: bash .github/scripts/burst.sh
