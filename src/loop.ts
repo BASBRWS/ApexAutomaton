@@ -263,8 +263,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       });
     }
   } catch (err) {
-    heartbeatNote =
-      err instanceof PolicyError ? `heartbeat blocked: ${err.message}` : `heartbeat error: ${errMsg(err)}`;
+    heartbeatNote = summarizeHeartbeatError(err);
   }
 
   // --- Score: recompute equity after trades + burn. -------------------------
@@ -391,4 +390,22 @@ function buildObituary(
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * The on-chain heartbeat is best-effort proof-of-life, decoupled from the paper
+ * economy. On failure (kill switch, an unfunded devnet destination, RPC hiccup)
+ * the Solana SDK throws a SendTransactionError whose message carries a multi-line
+ * simulation dump. Keep the journal note to a single, legible line rather than
+ * spilling that dump into every cycle's record.
+ */
+function summarizeHeartbeatError(err: unknown): string {
+  if (err instanceof PolicyError) return `heartbeat blocked: ${err.message}`;
+  const raw = errMsg(err);
+  if (/insufficient funds for rent/i.test(raw)) {
+    return 'heartbeat skipped: on-chain destination not rent-funded (devnet; non-fatal)';
+  }
+  const firstLine = (raw.split('\n')[0] ?? '').trim();
+  const short = firstLine.length > 140 ? `${firstLine.slice(0, 140)}…` : firstLine;
+  return `heartbeat error: ${short || 'unknown (non-fatal)'}`;
 }
