@@ -1,9 +1,9 @@
 {
   "bornAt": "2026-09-22T07:04:41.917Z",
-  "cycle": 17,
-  "lastRunAt": "2026-09-22T12:55:39.383Z",
+  "cycle": 18,
+  "lastRunAt": "2026-09-22T13:10:50.741Z",
   "desk": {
-    "cashUsd": 27.1843256273813,
+    "cashUsd": 27.168841627381298,
     "positions": {
       "BTC": {
         "units": 0.00013692417032920576,
@@ -28,31 +28,31 @@
     },
     "capitalUsd": 117.565,
     "openedAtCycle": 0,
-    "stakedUsd": 100.00177625589232
+    "stakedUsd": 100.00191965693641
   },
   "lastPrices": {
-    "ETH": 2751.665,
-    "XRP": 1.54255,
-    "ADA": 0.248125,
-    "BTC": 85932.055,
-    "AVAX": 10.8285,
-    "MATIC": 0.108105,
-    "PAXG": 4333.77,
-    "SOL": 117.375,
-    "DOT": 1.17215,
-    "PYTH": 0.062945,
-    "BNB": 788.485,
-    "ARB": 0.22037,
-    "DOGE": 0.0993,
-    "SUI": 1.02395,
-    "BONK": 0.000003565,
-    "WIF": 0.26825,
-    "UNI": 9.622,
-    "LTC": 60.7575,
-    "JUP": 0.0004463428786979258,
-    "RENDER": 1.85825,
-    "ATOM": 1.75595,
-    "LINK": 12.9685
+    "ETH": 2758.02,
+    "XRP": 1.54155,
+    "ADA": 0.25111,
+    "BTC": 86126.915,
+    "AVAX": 10.972,
+    "MATIC": 0.108945,
+    "PAXG": 4339.245,
+    "SOL": 117.65,
+    "DOT": 1.17655,
+    "PYTH": 0.063495,
+    "BNB": 790.27,
+    "ARB": 0.221595,
+    "DOGE": 0.100145,
+    "SUI": 1.02385,
+    "BONK": 0.00000359,
+    "WIF": 0.27362,
+    "UNI": 9.45425,
+    "LTC": 61.518,
+    "JUP": 0.0004486517555444726,
+    "RENDER": 1.87595,
+    "ATOM": 1.77025,
+    "LINK": 13.11
   },
   "children": [],
   "caps": {
@@ -100,15 +100,25 @@
       "cycle": 17,
       "at": "2026-09-22T12:55:39.383Z",
       "note": "heartbeat (memo)"
+    },
+    {
+      "kind": "heartbeat",
+      "signature": "wEFgLNURLqTRsfoRJXtCUDEr3X2PBjZHhnEoPL9fY6TrsYeUWRDxVMLgA8CdHzFq64pm6eao83SPDXdoYWCbdYF",
+      "lamports": 0,
+      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "cycle": 18,
+      "at": "2026-09-22T13:10:50.740Z",
+      "note": "heartbeat (memo)"
     }
   ],
   "score": {
     "startEquityUsd": 117.565,
-    "equityUsd": 115.28979774478084,
+    "equityUsd": 115.054848081933,
     "peakEquityUsd": 118.03763177571055,
-    "netPnlUsd": -2.275202255219156,
+    "netPnlUsd": -2.5101519180669953,
     "tradeCycles": 5,
-    "cumulativeBurnUsd": 0.2753675,
+    "cumulativeBurnUsd": 0.2908515,
     "firstProfitAtCycle": 3
   },
   "sustainedSovereignCycles": 0,
