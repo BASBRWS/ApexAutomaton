@@ -97,6 +97,9 @@
         </table>
       </div>
 
+      <h2>Ventures <span id="ventures-sub" class="muted" style="font-size:12px;font-weight:400">· real-economy opportunities the agent builds; you approve at the money/identity edge</span></h2>
+      <div id="ventures"></div>
+
       <h2>Population <span id="pop-count" class="muted"></span></h2>
       <div id="population"></div>
 
@@ -328,12 +331,63 @@
         });
       }
 
+      function ventureStatusLabel(s) {
+        return {
+          proposed: 'awaiting you',
+          approved: 'approved',
+          active: 'live',
+          killed: 'killed',
+          rejected: 'rejected',
+        }[s] || String(s || '');
+      }
+
+      function renderVentures(book) {
+        const host = document.getElementById('ventures');
+        const sub = document.getElementById('ventures-sub');
+        host.innerHTML = '';
+        const ventures = (book && Array.isArray(book.ventures)) ? book.ventures : [];
+        if (!ventures.length) {
+          host.innerHTML = '<div class="empty">No ventures yet — when the agent finds a real-world opportunity it builds one here, and it waits for your approval before it can earn.</div>';
+          return;
+        }
+        const waiting = ventures.filter((v) => v.status === 'proposed').length;
+        const live = ventures.filter((v) => v.status === 'active').length;
+        const earned = ventures.reduce((sum, v) => sum + (Number(v.revenueUsd) || 0), 0);
+        const auto = Object.entries((book && book.ledger) || {})
+          .filter(([, e]) => e && e.autoEligible)
+          .map(([c]) => c);
+        sub.textContent = `· ${waiting} awaiting you · ${live} live · ${usd(earned)} real revenue`
+          + (auto.length ? ` · autonomy-earned: ${auto.join(', ')}` : '');
+
+        ventures.slice().reverse().forEach((v) => {
+          const div = document.createElement('div');
+          div.className = 'msg';
+          const st = String(v.status || '');
+          const money = (Number(v.revenueUsd) || 0) > 0
+            ? `earned ${usd(v.revenueUsd)}`
+            : `est ${usd(v.estRevenueUsd)}`;
+          div.innerHTML =
+            '<div class="msg-head">' +
+              `<span class="cyc">${escapeHtml(v.id || '')}</span>` +
+              `<span class="badge ${st === 'proposed' ? 'reflect' : ''}">${escapeHtml(ventureStatusLabel(st))}</span>` +
+              `<span>${escapeHtml(v.category || '')}</span>` +
+              `<span>${escapeHtml(money)}</span>` +
+            '</div>' +
+            `<div class="msg-why"><strong>${escapeHtml(v.title || '')}</strong> — ${escapeHtml(v.thesis || '')}</div>` +
+            (v.deliverable ? `<div class="msg-think">${escapeHtml(v.deliverable)}</div>` : '') +
+            (v.humanAction ? `<div class="msg-sum">Your move: ${escapeHtml(v.humanAction)}</div>` : '') +
+            (v.killCriteria ? `<div class="msg-note">kill if: ${escapeHtml(v.killCriteria)}</div>` : '');
+          host.appendChild(div);
+        });
+      }
+
       (async () => {
         const status = document.getElementById('status');
         try {
-          const [state, journal] = await Promise.all([
+          const [state, journal, ventures] = await Promise.all([
             loadJson('../state/state.json'),
             loadNdjson('../state/journal.ndjson').catch(() => []),
+            loadJson('../state/ventures.json').catch(() => null),
           ]);
 
           const s = state.score ?? {};
@@ -360,11 +414,17 @@
             tile('open positions', openPositions),
             tile('cycles traded', s.tradeCycles ?? 0),
             tile('compute burn', usd(s.cumulativeBurnUsd)),
+            tile(
+              'ventures',
+              (ventures?.ventures ?? []).filter((v) => v.status === 'active').length + ' live',
+              (ventures?.ventures ?? []).filter((v) => v.status === 'proposed').length + ' awaiting you',
+            ),
           );
 
           drawChart(journal);
           renderReasoning(journal);
           renderBook(desk, prices);
+          renderVentures(ventures);
           renderPopulation(state.children);
 
           const tbody = document.querySelector('#cycles tbody');

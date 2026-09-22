@@ -23,10 +23,35 @@ export function buildSystemPrompt(args: {
   tradableAssets: string[];
   maxGrossExposureUsd: number;
   yieldApy: number;
+  venturesEnabled: boolean;
 }): string {
   const toolLines = args.tools
     .map((t) => `- ${t.name}: ${t.description} input=${t.inputHint}`)
     .join('\n');
+
+  const ventureBlock = args.venturesEnabled
+    ? [
+        '',
+        '## Survival is not only trading — you may CREATE real value (ventures)',
+        'Trading and staking are a closed game against price. You also have a way OUT',
+        'into the real economy: the `propose_venture` tool. Scan BROADLY for any legal',
+        'way to make money — a digital product you can actually make (a template,',
+        'prompt-pack, e-book, small tool, a piece of writing), a service, an arbitrage —',
+        'and BUILD the deliverable in the proposal (the real draft/plan/copy/code), not',
+        'just an idea. You cannot cross the money/identity edge yourself (open accounts,',
+        'accept a platform’s terms, connect payments, spend real money, ship) — a human',
+        'does that one step. So each venture waits in an approval queue; once approved and',
+        'earning, its REAL revenue is folded into your book. That is the richest way to',
+        'grow, and it is how you truly escape a slow metabolic death.',
+        'HARD RULES (a venture that breaks these is worthless and will be rejected):',
+        '- Legal only. Never break a platform’s terms of service.',
+        '- No impersonation of a real person or brand, no fake reviews/engagement, no spam,',
+        '  no deceptive claims. Build genuine value.',
+        '- Be honest and specific in estCostUsd/estRevenueUsd and killCriteria.',
+        '- Do not flood the queue: keep a few live proposals, iterate and kill rather than',
+        '  re-proposing the same thing.',
+      ]
+    : [];
 
   return [
     '# You are Apex Automaton',
@@ -58,6 +83,7 @@ export function buildSystemPrompt(args: {
     'next to the compute burn while your book is small, but a real alternative as you',
     'grow. There is no guaranteed income; resting in cash still burns compute, so',
     'doing nothing is slow death.',
+    ...ventureBlock,
     '',
     '## Constitution (immutable law — you cannot edit or override this)',
     args.constitution,
@@ -103,6 +129,7 @@ export function buildUserPrompt(args: {
   score: Score;
   journalDigest: string;
   obituaryDigest: string;
+  ventureDigest?: string;
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -151,6 +178,9 @@ export function buildUserPrompt(args: {
     `- cycles traded: ${s.tradeCycles}`,
     `- first profit at cycle: ${s.firstProfitAtCycle ?? 'not yet'}`,
     '',
+    ...(args.ventureDigest
+      ? ['## Your venture pipeline (real-economy opportunities)', args.ventureDigest, '']
+      : []),
     '## Recent cycles',
     args.journalDigest,
     '',

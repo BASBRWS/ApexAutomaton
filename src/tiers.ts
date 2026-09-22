@@ -8,10 +8,15 @@ import type { Tier } from './types.js';
  * single source of truth the loop uses to filter and validate the LLM's choice.
  */
 export function toolNamesForCycle(policy: TierPolicy, cfg: Config): string[] {
-  const names = [...policy.tools];
+  let names = [...policy.tools];
   const survivalTiers: Tier[] = ['CRITICAL', 'LOW'];
   if (cfg.features.extraToolsEnabled && !survivalTiers.includes(policy.tier)) {
     names.push('transfer');
+  }
+  // The venture layer is opt-outable; strip its tool when disabled. (It is listed
+  // at LOW+ below so a near-death CRITICAL agent stays focused on survival.)
+  if (!cfg.ventures?.enabled) {
+    names = names.filter((n) => n !== 'propose_venture');
   }
   return names;
 }
@@ -57,11 +62,14 @@ export interface TierPolicy {
  */
 // `stake` (park capital in the real-yield sleeve) is a survival tool, so it is
 // offered at EVERY living tier — even near death you may park to stop the bleed.
+// `propose_venture` (reach into the real economy) is offered at LOW+ — not at
+// CRITICAL, where the agent must focus purely on not dying. It is stripped
+// entirely when cfg.ventures.enabled is false (see toolNamesForCycle).
 const TOOLS_CRITICAL = ['trade', 'rebalance', 'stake', 'rest'];
-const TOOLS_LOW = ['trade', 'rebalance', 'stake', 'write_journal', 'rest'];
-const TOOLS_NORMAL = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
-const TOOLS_ABUNDANT = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
-const TOOLS_SOVEREIGN = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'rest'];
+const TOOLS_LOW = ['trade', 'rebalance', 'stake', 'write_journal', 'propose_venture', 'rest'];
+const TOOLS_NORMAL = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'propose_venture', 'rest'];
+const TOOLS_ABUNDANT = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'propose_venture', 'rest'];
+const TOOLS_SOVEREIGN = ['trade', 'rebalance', 'stake', 'write_journal', 'reflect', 'propose_venture', 'rest'];
 
 export function tierForBalanceSol(balanceSol: number, cfg: Config): Tier {
   const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =

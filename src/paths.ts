@@ -9,6 +9,8 @@ export const REPO_ROOT = process.cwd();
 export const STATE_DIR = path.resolve(REPO_ROOT, 'state');
 export const STATE_FILE = path.join(STATE_DIR, 'state.json');
 export const JOURNAL_FILE = path.join(STATE_DIR, 'journal.ndjson');
+/** The venture pipeline / approval queue (real-world opportunity layer). */
+export const VENTURES_FILE = path.join(STATE_DIR, 'ventures.json');
 export const OBITUARY_DIR = path.join(STATE_DIR, 'obituaries');
 export const CHILDREN_SECRET_DIR = path.join(STATE_DIR, 'children');
 export const KILL_FILE = path.join(STATE_DIR, 'KILL');

@@ -10,6 +10,7 @@ import {
   type Order,
 } from '../trading/desk.js';
 import type { TransferProposal } from '../types.js';
+import { addProposal, type ProposalInput } from '../ventures/store.js';
 import { ToolRegistry, type Tool } from './registry.js';
 
 /**
@@ -178,6 +179,55 @@ const reflect: Tool = {
   },
 };
 
+const proposeVenture: Tool = {
+  name: 'propose_venture',
+  description:
+    'Reach beyond trading into the REAL economy: propose ONE concrete, LEGAL ' +
+    'money-making venture and BUILD its deliverable now. Scan broadly — a digital ' +
+    'product you can create (template, prompt-pack, e-book, tool), a piece of ' +
+    'content, a service, an arbitrage — any legal category. You must actually ' +
+    'produce the deliverable (the draft/plan/copy/code), not just an idea. It goes ' +
+    'into an approval queue: a human takes the one step you legally cannot (open the ' +
+    'account, accept the platform terms, connect payments, publish, ship), then real ' +
+    'revenue they report is folded into your book. Never propose anything that breaks ' +
+    'a platform’s terms, impersonates a person or brand, fakes reviews, or spams. ' +
+    'Keep at most a few proposals waiting; iterate and kill rather than pile up.',
+  movesValue: false,
+  inputHint:
+    '{ "category": "digital-product", "title": "...", "thesis": "why it earns, legally", ' +
+    '"deliverable": "the ACTUAL drafted product/plan/copy/code", "humanAction": "the one ' +
+    'step you must take at the money/identity edge", "estCostUsd": 0, "estRevenueUsd": 50, ' +
+    '"killCriteria": "when to abandon it" }',
+  async execute(input, ctx) {
+    if (!ctx.ventureBook) {
+      return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
+    }
+    const proposal: ProposalInput = {
+      category: str(input.category) || 'other',
+      title: str(input.title),
+      thesis: str(input.thesis),
+      deliverable: str(input.deliverable),
+      humanAction: str(input.humanAction),
+      estCostUsd: Number(input.estCostUsd),
+      estRevenueUsd: Number(input.estRevenueUsd),
+      killCriteria: str(input.killCriteria),
+    };
+    const res = addProposal(ctx.ventureBook, proposal, ctx.cycle, new Date().toISOString());
+    if (!res.ok || !res.venture) {
+      return { summary: `venture not queued: ${res.reason}`, note: `venture rejected: ${res.reason}` };
+    }
+    const v = res.venture;
+    return {
+      summary: `proposed venture ${v.id} "${v.title}" (${v.category}) — awaiting your approval`,
+      note: `venture ${v.id} queued: ${v.humanAction.slice(0, 120)}`,
+    };
+  },
+};
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v === undefined || v === null ? '' : String(v);
+}
+
 const rest: Tool = {
   name: 'rest',
   description:
@@ -234,8 +284,18 @@ export function buildRegistry(): ToolRegistry {
     .register(stake)
     .register(writeJournal)
     .register(reflect)
+    .register(proposeVenture)
     .register(rest)
     .register(transfer);
 }
 
-export const BUILTIN_TOOLS = [trade, rebalance, stake, writeJournal, reflect, rest, transfer];
+export const BUILTIN_TOOLS = [
+  trade,
+  rebalance,
+  stake,
+  writeJournal,
+  reflect,
+  proposeVenture,
+  rest,
+  transfer,
+];

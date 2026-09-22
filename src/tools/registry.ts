@@ -6,6 +6,7 @@ import type { RevenueAdapter } from '../revenue/adapter.js';
 import type { Signer } from '../solana/signer.js';
 import type { AutomatonState, Tier } from '../types.js';
 import type { TierPolicy } from '../tiers.js';
+import type { VentureBook } from '../ventures/types.js';
 
 /**
  * Pluggable tool registry. Each tool declares a name, a description, an input
@@ -29,6 +30,9 @@ export interface ToolContext {
   tier: Tier;
   policy: TierPolicy;
   cycle: number;
+  /** the venture pipeline for this cycle, owned by the loop. The propose_venture
+   * tool mutates it; the loop persists it once at the end of the cycle. */
+  ventureBook?: VentureBook;
 }
 
 export interface ToolResult {

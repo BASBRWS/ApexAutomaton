@@ -25,6 +25,12 @@ import {
 import { buildRegistry } from './tools/builtin.js';
 import type { Tool, ToolContext, ToolResult } from './tools/registry.js';
 import { shouldReplicate, replicate } from './replication.js';
+import {
+  loadVentureBook,
+  saveVentureBook,
+  applyDecisions,
+  ventureDigest,
+} from './ventures/store.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
@@ -124,6 +130,28 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const yieldEarnedUsd = accrueYield(state.desk, cfg.trading.yieldApy, dtYears);
   const yieldNote = yieldEarnedUsd > 0 ? `yield +$${yieldEarnedUsd.toFixed(4)}` : undefined;
 
+  // --- Ventures: apply the human's queue decisions and fold any newly-reported
+  // REAL revenue into the book BEFORE the death check, so real income counts (and
+  // can even save the agent). Activation of approved ventures ticks the autonomy
+  // ledger. The book is owned by the loop and saved once at the end. --------------
+  const ventureBook = cfg.ventures.enabled ? loadVentureBook() : null;
+  let ventureNote: string | undefined;
+  if (ventureBook) {
+    const decisions = applyDecisions(
+      ventureBook,
+      cycle,
+      cfg.ventures.autonomyThreshold,
+      (usd) => {
+        state.desk.cashUsd += usd;
+      },
+    );
+    const parts: string[] = [];
+    if (decisions.activated.length > 0) parts.push(`ventures live +${decisions.activated.length}`);
+    if (decisions.revenueAddedUsd > 0) parts.push(`venture revenue +$${decisions.revenueAddedUsd.toFixed(2)}`);
+    if (decisions.newlyAutonomous.length > 0) parts.push(`autonomy earned: ${decisions.newlyAutonomous.join(',')}`);
+    if (parts.length > 0) ventureNote = parts.join('; ');
+  }
+
   // Gross-exposure cap for this cycle: the SOL cap priced at the live SOL price.
   const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
 
@@ -175,6 +203,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     tradableAssets: cfg.trading.assets,
     maxGrossExposureUsd,
     yieldApy: cfg.trading.yieldApy,
+    venturesEnabled: Boolean(ventureBook),
   });
   // --- Survival metrics: give the agent the numbers to weigh its own mortality.
   const dustUsd = cfg.trading.dustSol * solPrice;
@@ -201,6 +230,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     score: state.score,
     journalDigest: digestRecent(8),
     obituaryDigest: obituaryDigest(),
+    ventureDigest: ventureBook ? ventureDigest(ventureBook) : undefined,
   });
 
   // --- Think: one LLM call, priced by the tier's model. ---------------------
@@ -234,6 +264,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     tier,
     policy,
     cycle,
+    ventureBook: ventureBook ?? undefined,
   };
   let toolResult: ToolResult;
   try {
@@ -340,6 +371,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     priceNote,
     yieldNote,
     metabolicNote,
+    ventureNote,
     toolResult.note,
     heartbeatNote,
     replicationNote,
@@ -362,6 +394,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     note: noteParts.join(' | ') || undefined,
   };
   appendEntry(entry);
+
+  if (ventureBook) saveVentureBook(ventureBook);
 
   state.lastRunAt = now();
   await store.save(state);

@@ -165,6 +165,16 @@ export interface Config {
     priceApiBase: string;
   };
 
+  /** The Venture layer — the agent's reach into the REAL economy (opportunity
+   * scanning + building, gated by a human approval queue). Additive: the paper
+   * survival game is unchanged when disabled. */
+  ventures: {
+    /** expose the propose_venture tool and the pipeline in the prompt. */
+    enabled: boolean;
+    /** approvals of one category needed before it is flagged "autonomy-earned". */
+    autonomyThreshold: number;
+  };
+
   /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
    * unless these are explicitly enabled. */
   features: {
@@ -268,6 +278,11 @@ export function loadConfig(): Config {
       metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
+    },
+
+    ventures: {
+      enabled: envBool('VENTURES_ENABLED', true),
+      autonomyThreshold: Math.trunc(envNum('VENTURE_AUTONOMY_THRESHOLD', 10)),
     },
 
     features: {
