@@ -40,6 +40,26 @@ if [ "$age" -lt "$STALE_SECONDS" ]; then
 fi
 echo "Last cycle ${age}s ago — starting a burst of up to ${BURST_CYCLES} cycles, one per ${BURST_INTERVAL_SECONDS}s."
 
+# Ask the Pages workflow to redeploy. Our own state pushes use GITHUB_TOKEN, and
+# pushes made with that token do NOT trigger other workflows — so without this the
+# dashboard would only refresh when the (now ~2h) burst finishes. workflow_dispatch
+# IS allowed to run from GITHUB_TOKEN, so we dispatch it explicitly each cycle.
+dispatch_pages() {
+  if [ -z "${GH_TOKEN:-}" ] || [ -z "${GITHUB_REPOSITORY:-}" ]; then
+    return
+  fi
+  if curl -sS -o /dev/null -w '%{http_code}' -X POST \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pages.yml/dispatches" \
+      -d '{"ref":"main"}' | grep -q '^204$'; then
+    echo "Requested a Pages redeploy."
+  else
+    echo "::warning::Pages redeploy dispatch failed (non-fatal); dashboard will catch up later."
+  fi
+}
+
 push_state() {
   git add state/ SOUL.md || true
   if git diff --cached --quiet; then
@@ -51,7 +71,10 @@ push_state() {
   git pull --rebase --autostash origin main || true
   local a
   for a in 1 2 3 4; do
-    git push && return
+    if git push; then
+      dispatch_pages
+      return
+    fi
     echo "push failed; retry $a"
     sleep $(( a * 2 ))
   done

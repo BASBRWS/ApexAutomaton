@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write # to dispatch the Pages redeploy after each cycle
 
 env:
   BURST_CYCLES: '8'
@@ -50,4 +51,6 @@ jobs:
           OPERATOR_PUBKEY: ${{ secrets.OPERATOR_PUBKEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           REPLICATION_ENABLED: 'true'
+          # Lets the burst dispatch the Pages redeploy after each cycle's push.
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh

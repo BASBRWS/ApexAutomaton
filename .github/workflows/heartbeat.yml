@@ -31,6 +31,7 @@ concurrency:
 
 permissions:
   contents: write # to commit updated /state back to the repo
+  actions: write # to dispatch the Pages redeploy after each cycle
 
 env:
   # Cadence + burst length (see .github/scripts/burst.sh for the semantics).
@@ -68,4 +69,6 @@ jobs:
           # success, never scarcity). Safe on devnet; a funding failure is noted,
           # not fatal.
           REPLICATION_ENABLED: 'true'
+          # Lets the burst dispatch the Pages redeploy after each cycle's push.
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh
