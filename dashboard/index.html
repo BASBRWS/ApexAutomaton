@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Apex Automaton — dashboard</title>
     <!--
-      A static, dependency-free dashboard that reads the committed /state files
-      and shows the trading book's equity over cycles, the score metrics, and the
-      current positions. Serve the repo root and open /dashboard/, e.g.:
+      A static, dependency-free dashboard that reads the committed /state files.
+      The whole game is denominated in SOL: it shows equity in SOL (with the USD
+      value alongside), the score, the live trade book, and the population of
+      replicated offspring. Serve the repo root and open /dashboard/, e.g.:
           npx serve .      (then visit http://localhost:3000/dashboard/)
       It fetches ../state/state.json and ../state/journal.ndjson relative to
       this file. No build step, no framework.
@@ -18,52 +19,79 @@
         --fg: #e6edf3;
         --muted: #8b98a5;
         --accent: #5ad19b;
+        --accent-dim: #2e6f52;
+        --long: #5ad19b;
+        --short: #e0863c;
         --line: #1f2933;
+        --card: #10161d;
       }
       @media (prefers-color-scheme: light) {
-        :root { --bg: #ffffff; --fg: #0b0f14; --muted: #5a6672; --accent: #0a7f52; --line: #e2e8f0; }
+        :root { --bg: #ffffff; --fg: #0b0f14; --muted: #5a6672; --accent: #0a7f52; --accent-dim: #9fd9bf; --long: #0a7f52; --short: #b45a1c; --line: #e2e8f0; --card: #f6f8fa; }
       }
-      body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
-      .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
+      h2 { font-size: 16px; margin: 28px 0 8px; }
       .muted { color: var(--muted); }
-      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
-      .tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 20px 0; }
+      .tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); }
       .tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-      .tile .v { font-size: 20px; font-weight: 600; margin-top: 4px; }
-      svg { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 10px; }
+      .tile .v { font-size: 22px; font-weight: 600; margin-top: 4px; }
+      .tile .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      svg { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
+      th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+      th:first-child, td:first-child { text-align: left; }
+      th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; font-size: 11px; }
+      td.asset { font-weight: 600; }
+      .long { color: var(--long); }
+      .short { color: var(--short); }
+      .pos { color: var(--long); }
+      .neg { color: var(--short); }
       code { color: var(--accent); }
       .err { color: #e06c75; }
+      .empty { color: var(--muted); padding: 10px 2px; }
+      .scroll { overflow-x: auto; }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>Apex Automaton</h1>
-      <div class="muted">Autonomous agent trading a paper book against real prices · the market decides, grow or die.</div>
+      <div class="muted">Autonomous agent growing a paper book of <b>1 SOL</b> against real prices · the market decides, grow or die.</div>
       <div id="nav" class="muted" style="margin-top:6px">
         <a href="../setup/">⚙ Setup wizard (build your .env)</a>
       </div>
 
       <div id="tiles" class="grid"></div>
 
-      <h2 style="font-size:16px">Book equity over time (USD)</h2>
-      <svg id="chart" viewBox="0 0 900 260" aria-label="equity over cycles chart"></svg>
+      <h2>Book equity over time (SOL)</h2>
+      <svg id="chart" viewBox="0 0 900 260" aria-label="equity in SOL over cycles chart"></svg>
 
-      <h2 style="font-size:16px">Current book</h2>
-      <div id="population" class="muted">—</div>
+      <h2>Trade book</h2>
+      <div id="book-cash" class="muted"></div>
+      <div class="scroll">
+        <table id="book">
+          <thead><tr><th>asset</th><th>side</th><th>size</th><th>entry</th><th>mark</th><th>value $</th><th>uPnL $</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-      <h2 style="font-size:16px">Recent cycles</h2>
-      <table id="cycles"><thead><tr><th>#</th><th>tier</th><th>action</th><th>equity $</th><th>cycle PnL $</th><th>burn $</th></tr></thead><tbody></tbody></table>
+      <h2>Population <span id="pop-count" class="muted"></span></h2>
+      <div id="population"></div>
+
+      <h2>Recent cycles</h2>
+      <div class="scroll">
+        <table id="cycles">
+          <thead><tr><th>#</th><th>tier</th><th>action</th><th>equity SOL</th><th>equity $</th><th>cycle PnL $</th><th>burn $</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
       <p id="status" class="muted" style="margin-top:16px"></p>
     </div>
 
     <script>
-      const SOL = 1e9;
-      const fmt = (lamports) => (lamports / SOL).toFixed(4);
-
       async function loadJson(path) {
         const r = await fetch(path, { cache: 'no-store' });
         if (!r.ok) throw new Error(`${path}: ${r.status}`);
@@ -76,10 +104,29 @@
         return text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
       }
 
-      function tile(k, v) {
+      const usd = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+      const sol = (n) => `${(Number(n) || 0).toFixed(4)} SOL`;
+      const signed = (n, unit) => `${n >= 0 ? '+' : ''}${unit(n)}`;
+      function fmtUnits(u) {
+        const a = Math.abs(u);
+        if (a >= 1000) return u.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        if (a >= 1) return u.toFixed(3);
+        if (a === 0) return '0';
+        return u.toPrecision(3);
+      }
+      function fmtPrice(p) {
+        const a = Math.abs(p);
+        if (a >= 1000) return '$' + p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        if (a >= 1) return '$' + p.toFixed(3);
+        if (a >= 0.01) return '$' + p.toFixed(4);
+        return '$' + p.toPrecision(3);
+      }
+      const shortKey = (k) => (k.length > 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : k);
+
+      function tile(k, v, sub) {
         const el = document.createElement('div');
         el.className = 'tile';
-        el.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>`;
+        el.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>` + (sub ? `<div class="sub">${sub}</div>` : '');
         return el;
       }
 
@@ -95,9 +142,9 @@
           return el;
         };
 
-        const W = 900, H = 260, m = { l: 66, r: 16, t: 14, b: 40 };
+        const W = 900, H = 260, m = { l: 72, r: 16, t: 14, b: 40 };
         const iw = W - m.l - m.r, ih = H - m.t - m.b;
-        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: e.equityUsd ?? 0 }));
+        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: Number(e.equitySol) || 0 }));
 
         if (pts.length === 0) {
           add('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 13 }, 'no cycles yet');
@@ -106,18 +153,18 @@
 
         const ys = pts.map((p) => p.y), xs = pts.map((p) => p.x);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
-        if (maxY - minY < 0.02) { maxY += 0.5; minY -= 0.5; }
+        if (maxY - minY < 0.0002) { maxY += 0.05; minY = Math.max(0, minY - 0.05); }
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const sx = (x) => m.l + (maxX === minX ? iw / 2 : ((x - minX) / (maxX - minX)) * iw);
         const sy = (y) => m.t + ih - ((y - minY) / (maxY - minY)) * ih;
 
-        // Y gridlines + $ labels
+        // Y gridlines + SOL labels
         const yticks = 4;
         for (let i = 0; i <= yticks; i++) {
           const v = minY + ((maxY - minY) * i) / yticks;
           const yy = sy(v);
           add('line', { x1: m.l, y1: yy, x2: m.l + iw, y2: yy, stroke: 'var(--line)', 'stroke-width': i === 0 ? 1 : 0.5, opacity: i === 0 ? 1 : 0.5 });
-          add('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, '$' + v.toFixed(2));
+          add('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, v.toFixed(3));
         }
         // X axis line
         add('line', { x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih, stroke: 'var(--line)', 'stroke-width': 1 });
@@ -129,7 +176,14 @@
         });
         // Axis titles
         add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, 'cycle');
-        add('text', { x: 14, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 14 ${m.t + ih / 2})` }, 'equity $');
+        add('text', { x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 16 ${m.t + ih / 2})` }, 'equity SOL');
+
+        // 1.0 SOL reference line (the starting stake), if in range
+        if (1 >= minY && 1 <= maxY) {
+          const y1 = sy(1);
+          add('line', { x1: m.l, y1, x2: m.l + iw, y2: y1, stroke: 'var(--accent-dim)', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
+          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start 1.0');
+        }
 
         // Line + points
         if (pts.length >= 2) {
@@ -137,6 +191,69 @@
           add('path', { d, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2 });
         }
         pts.forEach((p) => add('circle', { cx: sx(p.x), cy: sy(p.y), r: 2.5, fill: 'var(--accent)' }));
+      }
+
+      function renderBook(desk, prices) {
+        const tbody = document.querySelector('#book tbody');
+        tbody.innerHTML = '';
+        const cash = Number(desk.cashUsd) || 0;
+        document.getElementById('book-cash').innerHTML = `<b>Cash:</b> ${usd(cash)} uninvested`;
+        const entries = Object.entries(desk.positions ?? {});
+        if (entries.length === 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="7" class="empty">All in cash — no open positions.</td>`;
+          tbody.appendChild(tr);
+          return;
+        }
+        // Sort by absolute exposure, biggest first.
+        entries.sort((a, b) => {
+          const va = Math.abs(a[1].units * (prices[a[0]] ?? a[1].entryPriceUsd));
+          const vb = Math.abs(b[1].units * (prices[b[0]] ?? b[1].entryPriceUsd));
+          return vb - va;
+        });
+        for (const [asset, p] of entries) {
+          const mark = prices[asset] ?? p.entryPriceUsd;
+          const value = p.units * mark;
+          const uPnl = p.units * (mark - p.entryPriceUsd);
+          const isLong = p.units >= 0;
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            `<td class="asset">${asset}</td>` +
+            `<td class="${isLong ? 'long' : 'short'}">${isLong ? 'long' : 'short'}</td>` +
+            `<td>${fmtUnits(p.units)}</td>` +
+            `<td>${fmtPrice(p.entryPriceUsd)}</td>` +
+            `<td>${fmtPrice(mark)}</td>` +
+            `<td>${usd(Math.abs(value))}</td>` +
+            `<td class="${uPnl >= 0 ? 'pos' : 'neg'}">${signed(uPnl, usd)}</td>`;
+          tbody.appendChild(tr);
+        }
+      }
+
+      function renderPopulation(children) {
+        const host = document.getElementById('population');
+        const count = document.getElementById('pop-count');
+        const kids = Array.isArray(children) ? children : [];
+        count.textContent = `· ${kids.length} offspring`;
+        if (kids.length === 0) {
+          host.innerHTML =
+            '<div class="empty">No offspring yet. Replication is <b>enabled</b>, but the agent only ' +
+            'spawns a child after sustained growth to the SOVEREIGN tier (5+ SOL) — birth is gated on ' +
+            'success, never on scarcity. Each child is funded by a real devnet transfer and inherits the ' +
+            'parent strategy with exactly one mutated parameter.</div>';
+          return;
+        }
+        const rows = kids
+          .map(
+            (c) =>
+              `<tr><td class="asset"><code>${shortKey(c.pubkey)}</code></td>` +
+              `<td>${c.createdAtCycle ?? '—'}</td>` +
+              `<td>${c.mutatedParam ?? '—'}</td>` +
+              `<td>${((Number(c.fundedLamports) || 0) / 1e9).toFixed(3)} SOL</td></tr>`,
+          )
+          .join('');
+        host.innerHTML =
+          '<div class="scroll"><table><thead><tr><th>child</th><th>born cycle</th><th>mutated</th><th>funded</th></tr></thead>' +
+          `<tbody>${rows}</tbody></table></div>`;
       }
 
       (async () => {
@@ -148,40 +265,44 @@
           ]);
 
           const s = state.score ?? {};
-          const usd = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+          const desk = state.desk ?? { cashUsd: 0, positions: {} };
+          const prices = state.lastPrices ?? {};
+          const solPrice = Number(prices.SOL) || 0;
+
+          const eqUsd = Number(s.equityUsd) || 0;
+          const last = journal.length ? journal[journal.length - 1] : null;
+          const eqSol = solPrice > 0 ? eqUsd / solPrice : last ? Number(last.equitySol) || 0 : 0;
+          const startSol = journal.length ? Number(journal[0].equitySol) || 0 : eqSol;
+          const peakSol = journal.reduce((mx, e) => Math.max(mx, Number(e.equitySol) || 0), eqSol);
+          const netSol = eqSol - startSol;
+          const openPositions = Object.keys(desk.positions ?? {}).length;
+
           const tiles = document.getElementById('tiles');
           tiles.append(
             tile('cycle', state.cycle ?? 0),
-            tile('equity', usd(s.equityUsd)),
-            tile('net PnL', usd(s.netPnlUsd)),
-            tile('peak equity', usd(s.peakEquityUsd)),
+            tile('equity', sol(eqSol), usd(eqUsd) + (solPrice ? ` · SOL @ ${usd(solPrice)}` : '')),
+            tile('net PnL', signed(netSol, sol), signed(Number(s.netPnlUsd) || 0, usd)),
+            tile('peak equity', sol(peakSol)),
+            tile('population', (state.children ?? []).length),
+            tile('open positions', openPositions),
             tile('cycles traded', s.tradeCycles ?? 0),
             tile('compute burn', usd(s.cumulativeBurnUsd)),
-            tile('first profit at', s.firstProfitAtCycle ?? '—'),
-            tile('open positions', Object.keys((state.desk ?? {}).positions ?? {}).length),
           );
 
           drawChart(journal);
-
-          const pop = document.getElementById('population');
-          const desk = state.desk ?? { cashUsd: 0, positions: {} };
-          const prices = state.lastPrices ?? {};
-          const posEntries = Object.entries(desk.positions ?? {});
-          const posHtml = posEntries.length
-            ? posEntries
-                .map(([a, p]) => {
-                  const price = prices[a] ?? p.entryPriceUsd;
-                  const valUsd = p.units * price;
-                  return `${a} <b>${valUsd >= 0 ? 'long' : 'short'}</b> ${usd(Math.abs(valUsd))}`;
-                })
-                .join(' · ')
-            : 'all in cash';
-          pop.innerHTML = `<b>Cash:</b> ${usd(desk.cashUsd)} &nbsp;|&nbsp; <b>Positions:</b> ${posHtml}`;
+          renderBook(desk, prices);
+          renderPopulation(state.children);
 
           const tbody = document.querySelector('#cycles tbody');
           journal.slice(-15).reverse().forEach((e) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${e.cycle}</td><td>${e.tier}</td><td>${e.action}</td><td>${(e.equityUsd ?? 0).toFixed(2)}</td><td>${(e.cyclePnlUsd ?? 0).toFixed(2)}</td><td>${(e.costUsd ?? 0).toFixed(4)}</td>`;
+            const pnl = Number(e.cyclePnlUsd) || 0;
+            tr.innerHTML =
+              `<td>${e.cycle}</td><td>${e.tier}</td><td>${e.action}</td>` +
+              `<td>${(Number(e.equitySol) || 0).toFixed(4)}</td>` +
+              `<td>${(Number(e.equityUsd) || 0).toFixed(2)}</td>` +
+              `<td class="${pnl >= 0 ? 'pos' : 'neg'}">${pnl.toFixed(2)}</td>` +
+              `<td>${(Number(e.costUsd) || 0).toFixed(4)}</td>`;
             tbody.appendChild(tr);
           });
 

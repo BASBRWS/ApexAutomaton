@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { STATE_DIR, STATE_FILE } from './paths.js';
 import type { Config } from './config.js';
 import { initialScore } from './score.js';
-import { initDesk } from './trading/desk.js';
+import { initUnfundedDesk } from './trading/desk.js';
 import type { AutomatonState, DailyCaps, TxRecord } from './types.js';
 
 /**
@@ -25,12 +25,14 @@ export function freshState(cfg: Config): AutomatonState {
     bornAt: now,
     cycle: 0,
     lastRunAt: null,
-    desk: initDesk(cfg.trading.capitalUsd, 0),
+    // Unfunded: the SOL stake is priced to USD at genesis, once the loop sees a
+    // real SOL price. Until then the book carries no cash and no baseline.
+    desk: initUnfundedDesk(),
     lastPrices: {},
     children: [],
     caps: freshCaps(),
     recentSignatures: [],
-    score: initialScore(cfg.trading.capitalUsd),
+    score: initialScore(0),
     sustainedSovereignCycles: 0,
     dead: false,
   };

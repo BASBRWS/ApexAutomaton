@@ -51,6 +51,25 @@ export function initDesk(capitalUsd: number, cycle: number): Desk {
   return { cashUsd: capitalUsd, positions: {}, capitalUsd, openedAtCycle: cycle };
 }
 
+/**
+ * An unfunded book: no cash, no capital baseline yet. The stake is denominated
+ * in SOL, so it cannot be priced to USD until a real SOL price is known; the
+ * loop funds this at genesis (its first priced cycle) via {@link fundDesk}.
+ */
+export function initUnfundedDesk(): Desk {
+  return { cashUsd: 0, positions: {}, capitalUsd: 0, openedAtCycle: -1 };
+}
+
+/** Fund a genesis book with its USD capital baseline (the SOL stake, priced). */
+export function fundDesk(desk: Desk, capitalUsd: number, cycle: number): Desk {
+  return { ...desk, cashUsd: capitalUsd, capitalUsd, openedAtCycle: cycle };
+}
+
+/** True once the book has been funded at genesis (a real capital baseline set). */
+export function isFunded(desk: Desk): boolean {
+  return desk.openedAtCycle >= 0 && desk.capitalUsd > 0;
+}
+
 function markPrice(prices: PriceMap, asset: string, fallback: number): number {
   const p = prices[asset];
   return typeof p === 'number' && Number.isFinite(p) && p > 0 ? p : fallback;

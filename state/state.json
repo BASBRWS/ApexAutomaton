@@ -1,56 +1,11 @@
 {
-  "bornAt": "2026-09-21T20:30:04.367Z",
-  "cycle": 3,
-  "lastRunAt": "2026-09-22T01:49:02.224Z",
+  "bornAt": "2026-09-22T07:04:41.917Z",
+  "cycle": 0,
+  "lastRunAt": null,
   "desk": {
-    "cashUsd": 500.3254129439734,
-    "positions": {
-      "XRP": {
-        "units": -29.74940504704052,
-        "entryPriceUsd": 1.53885
-      },
-      "ADA": {
-        "units": 142.55221741958087,
-        "entryPriceUsd": 0.24411
-      },
-      "AVAX": {
-        "units": -3.601716504905331,
-        "entryPriceUsd": 11.236
-      },
-      "LTC": {
-        "units": -0.4084207108176056,
-        "entryPriceUsd": 61.2565
-      },
-      "UNI": {
-        "units": 4.941937886074281,
-        "entryPriceUsd": 9.11245
-      },
-      "ARB": {
-        "units": -225.7471082535408,
-        "entryPriceUsd": 0.22813
-      },
-      "BONK": {
-        "units": 14566767.552954096,
-        "entryPriceUsd": 0.000003365
-      },
-      "BTC": {
-        "units": -0.00029207334856170387,
-        "entryPriceUsd": 85658.015
-      },
-      "BNB": {
-        "units": -0.050757926335399585,
-        "entryPriceUsd": 788.635
-      },
-      "SUI": {
-        "units": 43.28863009704661,
-        "entryPriceUsd": 1.0403
-      },
-      "WIF": {
-        "units": 202.2262722563849,
-        "entryPriceUsd": 0.24743
-      }
-    },
-    "capitalUsd": 500,
+    "cashUsd": 117.565,
+    "positions": {},
+    "capitalUsd": 117.565,
     "openedAtCycle": 0
   },
   "lastPrices": {
@@ -85,13 +40,13 @@
   },
   "recentSignatures": [],
   "score": {
-    "startEquityUsd": 500,
-    "equityUsd": 500.32541294397333,
-    "peakEquityUsd": 500.32541294397333,
-    "netPnlUsd": 0.3254129439733333,
-    "tradeCycles": 3,
-    "cumulativeBurnUsd": 0.10446749999999999,
-    "firstProfitAtCycle": 3
+    "startEquityUsd": 117.565,
+    "equityUsd": 117.565,
+    "peakEquityUsd": 117.565,
+    "netPnlUsd": 0,
+    "tradeCycles": 0,
+    "cumulativeBurnUsd": 0,
+    "firstProfitAtCycle": null
   },
   "sustainedSovereignCycles": 0,
   "dead": false

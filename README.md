@@ -72,8 +72,8 @@ observe prices → think → trade → burn → heartbeat → score → persist 
    journal + obituaries, and the score.
 2. Fetch **real market prices**; mark the book to market and compute its equity
    (USD, and in SOL for the tier).
-3. If **DEAD** (book equity ≤ `TRADING_DUST_USD`): write an obituary, persist,
-   `exit(1)`. Never self-resurrect.
+3. If **DEAD** (book equity in SOL ≤ `TRADING_DUST_SOL`): write an obituary,
+   persist, `exit(1)`. Never self-resurrect.
 4. Select the model, compute budget, tools, and rights for the tier.
 5. Prompt the LLM (constitution + soul + prices + book + score + tools) for **one**
    next action. The framing: *grow your book; the market decides, not you.*
@@ -114,14 +114,17 @@ funds are ever at risk.**
   portfolio as weights). Full freedom of strategy within the gross-exposure cap;
   the market is the judge.
 - The **book** (`src/trading/desk.ts`) is a pure, marked-to-market portfolio in
-  USD. It starts at `PAPER_TRADING_CAPITAL_USD` (default $500 — the modeled "$500
-  of SOL"). Its equity moves with real prices.
+  USD. The whole game is **denominated in SOL**: it starts at
+  `PAPER_TRADING_CAPITAL_SOL` SOL (default **1 SOL**), priced to USD once at
+  genesis with the live SOL/USD price, and its goal is to grow that back into
+  more SOL. (Set `PAPER_TRADING_CAPITAL_USD` to pin a fixed USD stake instead.)
+  Positions are quoted in USD (the market's unit); equity is reported in both.
 - **Compute burn:** the real USD cost of each LLM call (tokens × `src/llm/pricing.ts`)
   is deducted from the book every cycle. Resting in cash still burns — doing
   nothing is slow death.
-- **Death is economic:** if book equity falls to `TRADING_DUST_USD`, the agent
-  writes an obituary and exits. There is **no guaranteed income** — if it can't
-  trade profitably faster than it burns, it dies. Exactly like a real trader.
+- **Death is economic:** if book equity (in SOL) falls to `TRADING_DUST_SOL`, the
+  agent writes an obituary and exits. There is **no guaranteed income** — if it
+  can't trade profitably faster than it burns, it dies. Exactly like a real trader.
 - **On-chain heartbeat:** every cycle still does one tiny **real devnet**
   transaction (a memo tagging the cycle + equity), so the Solana loop is
   genuinely exercised and auditable — funded by the operator seed, decoupled from
@@ -337,12 +340,14 @@ dashboard/             Phase 3 scaffold — static HTML reading /state
   only at NORMAL+ when `PHASE2_TOOLS_ENABLED=1` and fully policy-gated; a
   `StateStore` seam (`src/persistence/`) with the committed **file** store as
   default and a **Firestore** scaffold selected when `FIRESTORE_PROJECT_ID` is set.
-- **Phase 3 (scaffolded):** code-driven replication (`src/replication.ts`, enabled
-  by `REPLICATION_ENABLED=1`) + the static dashboard (`dashboard/`). Replication is
-  SOVEREIGN-gated and conditioned only on **sustained profit** and the population
-  cap — never on population size as a driver, never an LLM choice, and never
-  decidable in the same context the agent uses to reason about death. Funding a
-  child is an ordinary capped transfer (keep `CHILD_SEED_SOL` ≤ `PER_TX_CAP_SOL`).
+- **Phase 3:** code-driven replication (`src/replication.ts`, enabled by
+  `REPLICATION_ENABLED=1` — **on** in the hosted heartbeat/watchdog workflows) +
+  the static dashboard (`dashboard/`), which shows the live **population** of
+  offspring. Replication is SOVEREIGN-gated and conditioned only on **sustained
+  profit** and the population cap — never on population size as a driver, never an
+  LLM choice, and never decidable in the same context the agent uses to reason
+  about death. Funding a child is an ordinary capped devnet transfer (keep
+  `CHILD_SEED_SOL` ≤ `PER_TX_CAP_SOL`); a funding failure is noted, not fatal.
 
 ### Enabling Phase 2/3
 

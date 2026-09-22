@@ -131,18 +131,25 @@ export interface Config {
 
   /** Trading layer — the agent grows a paper book against REAL market prices.
    * No real funds are ever at risk; the devnet layer stays the on-chain proof.
-   * Death is economic: book equity <= dust. */
+   * The whole game is denominated in SOL: the stake is a number of SOL, priced
+   * to USD at genesis with the live SOL price, and death is economic (book
+   * equity, in SOL, at/below dust). */
   trading: {
-    /** starting paper book size in USD (the modeled "$500 of SOL"). */
-    capitalUsd: number;
-    /** cap on total gross exposure (sum of |position value|) in USD. */
-    maxGrossExposureUsd: number;
+    /** starting paper book size, in SOL (the modeled "1 SOL of capital"). It is
+     * priced to USD once, at genesis, using the live SOL/USD price. */
+    capitalSol: number;
+    /** optional explicit USD stake. When set, it overrides the SOL stake (the
+     * book starts at exactly this many USD instead of `capitalSol` × SOL price). */
+    capitalUsdOverride: number | undefined;
+    /** cap on total gross exposure (sum of |position value|), in SOL. Converted
+     * to USD each cycle at the live SOL price. */
+    maxGrossExposureSol: number;
     /** tradable symbols (priced from the real market); SOL is always fetched too. */
     assets: string[];
     /** whether the agent may hold short (negative) positions. */
     allowShort: boolean;
-    /** economic death threshold: book equity at/below this (USD) is DEAD. */
-    dustUsd: number;
+    /** economic death threshold: book equity at/below this (in SOL) is DEAD. */
+    dustSol: number;
     /** base URL of the price API (default: CoinGecko simple price). */
     priceApiBase: string;
   };
@@ -222,10 +229,14 @@ export function loadConfig(): Config {
     },
 
     trading: {
-      capitalUsd: envNum('PAPER_TRADING_CAPITAL_USD', 500),
-      maxGrossExposureUsd: envNum(
-        'MAX_GROSS_EXPOSURE_USD',
-        envNum('PAPER_TRADING_CAPITAL_USD', 500),
+      capitalSol: envNum('PAPER_TRADING_CAPITAL_SOL', 1.0),
+      capitalUsdOverride:
+        envStr('PAPER_TRADING_CAPITAL_USD') === undefined
+          ? undefined
+          : envNum('PAPER_TRADING_CAPITAL_USD', 0),
+      maxGrossExposureSol: envNum(
+        'MAX_GROSS_EXPOSURE_SOL',
+        envNum('PAPER_TRADING_CAPITAL_SOL', 1.0),
       ),
       assets: (
         envStr('TRADING_ASSETS') ??
@@ -235,7 +246,7 @@ export function loadConfig(): Config {
         .map((s) => s.trim().toUpperCase())
         .filter((s) => s.length > 0),
       allowShort: envBool('ALLOW_SHORT', true),
-      dustUsd: envNum('TRADING_DUST_USD', 5),
+      dustSol: envNum('TRADING_DUST_SOL', 0.02),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },
@@ -288,4 +299,15 @@ export function worstCaseCycleBurnSol(cfg: Config): number {
 
 export function economyCanGrow(cfg: Config): boolean {
   return cfg.economy.marketTaskRewardSol > worstCaseCycleBurnSol(cfg);
+}
+
+/**
+ * Genesis book size in USD. The stake is SOL-denominated, so we price it to USD
+ * exactly once — at birth — with the live SOL/USD price. A fixed-USD override
+ * (PAPER_TRADING_CAPITAL_USD) short-circuits this. Used by the loop the first
+ * time it sees a real price, to fund the freshly-created (unfunded) book.
+ */
+export function genesisCapitalUsd(cfg: Config, solPriceUsd: number): number {
+  if (cfg.trading.capitalUsdOverride !== undefined) return cfg.trading.capitalUsdOverride;
+  return cfg.trading.capitalSol * (solPriceUsd > 0 ? solPriceUsd : 0);
 }

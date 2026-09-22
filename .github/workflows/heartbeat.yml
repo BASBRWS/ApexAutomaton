@@ -48,6 +48,11 @@ jobs:
           COMPUTE_PROVIDER_PUBKEY: ${{ secrets.COMPUTE_PROVIDER_PUBKEY }}
           OPERATOR_PUBKEY: ${{ secrets.OPERATOR_PUBKEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Replication ON: the agent may spawn devnet-funded offspring, but only
+          # after sustained growth to the SOVEREIGN tier (birth is gated on
+          # success, never scarcity). Safe on devnet; a funding failure is noted,
+          # not fatal.
+          REPLICATION_ENABLED: 'true'
         # exit 1 means the agent died this cycle; we still want to persist state,
         # so don't fail the job on a death — capture the code and continue.
         continue-on-error: true

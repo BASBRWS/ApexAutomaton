@@ -1,4 +1,4 @@
-import { loadConfig, type Config } from './config.js';
+import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
 import { makeConnection } from './solana/wallet.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
@@ -8,8 +8,13 @@ import { readSoul, ensureSoul } from './soul.js';
 import { appendEntry, digestRecent, obituaryDigest, writeObituary } from './journal.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
 import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
-import { updateScore } from './score.js';
-import { equityUsd as deskEquityUsd, summarizeDesk } from './trading/desk.js';
+import { initialScore, updateScore } from './score.js';
+import {
+  equityUsd as deskEquityUsd,
+  summarizeDesk,
+  isFunded,
+  fundDesk,
+} from './trading/desk.js';
 import {
   makePriceSource,
   requiredSymbols,
@@ -45,11 +50,11 @@ export interface CycleOutcome {
   summary: string;
 }
 
-function railsSummary(cfg: Config): string {
+function railsSummary(cfg: Config, maxGrossExposureUsd: number): string {
   return [
     `- any on-chain transfer is destination-allowlisted (compute-provider, market, children).`,
     `- per-tx cap ${cfg.rails.perTxCapSol} SOL; daily cap ${cfg.rails.dailyCapSol} SOL; max ${cfg.rails.maxTxPerCycle} tx/cycle.`,
-    `- max gross trading exposure $${cfg.trading.maxGrossExposureUsd}; shorting ${cfg.trading.allowShort ? 'allowed' : 'disabled'}.`,
+    `- max gross trading exposure ${cfg.trading.maxGrossExposureSol} SOL (~$${maxGrossExposureUsd.toFixed(2)}); shorting ${cfg.trading.allowShort ? 'allowed' : 'disabled'}.`,
     `- a kill switch can stop you at any time. You cannot disable any of this.`,
   ].join('\n');
 }
@@ -92,13 +97,26 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     priceNote = `price fetch failed (${errMsg(err)}) — using cached prices`;
   }
 
-  const equityPre = deskEquityUsd(state.desk, prices);
   const solPrice = solPriceOf(prices, state);
+
+  // --- Genesis: price the SOL-denominated stake to USD, once. ---------------
+  // The book is born unfunded; the first cycle that sees a real SOL price funds
+  // it with `capitalSol` SOL worth of USD. From then on it grows or dies in SOL.
+  if (!isFunded(state.desk)) {
+    const capUsd = genesisCapitalUsd(cfg, solPrice);
+    state.desk = fundDesk(state.desk, capUsd, cycle);
+    state.score = initialScore(capUsd);
+  }
+
+  // Gross-exposure cap for this cycle: the SOL cap priced at the live SOL price.
+  const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
+
+  const equityPre = deskEquityUsd(state.desk, prices);
   const equitySolPre = equityToSol(equityPre, solPrice);
 
-  // --- Death check: economic, in USD. Never self-resurrect. -----------------
-  if (equityPre <= cfg.trading.dustUsd) {
-    const file = writeObituary(buildObituary(cycle, equityPre, state), cycle);
+  // --- Death check: economic, in SOL. Never self-resurrect. -----------------
+  if (equitySolPre <= cfg.trading.dustSol) {
+    const file = writeObituary(buildObituary(cycle, equityPre, equitySolPre, state), cycle);
     state.dead = true;
     appendEntry({
       cycle,
@@ -108,7 +126,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       equityUsd: equityPre,
       model: '(none)',
       action: 'die',
-      actionSummary: `book equity $${equityPre.toFixed(2)} <= dust $${cfg.trading.dustUsd} — obituary ${file}`,
+      actionSummary: `book equity ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
       costUsd: 0,
       cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
@@ -117,7 +135,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     });
     state.lastRunAt = now();
     await store.save(state);
-    return { exitCode: 1, summary: `DEAD at $${equityPre.toFixed(2)}` };
+    return { exitCode: 1, summary: `DEAD at ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)})` };
   }
 
   // Tier from equity-in-SOL (clamp away from DEAD; death is the USD check above).
@@ -137,9 +155,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     constitution: loadConstitution(),
     soul: readSoul(),
     tools,
-    railsSummary: railsSummary(cfg),
+    railsSummary: railsSummary(cfg, maxGrossExposureUsd),
     tradableAssets: cfg.trading.assets,
-    maxGrossExposureUsd: cfg.trading.maxGrossExposureUsd,
+    maxGrossExposureUsd,
   });
   const user = buildUserPrompt({
     cycle,
@@ -176,7 +194,17 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
   const tool = registry.get(chosenName)!;
 
-  const ctx: ToolContext = { connection, cfg, state, signer, prices, tier, policy, cycle };
+  const ctx: ToolContext = {
+    connection,
+    cfg,
+    state,
+    signer,
+    prices,
+    maxGrossExposureUsd,
+    tier,
+    policy,
+    cycle,
+  };
   let toolResult: ToolResult;
   try {
     toolResult = await tool.execute(action?.input ?? {}, ctx);
@@ -323,11 +351,16 @@ function standDownEntry(state: AutomatonState, equityUsd: number, solPrice: numb
   };
 }
 
-function buildObituary(cycle: number, equityUsd: number, state: AutomatonState): string {
+function buildObituary(
+  cycle: number,
+  equityUsd: number,
+  equitySol: number,
+  state: AutomatonState,
+): string {
   return [
     `# Obituary`,
     ``,
-    `Died at cycle ${cycle} with a book of $${equityUsd.toFixed(2)} (at or below the dust threshold).`,
+    `Died at cycle ${cycle} with a book of ${equitySol.toFixed(4)} SOL ($${equityUsd.toFixed(2)}) (at or below the dust threshold).`,
     `Born: ${state.bornAt}`,
     ``,
     `- start equity: $${state.score.startEquityUsd.toFixed(2)}`,

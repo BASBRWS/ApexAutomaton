@@ -42,11 +42,12 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
     },
     seed: { airdropSol: 1.0, marketAirdropSol: 2.0 },
     trading: {
-      capitalUsd: 500,
-      maxGrossExposureUsd: 500,
+      capitalSol: 1.0,
+      capitalUsdOverride: undefined,
+      maxGrossExposureSol: 1.0,
       assets: ['BTC', 'ETH'],
       allowShort: true,
-      dustUsd: 5,
+      dustSol: 0.02,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
     features: {

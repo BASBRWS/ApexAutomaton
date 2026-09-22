@@ -48,7 +48,7 @@ const trade: Tool = {
     const outcomes = applyOrders(ctx.state.desk, orders, {
       prices: ctx.prices,
       tradableAssets: ctx.cfg.trading.assets,
-      maxGrossExposureUsd: ctx.cfg.trading.maxGrossExposureUsd,
+      maxGrossExposureUsd: ctx.maxGrossExposureUsd,
       allowShort: ctx.cfg.trading.allowShort,
     });
     const applied = outcomes.filter((o) => o.ok);
@@ -97,7 +97,7 @@ const rebalance: Tool = {
     const outcomes = applyOrders(ctx.state.desk, orders, {
       prices: ctx.prices,
       tradableAssets: ctx.cfg.trading.assets,
-      maxGrossExposureUsd: ctx.cfg.trading.maxGrossExposureUsd,
+      maxGrossExposureUsd: ctx.maxGrossExposureUsd,
       allowShort: ctx.cfg.trading.allowShort,
     });
     const rejected = outcomes.filter((o) => !o.ok);
