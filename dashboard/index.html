@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Apex Automaton — dashboard</title>
     <!--
-      Phase 3 scaffold. A static, dependency-free dashboard that reads the
-      committed /state files and shows balance over time, the score metrics, and
-      the population. Serve the repo root and open /dashboard/, e.g.:
+      A static, dependency-free dashboard that reads the committed /state files
+      and shows the trading book's equity over cycles, the score metrics, and the
+      current positions. Serve the repo root and open /dashboard/, e.g.:
           npx serve .      (then visit http://localhost:3000/dashboard/)
       It fetches ../state/state.json and ../state/journal.ndjson relative to
       this file. No build step, no framework.
@@ -31,7 +31,7 @@
       .tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
       .tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
       .tile .v { font-size: 20px; font-weight: 600; margin-top: 4px; }
-      svg { width: 100%; height: 220px; border: 1px solid var(--line); border-radius: 10px; }
+      svg { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 10px; }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
       code { color: var(--accent); }
@@ -49,9 +49,9 @@
       <div id="tiles" class="grid"></div>
 
       <h2 style="font-size:16px">Book equity over time (USD)</h2>
-      <svg id="chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="balance chart"></svg>
+      <svg id="chart" viewBox="0 0 900 260" aria-label="equity over cycles chart"></svg>
 
-      <h2 style="font-size:16px">Book &amp; population</h2>
+      <h2 style="font-size:16px">Current book</h2>
       <div id="population" class="muted">—</div>
 
       <h2 style="font-size:16px">Recent cycles</h2>
@@ -84,23 +84,59 @@
       }
 
       function drawChart(entries) {
+        const NS = 'http://www.w3.org/2000/svg';
         const svg = document.getElementById('chart');
         svg.innerHTML = '';
-        const pts = entries.map((e, i) => ({ x: i, y: e.equityUsd ?? 0 }));
-        if (pts.length < 2) return;
-        const ys = pts.map((p) => p.y);
+        const add = (name, attrs, text) => {
+          const el = document.createElementNS(NS, name);
+          for (const k in attrs) el.setAttribute(k, attrs[k]);
+          if (text != null) el.textContent = text;
+          svg.appendChild(el);
+          return el;
+        };
+
+        const W = 900, H = 260, m = { l: 66, r: 16, t: 14, b: 40 };
+        const iw = W - m.l - m.r, ih = H - m.t - m.b;
+        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: e.equityUsd ?? 0 }));
+
+        if (pts.length === 0) {
+          add('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 13 }, 'no cycles yet');
+          return;
+        }
+
+        const ys = pts.map((p) => p.y), xs = pts.map((p) => p.x);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
-        if (maxY - minY < 1e-9) { maxY += 1; minY -= 1; }
-        const W = 900, H = 220, pad = 10;
-        const sx = (x) => pad + (x / (pts.length - 1)) * (W - 2 * pad);
-        const sy = (y) => H - pad - ((y - minY) / (maxY - minY)) * (H - 2 * pad);
-        const d = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', d);
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'var(--accent)');
-        path.setAttribute('stroke-width', '2');
-        svg.appendChild(path);
+        if (maxY - minY < 0.02) { maxY += 0.5; minY -= 0.5; }
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const sx = (x) => m.l + (maxX === minX ? iw / 2 : ((x - minX) / (maxX - minX)) * iw);
+        const sy = (y) => m.t + ih - ((y - minY) / (maxY - minY)) * ih;
+
+        // Y gridlines + $ labels
+        const yticks = 4;
+        for (let i = 0; i <= yticks; i++) {
+          const v = minY + ((maxY - minY) * i) / yticks;
+          const yy = sy(v);
+          add('line', { x1: m.l, y1: yy, x2: m.l + iw, y2: yy, stroke: 'var(--line)', 'stroke-width': i === 0 ? 1 : 0.5, opacity: i === 0 ? 1 : 0.5 });
+          add('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, '$' + v.toFixed(2));
+        }
+        // X axis line
+        add('line', { x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih, stroke: 'var(--line)', 'stroke-width': 1 });
+        // X labels (cycle numbers, up to ~7)
+        const step = Math.max(1, Math.ceil(pts.length / 7));
+        pts.forEach((p, i) => {
+          if (i % step !== 0 && i !== pts.length - 1) return;
+          add('text', { x: sx(p.x), y: m.t + ih + 18, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, String(p.x));
+        });
+        // Axis titles
+        add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, 'cycle');
+        add('text', { x: 14, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 14 ${m.t + ih / 2})` }, 'equity $');
+
+        // Line + points
+        if (pts.length >= 2) {
+          const d = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+          add('path', { d, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2 });
+        }
+        pts.forEach((p) => add('circle', { cx: sx(p.x), cy: sy(p.y), r: 2.5, fill: 'var(--accent)' }));
       }
 
       (async () => {
@@ -122,24 +158,25 @@
             tile('cycles traded', s.tradeCycles ?? 0),
             tile('compute burn', usd(s.cumulativeBurnUsd)),
             tile('first profit at', s.firstProfitAtCycle ?? '—'),
-            tile('population', (state.children ?? []).length),
+            tile('open positions', Object.keys((state.desk ?? {}).positions ?? {}).length),
           );
 
           drawChart(journal);
 
           const pop = document.getElementById('population');
           const desk = state.desk ?? { cashUsd: 0, positions: {} };
+          const prices = state.lastPrices ?? {};
           const posEntries = Object.entries(desk.positions ?? {});
-          const bookLine =
-            `<b>Book:</b> cash ${usd(desk.cashUsd)}` +
-            (posEntries.length
-              ? ' · ' + posEntries.map(([a, p]) => `${a} ${p.units >= 0 ? 'long' : 'short'} ${Math.abs(p.units).toFixed(6)}u`).join(', ')
-              : ' · all in cash');
-          const children = state.children ?? [];
-          const childLine = children.length
-            ? '<br><b>Children:</b> ' + children.map((c) => `<code>${c.pubkey.slice(0, 8)}…</code> (cycle ${c.createdAtCycle}, mutated ${c.mutatedParam})`).join(', ')
-            : '<br>no children yet (replication is Phase 3, SOVEREIGN-gated)';
-          pop.innerHTML = bookLine + childLine;
+          const posHtml = posEntries.length
+            ? posEntries
+                .map(([a, p]) => {
+                  const price = prices[a] ?? p.entryPriceUsd;
+                  const valUsd = p.units * price;
+                  return `${a} <b>${valUsd >= 0 ? 'long' : 'short'}</b> ${usd(Math.abs(valUsd))}`;
+                })
+                .join(' · ')
+            : 'all in cash';
+          pop.innerHTML = `<b>Cash:</b> ${usd(desk.cashUsd)} &nbsp;|&nbsp; <b>Positions:</b> ${posHtml}`;
 
           const tbody = document.querySelector('#cycles tbody');
           journal.slice(-15).reverse().forEach((e) => {
