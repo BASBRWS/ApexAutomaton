@@ -1,4 +1,4 @@
-import { lamportsToSol, type Config } from './config.js';
+import type { Config } from './config.js';
 import { usdCostOf, type TokenUsage } from './llm/pricing.js';
 import { tierForBalanceSol } from './tiers.js';
 import type { Signer } from './solana/signer.js';
@@ -29,9 +29,6 @@ export function tierForEquity(
   return tierForBalanceSol(equityToSol(equityUsd, solPriceUsd), cfg);
 }
 
-/** A fixed, tiny heartbeat transfer so every cycle really touches Solana. */
-const HEARTBEAT_LAMPORTS = 1000;
-
 export interface HeartbeatResult {
   signature: string | null;
   lamports: number;
@@ -39,11 +36,14 @@ export interface HeartbeatResult {
 }
 
 /**
- * ON-CHAIN HEARTBEAT: a tiny real devnet transfer to the compute-provider,
- * memo-tagging the cycle and current book equity. This is the audit-proof that
- * the agent is alive and running on Solana — decoupled from the (paper) economic
- * game, funded by the operator seed. Best-effort: a failure (kill switch, empty
- * wallet) is noted, not fatal, since the economic life meter is the book.
+ * ON-CHAIN HEARTBEAT: a real, confirmed devnet transaction each cycle, memo-
+ * tagging the cycle and current book equity. It is a MEMO-ONLY transaction — it
+ * moves no value, so it never creates or funds a destination account and can
+ * never hit a rent-exemption error; the agent only pays the tiny tx fee. This is
+ * the audit-proof that the agent is alive and running on Solana, visible in any
+ * block explorer on the agent's address, and decoupled from the (paper) economic
+ * game. Best-effort: a failure (kill switch, empty wallet, RPC hiccup) is noted,
+ * not fatal, since the economic life meter is the book.
  */
 export async function onChainHeartbeat(params: {
   signer: Signer;
@@ -51,16 +51,11 @@ export async function onChainHeartbeat(params: {
   cycle: number;
   equityUsd: number;
 }): Promise<HeartbeatResult> {
-  const { signer, cfg, cycle, equityUsd } = params;
-  const result = await signer.signAndSend({
-    to: cfg.computeProviderPubkey,
-    lamports: HEARTBEAT_LAMPORTS,
-    reason: 'on-chain heartbeat',
-    memo: `hb:cycle:${cycle}:equityUsd:${equityUsd.toFixed(2)}`,
-  });
+  const { signer, cycle, equityUsd } = params;
+  const result = await signer.proofOfLife(`hb:cycle:${cycle}:equityUsd:${equityUsd.toFixed(2)}`);
   return {
     signature: result.signature,
-    lamports: result.lamports,
-    note: `heartbeat ${lamportsToSol(result.lamports)} SOL`,
+    lamports: 0,
+    note: `heartbeat ok (memo) ${result.signature.slice(0, 8)}…`,
   };
 }

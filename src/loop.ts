@@ -256,10 +256,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
         signature: hb.signature,
         lamports: hb.lamports,
         from: cfg.agentPubkey,
-        to: cfg.computeProviderPubkey,
+        to: cfg.agentPubkey, // memo-only proof-of-life on the agent's own address
         cycle,
         at: now(),
-        note: 'heartbeat',
+        note: 'heartbeat (memo)',
       });
     }
   } catch (err) {

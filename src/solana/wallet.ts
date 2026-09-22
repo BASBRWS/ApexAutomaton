@@ -65,6 +65,19 @@ export function buildTransfer(params: {
 }
 
 /**
+ * Build an UNSIGNED memo-only transaction (no value transfer). Used for the
+ * on-chain heartbeat / proof-of-life: it lands a real, confirmed devnet
+ * transaction carrying a memo, paid for by `feePayer`, WITHOUT creating or
+ * funding any destination account — so it can never hit a rent-exemption error.
+ */
+export function buildMemoOnly(params: { feePayer: PublicKey; memo: string }): Transaction {
+  const tx = new Transaction();
+  tx.add(memoInstruction(params.memo));
+  tx.feePayer = params.feePayer;
+  return tx;
+}
+
+/**
  * Sign + send + confirm a transfer built from trusted code. The caller supplies
  * the signing keypair(s); this function does not read any secret itself.
  */

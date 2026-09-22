@@ -4,7 +4,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { loadConfig, solToLamports, type Config } from '../config.js';
 import { KILL_FILE } from '../paths.js';
 import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.js';
-import { buildTransfer, sendTransfer } from './wallet.js';
+import { buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
 /**
  * signer.ts — the ONE place a private key is ever loaded. It contains NO LLM
@@ -219,6 +219,23 @@ export class Signer {
     this.state.caps.lamportsSpentToday += proposal.lamports;
 
     return { signature, lamports: proposal.lamports, to: proposal.to };
+  }
+
+  /**
+   * On-chain proof-of-life: a memo-only transaction. It moves NO value, so it is
+   * not a transfer and does not touch the allowlist or spend caps — but it still
+   * respects the kill switch. This lands a real, confirmed devnet transaction on
+   * the agent's own address (visible in a block explorer) without ever creating
+   * or funding a destination account, so it cannot hit a rent-exemption error.
+   * Best-effort: the caller treats a throw as non-fatal.
+   */
+  async proofOfLife(memo: string): Promise<SignedTxResult> {
+    if (isKillSwitchEngaged(this.cfg)) {
+      throw new PolicyError('kill switch engaged — no proof-of-life');
+    }
+    const tx = buildMemoOnly({ feePayer: this.keypair.publicKey, memo });
+    const signature = await sendTransfer(this.connection, tx, [this.keypair]);
+    return { signature, lamports: 0, to: this.cfg.agentPubkey };
   }
 }
 
