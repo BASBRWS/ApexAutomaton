@@ -37,6 +37,7 @@ import {
 } from './ventures/store.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
 import { appendLesson, lessonsDigest, realizedFromClose } from './memory/lessons.js';
+import { autoReflect } from './memory/reflect.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
 import type { AutomatonState, JournalEntry, Tier } from './types.js';
@@ -284,12 +285,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     obituaryDigest: obituaryDigest(),
     ventureDigest: ventureBook ? ventureDigest(ventureBook) : undefined,
     lessonsDigest: lessonsDigest(cfg.memory.lessonsInPrompt),
-    // Periodically nudge the agent to consolidate its lessons into SOUL.md — but
-    // only when it actually has the reflect tool (NORMAL+), never while fighting death.
-    reflectNudge:
-      cfg.memory.reflectEveryCycles > 0 &&
-      cycle % cfg.memory.reflectEveryCycles === 0 &&
-      allowedToolNames.includes('reflect'),
+    // No soft nudge: reflection is now GUARANTEED by the auto-reflect step below,
+    // so we never spend the agent's action on it. The reflect tool stays available.
+    reflectNudge: false,
   });
 
   // --- Think: one LLM call, priced by the tier's model. ---------------------
@@ -408,6 +406,33 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     heartbeatNote = summarizeHeartbeatError(err);
   }
 
+  // --- Guaranteed reflection: every N cycles the loop itself distils the recent
+  // lessons into SOUL.md via a small, cheap LLM call — so memory consolidates on
+  // schedule regardless of whether the agent chose to reflect. Best-effort; its
+  // cost is folded into this cycle's burn below. -----------------------------
+  let reflectNote: string | undefined;
+  let reflectCostUsd = 0;
+  const autoReflectDue =
+    cfg.memory.reflectEveryCycles > 0 && cycle % cfg.memory.reflectEveryCycles === 0;
+  if (autoReflectDue) {
+    try {
+      const res = await autoReflect(llm, {
+        cfg,
+        cycle,
+        score: state.score,
+        lessonsShown: cfg.memory.lessonsInPrompt,
+      });
+      reflectCostUsd = res.costUsd;
+      state.desk.cashUsd -= reflectCostUsd;
+      reflectNote = res.note;
+      if (res.ok) {
+        appendLesson({ cycle, at: now(), kind: 'reflection', text: 'auto-reflected: consolidated lessons into SOUL.md' });
+      }
+    } catch (err) {
+      reflectNote = `auto-reflect failed: ${errMsg(err)}`;
+    }
+  }
+
   // --- Score: recompute the scoreboard equity after trades + burn. The score is
   // the COMBINED total (paper book + real venture revenue); paper-only equity is
   // still recoverable as equityPost - ventureRevUsd. --------------------------
@@ -415,7 +440,12 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const equityPost = paperEquityPost + ventureRevUsd;
   const cyclePnlUsd = equityPost - state.score.equityUsd;
   const hadFirstProfit = state.score.firstProfitAtCycle !== null;
-  state.score = updateScore(state.score, { cycle, equityUsd: equityPost, burnUsd: costUsd, traded });
+  state.score = updateScore(state.score, {
+    cycle,
+    equityUsd: equityPost,
+    burnUsd: costUsd + reflectCostUsd,
+    traded,
+  });
   state.lastPrices = prices;
 
   // Milestone lesson: the first time net PnL turns positive.
@@ -472,6 +502,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     yieldNote,
     metabolicNote,
     ventureNote,
+    reflectNote,
     toolResult.note,
     heartbeatNote,
     replicationNote,
