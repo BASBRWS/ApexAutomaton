@@ -36,6 +36,7 @@ import {
   updateVentureMonitor,
 } from './ventures/store.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
+import { appendLesson, lessonsDigest, realizedFromClose } from './memory/lessons.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
 import type { AutomatonState, JournalEntry, Tier } from './types.js';
@@ -157,6 +158,14 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (decisions.revenueAddedUsd > 0) parts.push(`venture revenue +$${decisions.revenueAddedUsd.toFixed(2)}`);
     if (decisions.newlyAutonomous.length > 0) parts.push(`autonomy earned: ${decisions.newlyAutonomous.join(',')}`);
 
+    // Durable lessons from venture outcomes (facts, no model judgement).
+    for (const v of decisions.activated) {
+      appendLesson({ cycle, at: now(), kind: 'venture', text: `${v.id} "${v.title}" (${v.category}) went LIVE` });
+    }
+    if (decisions.revenueAddedUsd > 0) {
+      appendLesson({ cycle, at: now(), kind: 'venture', text: `real venture revenue booked`, pnlUsd: decisions.revenueAddedUsd });
+    }
+
     // --- Autonomous monitoring: for each LIVE venture, ping its listing (best-
     // effort) and refresh its monitor (uptime, days-live, kill-clock). This is
     // what "the agent monitors it" means without needing the human's credentials. -
@@ -164,10 +173,16 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     let killFlags = 0;
     for (const v of ventureBook.ventures) {
       if (v.status !== 'active' || !v.liveUrl) continue;
+      const wasKillDue = v.monitor?.killDue ?? false;
       const reachable = await pingUrl(v.liveUrl);
       updateVentureMonitor(v, reachable, Date.now());
       monitored += 1;
-      if (v.monitor?.killDue) killFlags += 1;
+      if (v.monitor?.killDue) {
+        killFlags += 1;
+        if (!wasKillDue) {
+          appendLesson({ cycle, at: now(), kind: 'venture', text: `${v.id} "${v.title}" is past its kill window with no revenue — decide to kill or promote` });
+        }
+      }
     }
     if (monitored > 0) parts.push(`monitored ${monitored} live` + (killFlags ? `, ${killFlags} kill-due` : ''));
 
@@ -190,6 +205,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   if (equitySolPre <= cfg.trading.dustSol) {
     const file = writeObituary(buildObituary(cycle, equityPre, equitySolPre, state), cycle);
     state.dead = true;
+    appendLesson({
+      cycle,
+      at: now(),
+      kind: 'death',
+      text: `DIED at ${equitySolPre.toFixed(4)} SOL — the market + burn + metabolism outpaced earnings`,
+      pnlUsd: state.score.netPnlUsd,
+    });
     appendEntry({
       cycle,
       at: now(),
@@ -261,6 +283,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     journalDigest: digestRecent(8),
     obituaryDigest: obituaryDigest(),
     ventureDigest: ventureBook ? ventureDigest(ventureBook) : undefined,
+    lessonsDigest: lessonsDigest(cfg.memory.lessonsInPrompt),
+    // Periodically nudge the agent to consolidate its lessons into SOUL.md — but
+    // only when it actually has the reflect tool (NORMAL+), never while fighting death.
+    reflectNudge:
+      cfg.memory.reflectEveryCycles > 0 &&
+      cycle % cfg.memory.reflectEveryCycles === 0 &&
+      allowedToolNames.includes('reflect'),
   });
 
   // --- Think: one LLM call, priced by the tier's model. ---------------------
@@ -296,6 +325,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     cycle,
     ventureBook: ventureBook ?? undefined,
   };
+  // Snapshot the book before the action so we can record REALIZED PnL on any
+  // position the trade closes or reduces — a concrete lesson from its own trading.
+  const positionsBefore = structuredClone(state.desk.positions);
   let toolResult: ToolResult;
   try {
     toolResult = await tool.execute(action?.input ?? {}, ctx);
@@ -304,6 +336,29 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
   const traded = toolResult.traded ?? false;
   const signatures: string[] = [...(toolResult.signatures ?? [])];
+
+  // --- Learn from this action: durable lessons ledger. ----------------------
+  if (traded) {
+    const { realizedUsd, legs } = realizedFromClose(positionsBefore, state.desk.positions, prices);
+    const notable = legs.length > 0 && Math.abs(realizedUsd) >= Math.max(1, paperEquityPre * 0.005);
+    if (notable) {
+      appendLesson({
+        cycle,
+        at: now(),
+        kind: 'trade',
+        text: `${chosenName} realized ${legs.join(', ')}`,
+        pnlUsd: realizedUsd,
+      });
+    }
+  }
+  if (toolResult.soulUpdated) {
+    appendLesson({
+      cycle,
+      at: now(),
+      kind: 'reflection',
+      text: action?.rationale ? `reflected: ${action.rationale.slice(0, 200)}` : 'reflected: rewrote SOUL.md',
+    });
+  }
 
   // Record any on-chain transfer the tool made (e.g. Phase 2 transfer).
   if (tool.movesValue) {
@@ -359,8 +414,20 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const paperEquityPost = deskEquityUsd(state.desk, prices);
   const equityPost = paperEquityPost + ventureRevUsd;
   const cyclePnlUsd = equityPost - state.score.equityUsd;
+  const hadFirstProfit = state.score.firstProfitAtCycle !== null;
   state.score = updateScore(state.score, { cycle, equityUsd: equityPost, burnUsd: costUsd, traded });
   state.lastPrices = prices;
+
+  // Milestone lesson: the first time net PnL turns positive.
+  if (!hadFirstProfit && state.score.firstProfitAtCycle === cycle) {
+    appendLesson({
+      cycle,
+      at: now(),
+      kind: 'milestone',
+      text: `first profit — net PnL turned positive`,
+      pnlUsd: state.score.netPnlUsd,
+    });
+  }
 
   // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
   const finalTier = tierForEquity(equityPost, solPrice, cfg);

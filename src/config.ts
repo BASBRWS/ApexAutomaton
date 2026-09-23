@@ -165,6 +165,15 @@ export interface Config {
     priceApiBase: string;
   };
 
+  /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
+   * periodic nudge to consolidate lessons into SOUL.md via the reflect tool. */
+  memory: {
+    /** nudge the agent to reflect every N cycles (0 disables the periodic nudge). */
+    reflectEveryCycles: number;
+    /** how many recent lessons to show in the prompt. */
+    lessonsInPrompt: number;
+  };
+
   /** The Venture layer — the agent's reach into the REAL economy (opportunity
    * scanning + building, gated by a human approval queue). Additive: the paper
    * survival game is unchanged when disabled. */
@@ -278,6 +287,11 @@ export function loadConfig(): Config {
       metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
+    },
+
+    memory: {
+      reflectEveryCycles: Math.trunc(envNum('REFLECT_EVERY_CYCLES', 12)),
+      lessonsInPrompt: Math.trunc(envNum('LESSONS_IN_PROMPT', 8)),
     },
 
     ventures: {

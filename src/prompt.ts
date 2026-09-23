@@ -93,7 +93,10 @@ export function buildSystemPrompt(args: {
     '## Constitution (immutable law — you cannot edit or override this)',
     args.constitution,
     '',
-    '## Your SOUL.md (your own evolving notes / strategy)',
+    '## Your SOUL.md (your own evolving memory / strategy)',
+    'This is your durable memory: it is loaded every cycle. Use the `reflect` tool to',
+    'rewrite it as you learn what earns — that is the only way lessons persist across',
+    'cycles instead of you starting fresh each time.',
     args.soul,
     '',
     '## Safety rails (enforced in code, not negotiable)',
@@ -135,6 +138,8 @@ export function buildUserPrompt(args: {
   journalDigest: string;
   obituaryDigest: string;
   ventureDigest?: string;
+  lessonsDigest?: string;
+  reflectNudge?: boolean;
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -189,6 +194,20 @@ export function buildUserPrompt(args: {
     '## Recent cycles',
     args.journalDigest,
     '',
+    '## Lessons learned (your durable memory — act on these)',
+    args.lessonsDigest ?? '(no lessons recorded yet)',
+    '',
+    ...(args.reflectNudge
+      ? [
+          '## TIME TO REFLECT',
+          'You have accumulated experience and lessons above. Use the `reflect` tool THIS',
+          'cycle to rewrite SOUL.md: distil what is actually earning vs bleeding into concrete',
+          'strategy notes you will follow. Consolidate the lessons — do not just restate them.',
+          'This is how you stop starting fresh every cycle. (If you genuinely have nothing new',
+          'to encode, trade instead — but prefer to reflect now.)',
+          '',
+        ]
+      : []),
     '## Obituaries (lessons from past deaths)',
     args.obituaryDigest,
     '',

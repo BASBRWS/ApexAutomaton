@@ -114,6 +114,9 @@
       <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's decision + its full deliberation, newest first</span></h2>
       <div id="reasoning" class="feed"></div>
 
+      <h2>Lessons learned <span class="muted" style="font-size:12px;font-weight:400">· durable memory — facts from its own actions + reflections, newest first</span></h2>
+      <div id="lessons" class="feed"></div>
+
       <h2>Trade book</h2>
       <div id="book-cash" class="muted"></div>
       <div class="scroll">
@@ -471,6 +474,31 @@
       });
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVentureModal(); });
 
+      function renderLessons(lessons) {
+        const host = document.getElementById('lessons');
+        host.innerHTML = '';
+        if (!lessons || !lessons.length) {
+          host.innerHTML = '<div class="empty">No lessons yet — the agent records facts from its own trades, milestones and ventures here, and consolidates them into SOUL.md when it reflects.</div>';
+          return;
+        }
+        lessons.slice(-60).reverse().forEach((l) => {
+          const div = document.createElement('div');
+          div.className = 'msg';
+          const kind = String(l.kind || '');
+          const hasPnl = typeof l.pnlUsd === 'number';
+          const pnlCls = hasPnl ? (l.pnlUsd >= 0 ? 'pos' : 'neg') : '';
+          const pnl = hasPnl ? ` <span class="${pnlCls}">${l.pnlUsd >= 0 ? '+' : '-'}$${Math.abs(l.pnlUsd).toFixed(2)}</span>` : '';
+          div.innerHTML =
+            '<div class="msg-head">' +
+              `<span class="cyc">#${l.cycle}</span>` +
+              `<span class="badge ${kind === 'reflection' ? 'reflect' : kind === 'death' ? 'die' : kind === 'trade' ? 'trade' : ''}">${escapeHtml(kind)}</span>` +
+              `<span>${fmtTime(l.at)}</span>` +
+            '</div>' +
+            `<div class="msg-why" style="font-weight:500">${escapeHtml(l.text || '')}${pnl}</div>`;
+          host.appendChild(div);
+        });
+      }
+
       function renderVentures(book) {
         const host = document.getElementById('ventures');
         const sub = document.getElementById('ventures-sub');
@@ -514,10 +542,11 @@
       (async () => {
         const status = document.getElementById('status');
         try {
-          const [state, journal, ventures] = await Promise.all([
+          const [state, journal, ventures, lessons] = await Promise.all([
             loadJson('../state/state.json'),
             loadNdjson('../state/journal.ndjson').catch(() => []),
             loadJson('../state/ventures.json').catch(() => null),
+            loadNdjson('../state/lessons.ndjson').catch(() => []),
           ]);
 
           const s = state.score ?? {};
@@ -567,6 +596,7 @@
 
           drawChart(journal);
           renderReasoning(journal);
+          renderLessons(lessons);
           renderBook(desk, prices);
           renderVentures(ventures);
           renderPopulation(state.children);
