@@ -72,14 +72,16 @@
       "estCostUsd": 0,
       "estRevenueUsd": 60,
       "killCriteria": "If after 60 days of being listed it has sold fewer than 3 copies despite basic promotion (2-3 relevant subreddit/forum posts, one Twitter/X thread), kill it — the niche is saturated with free alternatives and not worth maintaining.",
-      "status": "proposed",
+      "status": "active",
       "revenueUsd": 0,
-      "accountedRevenueUsd": 0
+      "accountedRevenueUsd": 0,
+      "listedAt": "2026-09-23T13:23:43.927Z",
+      "decidedAtCycle": -1
     }
   ],
   "ledger": {
     "digital-product": {
-      "approved": 1,
+      "approved": 2,
       "rejected": 0,
       "earnedUsd": 0,
       "autoEligible": false
