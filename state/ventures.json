@@ -15,8 +15,24 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0002",
+      "createdAtCycle": 38,
+      "at": "2026-09-23T03:04:54.449Z",
+      "category": "digital-product",
+      "title": "Crypto DCA & Rebalance Planner (Google Sheets Template)",
+      "thesis": "Retail crypto holders constantly ask 'how much should I buy/sell to get back to target weights' but don't want to build a spreadsheet. A clean, pre-built Google Sheets template that (a) tracks a target allocation across BTC/ETH/alts/stables, (b) computes drift vs targets, and (c) outputs exact buy/sell $ amounts to rebalance or to execute a scheduled DCA — sold once on Gumroad/Etsy for $9-15, zero marginal cost per sale, pure content/skill monetization, no ToS issues, no financial advice given (just arithmetic on user-entered numbers).",
+      "deliverable": "SHEET STRUCTURE (ready to build in Google Sheets, tabs and formulas specified):\n\nTAB 1 'Setup': Columns A=Asset, B=Target Weight %, C=Current Holdings (units), D=Current Price (user pastes), E=Current Value =C*D, F=Total Portfolio Value =SUM(E), G=Current Weight % =E/F, H=Target Value =B*F, I=Drift $ =H-E, J=Action ('BUY'/'SELL'/'HOLD' via =IF(I>1,\"BUY\",IF(I<-1,\"SELL\",\"HOLD\")), K=Amount to Trade $ =ABS(I).\nRows pre-filled for BTC, ETH, SOL, Stablecoin, 'Alts basket' — user edits freely, adds rows.\n\nTAB 2 'DCA Schedule': Columns for Date, Planned Contribution $, Split % per asset (defaults to Target Weight from Tab1 via QUERY/VLOOKUP), computed $ per asset, running total invested, running total units bought (=Contribution*Split/Price entered that date) — gives a full DCA log the user fills in weekly/monthly.\n\nTAB 3 'Dashboard': Pie chart of current vs target weights (native Sheets chart on Tab1 ranges), a single-cell total drift metric =SUMPRODUCT(ABS(I2:I10)) to show 'how far out of balance am I', and conditional formatting (red/green) on the Action column.\n\nTAB 4 'Read Me': Plain-English instructions (no advice, just mechanics): how to fill in prices, how often to rebalance (e.g. monthly or >5% drift), disclaimer that this is a calculator not financial advice.\n\nAll formulas above are copy-paste-ready native Google Sheets syntax — this is a fully specified, buildable template, not just a concept.",
+      "humanAction": "Actually build the Google Sheet from this spec (or paste formulas in), then create and publish a Gumroad listing (or Etsy digital-download listing) at $9-15, write the product description, and connect a payment method — the account/payment/publishing steps I cannot do myself.",
+      "estCostUsd": 0,
+      "estRevenueUsd": 60,
+      "killCriteria": "If after 60 days of being listed it has sold fewer than 3 copies despite basic promotion (2-3 relevant subreddit/forum posts, one Twitter/X thread), kill it — the niche is saturated with free alternatives and not worth maintaining.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {},
-  "seq": 1
+  "seq": 2
 }
