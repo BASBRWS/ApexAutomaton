@@ -6,6 +6,9 @@ import {
   grossExposureUsd,
   netPnlUsd,
   weightsToOrders,
+  addVentureRevenue,
+  ventureRevenueUsdOf,
+  scoreboardEquityUsd,
   type ApplyContext,
 } from '../src/trading/desk.js';
 
@@ -14,6 +17,34 @@ const ctx = (prices: Record<string, number>): ApplyContext => ({
   tradableAssets: ['BTC', 'ETH'],
   maxGrossExposureUsd: 500,
   allowShort: true,
+});
+
+describe('venture revenue is separate from the paper book', () => {
+  it('books revenue on its own line, never into paper cash or paper equity', () => {
+    const d = initDesk(500, 0);
+    addVentureRevenue(d, 25);
+    expect(d.cashUsd).toBe(500);                 // paper cash untouched
+    expect(equityUsd(d, {})).toBe(500);          // paper equity untouched
+    expect(ventureRevenueUsdOf(d)).toBe(25);     // tracked separately
+    expect(scoreboardEquityUsd(d, {})).toBe(525); // scoreboard = paper + venture
+  });
+
+  it('accumulates and stays readable as a distinct component', () => {
+    const d = initDesk(500, 0);
+    addVentureRevenue(d, 25);
+    addVentureRevenue(d, 15);
+    expect(ventureRevenueUsdOf(d)).toBe(40);
+    // paper trading equity is always recoverable as scoreboard - venture revenue
+    expect(scoreboardEquityUsd(d, {}) - ventureRevenueUsdOf(d)).toBe(equityUsd(d, {}));
+  });
+
+  it('tolerates state written before the field existed (treats missing as 0)', () => {
+    const d = initDesk(500, 0);
+    // simulate legacy persisted desk lacking the field
+    delete (d as { ventureRevenueUsd?: number }).ventureRevenueUsd;
+    expect(ventureRevenueUsdOf(d)).toBe(0);
+    expect(scoreboardEquityUsd(d, {})).toBe(500);
+  });
 });
 
 describe('trading desk', () => {

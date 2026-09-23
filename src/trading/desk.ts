@@ -26,6 +26,11 @@ export interface Desk {
   /** USD parked in the real-yield carry sleeve (earns yieldApy over time). Not
    * exposed to crypto price; a low-risk, non-directional survival stance. */
   stakedUsd: number;
+  /** REAL revenue reported from launched ventures, USD. Tracked SEPARATELY from
+   * the paper book (never mixed into cash), so paper-trading performance stays
+   * cleanly readable. It is added on top only for the combined "scoreboard"
+   * equity (survival/tiers/score), not for trade sizing or the metabolic cost. */
+  ventureRevenueUsd: number;
   /** starting book size, for net-PnL reporting. */
   capitalUsd: number;
   openedAtCycle: number;
@@ -51,7 +56,7 @@ export interface ApplyContext {
 }
 
 export function initDesk(capitalUsd: number, cycle: number): Desk {
-  return { cashUsd: capitalUsd, positions: {}, stakedUsd: 0, capitalUsd, openedAtCycle: cycle };
+  return { cashUsd: capitalUsd, positions: {}, stakedUsd: 0, ventureRevenueUsd: 0, capitalUsd, openedAtCycle: cycle };
 }
 
 /**
@@ -60,7 +65,7 @@ export function initDesk(capitalUsd: number, cycle: number): Desk {
  * loop funds this at genesis (its first priced cycle) via {@link fundDesk}.
  */
 export function initUnfundedDesk(): Desk {
-  return { cashUsd: 0, positions: {}, stakedUsd: 0, capitalUsd: 0, openedAtCycle: -1 };
+  return { cashUsd: 0, positions: {}, stakedUsd: 0, ventureRevenueUsd: 0, capitalUsd: 0, openedAtCycle: -1 };
 }
 
 /** Fund a genesis book with its USD capital baseline (the SOL stake, priced). */
@@ -71,6 +76,30 @@ export function fundDesk(desk: Desk, capitalUsd: number, cycle: number): Desk {
 /** Staked balance, tolerant of state written before the yield sleeve existed. */
 export function stakedUsdOf(desk: Desk): number {
   return typeof desk.stakedUsd === 'number' && Number.isFinite(desk.stakedUsd) ? desk.stakedUsd : 0;
+}
+
+/** Real venture revenue booked so far, tolerant of state written before it existed. */
+export function ventureRevenueUsdOf(desk: Desk): number {
+  return typeof desk.ventureRevenueUsd === 'number' && Number.isFinite(desk.ventureRevenueUsd)
+    ? desk.ventureRevenueUsd
+    : 0;
+}
+
+/** Book REAL venture revenue onto its own separate line (never into paper cash). */
+export function addVentureRevenue(desk: Desk, usd: number): void {
+  if (Number.isFinite(usd) && usd !== 0) {
+    desk.ventureRevenueUsd = ventureRevenueUsdOf(desk) + usd;
+  }
+}
+
+/**
+ * The combined "scoreboard" equity: the pure paper book PLUS real venture
+ * revenue. This is what the survival game (tiers, death, score) reads, so real
+ * value counts toward survival — while {@link equityUsd} stays pure paper for
+ * trade sizing and the metabolic cost, keeping the two cleanly separable.
+ */
+export function scoreboardEquityUsd(desk: Desk, prices: PriceMap): number {
+  return equityUsd(desk, prices) + ventureRevenueUsdOf(desk);
 }
 
 /** True once the book has been funded at genesis (a real capital baseline set). */

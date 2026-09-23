@@ -247,9 +247,11 @@
         tbody.innerHTML = '';
         const cash = Number(desk.cashUsd) || 0;
         const staked = Number(desk.stakedUsd) || 0;
+        const vrev = Number(desk.ventureRevenueUsd) || 0;
         document.getElementById('book-cash').innerHTML =
           `<b>Cash:</b> ${usd(cash)} uninvested` +
-          (staked > 0 ? ` &nbsp;|&nbsp; <b>Staked:</b> ${usd(staked)} <span class="pos">(real yield)</span>` : '');
+          (staked > 0 ? ` &nbsp;|&nbsp; <b>Staked:</b> ${usd(staked)} <span class="pos">(real yield)</span>` : '') +
+          (vrev > 0 ? ` &nbsp;|&nbsp; <b>Venture revenue:</b> ${usd(vrev)} <span class="pos">(real, kept separate)</span>` : '');
         const entries = Object.entries(desk.positions ?? {});
         if (entries.length === 0) {
           const tr = document.createElement('tr');
@@ -464,11 +466,15 @@
           const peakSol = journal.reduce((mx, e) => Math.max(mx, Number(e.equitySol) || 0), eqSol);
           const netSol = eqSol - startSol;
           const openPositions = Object.keys(desk.positions ?? {}).length;
+          const vrev = Number(desk.ventureRevenueUsd) || 0;           // real venture revenue (separate line)
+          const tradingUsd = eqUsd - vrev;                            // pure paper trading equity
+          const equitySub = (solPrice ? `${usd(eqUsd)} · frozen @ ${usd(solPrice)}/SOL` : usd(eqUsd))
+            + (vrev > 0 ? ` · trading ${usd(tradingUsd)} + ventures ${usd(vrev)}` : '');
 
           const tiles = document.getElementById('tiles');
           tiles.append(
             tile('cycle', state.cycle ?? 0),
-            tile('equity', sol(eqSol), usd(eqUsd) + (solPrice ? ` · frozen @ ${usd(solPrice)}/SOL` : '')),
+            tile('equity', sol(eqSol), equitySub),
             tile('net PnL', signed(netSol, sol), signed(Number(s.netPnlUsd) || 0, usd)),
             tile('peak equity', sol(peakSol)),
             tile('population', (state.children ?? []).length),

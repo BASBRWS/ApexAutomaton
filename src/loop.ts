@@ -11,6 +11,9 @@ import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './
 import { initialScore, updateScore } from './score.js';
 import {
   equityUsd as deskEquityUsd,
+  scoreboardEquityUsd,
+  ventureRevenueUsdOf,
+  addVentureRevenue,
   summarizeDesk,
   isFunded,
   fundDesk,
@@ -141,8 +144,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       ventureBook,
       cycle,
       cfg.ventures.autonomyThreshold,
+      // Book REAL revenue onto its OWN line — never mixed into the paper cash — so
+      // paper-trading performance stays cleanly readable; the scoreboard equity
+      // below adds it back on top (survival counts it, trade sizing does not).
       (usd) => {
-        state.desk.cashUsd += usd;
+        addVentureRevenue(state.desk, usd);
       },
     );
     const parts: string[] = [];
@@ -155,7 +161,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // Gross-exposure cap for this cycle: the SOL cap priced at the live SOL price.
   const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
 
-  const equityPre = deskEquityUsd(state.desk, prices);
+  // Paper book (pure) — drives the metabolic cost and trade sizing. The
+  // scoreboard adds real venture revenue on top: the survival game (death, tiers,
+  // score) reads the combined total, so real value counts toward survival while
+  // paper-trading performance stays cleanly readable (they never merge in cash).
+  const paperEquityPre = deskEquityUsd(state.desk, prices);
+  const ventureRevUsd = ventureRevenueUsdOf(state.desk);
+  const equityPre = paperEquityPre + ventureRevUsd; // scoreboard (mixed)
   const equitySolPre = equityToSol(equityPre, solPrice);
 
   // --- Death check: economic, in SOL. Never self-resurrect. -----------------
@@ -209,8 +221,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const dustUsd = cfg.trading.dustSol * solPrice;
   const priorCycles = Math.max(1, cycle - 1);
   const avgBurnUsd = Math.max(state.score.cumulativeBurnUsd / priorCycles, 0.01);
-  // Total drag if it just rests = compute burn + metabolic cost (the dominant one).
-  const dragPerCycle = avgBurnUsd + equityPre * cfg.trading.metabolicRatePerCycle;
+  // Total drag if it just rests = compute burn + metabolic cost (the dominant
+  // one). The metabolic cost is levied on the PAPER book only, so runway measures
+  // the combined scoreboard against the paper-book bleed.
+  const dragPerCycle = avgBurnUsd + paperEquityPre * cfg.trading.metabolicRatePerCycle;
   const runwayCycles = Math.max(0, (equityPre - dustUsd) / dragPerCycle);
 
   const user = buildUserPrompt({
@@ -297,7 +311,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Metabolic cost: a "cost of living" as a fraction of equity, so it bites
   // at every book size. This is the forcing function against coasting: the agent
   // must keep out-earning its own metabolism or it slowly starves toward death. --
-  const metabolicUsd = equityPre * cfg.trading.metabolicRatePerCycle;
+  const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
   state.desk.cashUsd -= metabolicUsd;
   const metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
 
@@ -323,8 +337,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     heartbeatNote = summarizeHeartbeatError(err);
   }
 
-  // --- Score: recompute equity after trades + burn. -------------------------
-  const equityPost = deskEquityUsd(state.desk, prices);
+  // --- Score: recompute the scoreboard equity after trades + burn. The score is
+  // the COMBINED total (paper book + real venture revenue); paper-only equity is
+  // still recoverable as equityPost - ventureRevUsd. --------------------------
+  const paperEquityPost = deskEquityUsd(state.desk, prices);
+  const equityPost = paperEquityPost + ventureRevUsd;
   const cyclePnlUsd = equityPost - state.score.equityUsd;
   state.score = updateScore(state.score, { cycle, equityUsd: equityPost, burnUsd: costUsd, traded });
   state.lastPrices = prices;
