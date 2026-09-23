@@ -1,0 +1,24 @@
+# Cloudflare Worker that reliably triggers the Apex Automaton heartbeat.
+# Deploy from this directory:  npx wrangler deploy   (see README.md)
+
+name = "apex-automaton-cron"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Reliable clock. Every 30 minutes is plenty: one dispatch starts a ~2h burst,
+# and the heartbeat's stale-guard (13 min) makes redundant triggers no-ops.
+# Change to "*/15 * * * *" for a tighter cadence, or "0 * * * *" for hourly.
+[triggers]
+crons = ["*/30 * * * *"]
+
+# Non-secret config. The token is a SECRET — never put it here; set it with
+#   npx wrangler secret put GH_TOKEN
+[vars]
+GH_OWNER = "BASBRWS"
+GH_REPO = "ApexAutomaton"
+GH_WORKFLOW = "heartbeat.yml"
+GH_REF = "main"
+
+# Observability: `npx wrangler tail` streams the console.log lines from each fire.
+[observability]
+enabled = true
