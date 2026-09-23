@@ -105,6 +105,9 @@
 
       <div id="tiles" class="grid"></div>
 
+      <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· % change in book equity (rate-frozen, so SOL = USD %)</span></h2>
+      <div id="growth" class="grid"></div>
+
       <h2>Book equity over time (SOL)</h2>
       <svg id="chart" viewBox="0 0 900 260" aria-label="equity in SOL over cycles chart"></svg>
 
@@ -157,6 +160,38 @@
       const usd = (n) => `$${(Number(n) || 0).toFixed(2)}`;
       const sol = (n) => `${(Number(n) || 0).toFixed(4)} SOL`;
       const signed = (n, unit) => `${n >= 0 ? '+' : ''}${unit(n)}`;
+      const pct = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(2)}%`;
+
+      /**
+       * Growth of equity over a trailing window. Baseline = the last journal
+       * entry at/just before (now - windowMs); if the agent is younger than the
+       * window, baseline = the earliest entry (so the figure is "since start").
+       * Returns { pctVal, spanned } or null when there's no usable baseline.
+       */
+      function growthOver(journal, eqNowSol, windowMs) {
+        if (!journal.length) return null;
+        const nowMs = Date.parse(journal[journal.length - 1].at) || Date.now();
+        const cutoff = nowMs - windowMs;
+        let baseline = null;
+        for (const e of journal) {
+          const t = Date.parse(e.at);
+          if (!Number.isFinite(t)) continue;
+          if (t <= cutoff) baseline = e; // keep the latest entry at/before the cutoff
+          else break;
+        }
+        const spanned = baseline !== null;
+        if (!baseline) baseline = journal[0];
+        const b = Number(baseline.equitySol) || 0;
+        if (!(b > 0)) return null;
+        return { pctVal: (eqNowSol - b) / b, spanned };
+      }
+
+      function growthTile(label, journal, eqNowSol, windowMs) {
+        const g = growthOver(journal, eqNowSol, windowMs);
+        if (!g) return tile(label, '—', 'no data yet');
+        const cls = g.pctVal >= 0 ? 'pos' : 'neg';
+        return tile(label, `<span class="${cls}">${pct(g.pctVal)}</span>`, g.spanned ? '' : 'since start (younger than window)');
+      }
       function fmtUnits(u) {
         const a = Math.abs(u);
         if (a >= 1000) return u.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -518,6 +553,16 @@
               (ventures?.ventures ?? []).filter((v) => v.status === 'active').length + ' live',
               (ventures?.ventures ?? []).filter((v) => v.status === 'proposed').length + ' awaiting you',
             ),
+          );
+
+          const growth = document.getElementById('growth');
+          const DAY = 86400000;
+          const sinceStartPct = startSol > 0 ? (eqSol - startSol) / startSol : 0;
+          growth.append(
+            tile('since start', `<span class="${sinceStartPct >= 0 ? 'pos' : 'neg'}">${pct(sinceStartPct)}</span>`, `from ${sol(startSol)}`),
+            growthTile('per day (24h)', journal, eqSol, DAY),
+            growthTile('per week (7d)', journal, eqSol, 7 * DAY),
+            growthTile('per month (30d)', journal, eqSol, 30 * DAY),
           );
 
           drawChart(journal);
