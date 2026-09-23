@@ -39,6 +39,20 @@ export interface LaunchStep {
   url?: string;
 }
 
+/** What the agent's autonomous monitor observes each cycle for a LIVE venture.
+ * It cannot read real sales without credentials, so it watches what it can: the
+ * listing is reachable, how long it has been live, and the kill-criteria clock. */
+export interface VentureMonitor {
+  lastCheckedAt: string;
+  /** the live URL responded (HTTP ok) this check. */
+  reachable: boolean;
+  /** whole days since listedAt. */
+  daysLive: number;
+  /** true once daysLive has reached the kill window with no reported revenue. */
+  killDue: boolean;
+  note?: string;
+}
+
 export interface Venture {
   id: string;
   createdAtCycle: number;
@@ -67,6 +81,12 @@ export interface Venture {
   /** when to abandon it — a concrete, falsifiable condition. */
   killCriteria: string;
   status: VentureStatus;
+  /** the public URL where it is selling, once the human has listed it live. */
+  liveUrl?: string;
+  /** ISO timestamp the human marked it live (starts the kill-criteria clock). */
+  listedAt?: string;
+  /** what the agent's autonomous monitor last observed for this live venture. */
+  monitor?: VentureMonitor;
   /** real revenue reported for this venture so far, USD (a human edits this). */
   revenueUsd: number;
   /** revenue already folded into the book, so only deltas are added. */

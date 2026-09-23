@@ -33,6 +33,7 @@ import {
   saveVentureBook,
   applyDecisions,
   ventureDigest,
+  updateVentureMonitor,
 } from './ventures/store.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
 import { AnthropicClient } from './llm/anthropic.js';
@@ -155,6 +156,21 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (decisions.activated.length > 0) parts.push(`ventures live +${decisions.activated.length}`);
     if (decisions.revenueAddedUsd > 0) parts.push(`venture revenue +$${decisions.revenueAddedUsd.toFixed(2)}`);
     if (decisions.newlyAutonomous.length > 0) parts.push(`autonomy earned: ${decisions.newlyAutonomous.join(',')}`);
+
+    // --- Autonomous monitoring: for each LIVE venture, ping its listing (best-
+    // effort) and refresh its monitor (uptime, days-live, kill-clock). This is
+    // what "the agent monitors it" means without needing the human's credentials. -
+    let monitored = 0;
+    let killFlags = 0;
+    for (const v of ventureBook.ventures) {
+      if (v.status !== 'active' || !v.liveUrl) continue;
+      const reachable = await pingUrl(v.liveUrl);
+      updateVentureMonitor(v, reachable, Date.now());
+      monitored += 1;
+      if (v.monitor?.killDue) killFlags += 1;
+    }
+    if (monitored > 0) parts.push(`monitored ${monitored} live` + (killFlags ? `, ${killFlags} kill-due` : ''));
+
     if (parts.length > 0) ventureNote = parts.join('; ');
   }
 
@@ -469,6 +485,28 @@ function buildObituary(
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Best-effort reachability check for a live venture's listing. Never throws; a
+ * timeout, DNS failure, or non-2xx just means "not reachable this cycle". */
+async function pingUrl(url: string): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: ctrl.signal,
+        headers: { 'user-agent': 'ApexAutomaton-monitor/1.0', accept: 'text/html' },
+      });
+      return res.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return false;
+  }
 }
 
 /**

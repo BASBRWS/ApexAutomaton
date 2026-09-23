@@ -204,6 +204,74 @@ export function applyDecisions(
   return { activated, rejected, revenueAddedUsd, newlyAutonomous };
 }
 
+/** Days a live venture may run without revenue before the monitor flags it due
+ * for the kill decision (matches the agents' usual 60-day kill criterion). */
+export const DEFAULT_KILL_DAYS = 60;
+
+export function findVenture(book: VentureBook, id: string): Venture | undefined {
+  return book.ventures.find((v) => v.id === id);
+}
+
+export interface MarkLiveResult {
+  ok: boolean;
+  reason?: string;
+  venture?: Venture;
+}
+
+/** The human pressed "mark live": the venture is now selling in the real world.
+ * Sets it active, records the public URL and the moment it went live (which starts
+ * the kill-criteria clock) and ticks the category's autonomy ledger the first time.
+ * Re-marking an already-live venture just updates the URL. */
+export function markLive(
+  book: VentureBook,
+  id: string,
+  liveUrl: string,
+  cycle: number,
+  at: string,
+  autonomyThreshold = 10,
+): MarkLiveResult {
+  const v = findVenture(book, id);
+  if (!v) return { ok: false, reason: `no venture with id ${id}` };
+  const url =
+    typeof liveUrl === 'string' && /^https?:\/\//i.test(liveUrl.trim())
+      ? liveUrl.trim().slice(0, 400)
+      : undefined;
+  const firstTime = v.status !== 'active';
+  v.status = 'active';
+  if (url) v.liveUrl = url;
+  if (firstTime || !v.listedAt) {
+    v.listedAt = at;
+    v.decidedAtCycle = cycle;
+    const entry = ensureLedger(book, v.category);
+    entry.approved += 1;
+    if (!entry.autoEligible && entry.approved >= autonomyThreshold) entry.autoEligible = true;
+  }
+  return { ok: true, venture: v };
+}
+
+/** Update one live venture's monitor observation (pure). `reachable` is the
+ * result of the loop's URL ping; daysLive/killDue are derived from listedAt. */
+export function updateVentureMonitor(
+  v: Venture,
+  reachable: boolean,
+  nowMs: number,
+  killDays = DEFAULT_KILL_DAYS,
+): void {
+  const listedMs = v.listedAt ? Date.parse(v.listedAt) : NaN;
+  const daysLive = Number.isFinite(listedMs) ? Math.max(0, Math.floor((nowMs - listedMs) / 86400000)) : 0;
+  const hasRevenue = cleanNum(v.revenueUsd) > 0;
+  const killDue = daysLive >= killDays && !hasRevenue;
+  v.monitor = {
+    lastCheckedAt: new Date(nowMs).toISOString(),
+    reachable,
+    daysLive,
+    killDue,
+    note: killDue
+      ? `${daysLive}d live, no revenue — past the ${killDays}d kill window`
+      : `${daysLive}d live${reachable ? '' : ' — listing UNREACHABLE'}`,
+  };
+}
+
 const STATUS_LABEL: Record<VentureStatus, string> = {
   proposed: 'AWAITING YOU',
   approved: 'approved',
@@ -223,7 +291,11 @@ export function ventureDigest(book: VentureBook, n = 8): string {
       v.revenueUsd > 0
         ? ` earned=$${v.revenueUsd.toFixed(2)}`
         : ` est=$${v.estRevenueUsd.toFixed(0)}`;
-    return `${v.id} [${STATUS_LABEL[v.status]}] (${v.category}) ${v.title}${money}`;
+    const mon =
+      v.status === 'active' && v.monitor
+        ? ` [${v.monitor.daysLive}d live${v.monitor.reachable ? '' : ', UNREACHABLE'}${v.monitor.killDue ? ', KILL-DUE' : ''}]`
+        : '';
+    return `${v.id} [${STATUS_LABEL[v.status]}] (${v.category}) ${v.title}${money}${mon}`;
   });
   const auto = Object.entries(book.ledger)
     .filter(([, e]) => e.autoEligible)

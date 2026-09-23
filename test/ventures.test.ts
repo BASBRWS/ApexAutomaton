@@ -6,6 +6,9 @@ import {
   openProposalCount,
   pipelineCounts,
   ventureDigest,
+  markLive,
+  updateVentureMonitor,
+  findVenture,
   type ProposalInput,
 } from '../src/ventures/store.js';
 
@@ -132,6 +135,55 @@ describe('venture decisions + revenue folding', () => {
     }
     expect(book.ledger['digital-product']!.approved).toBe(3);
     expect(book.ledger['digital-product']!.autoEligible).toBe(true);
+  });
+});
+
+describe('mark live + autonomous monitoring', () => {
+  function liveBook() {
+    const book = emptyVentureBook();
+    addProposal(book, proposal(), 1, 'now');
+    return book;
+  }
+
+  it('marks a venture live: active, records url + listedAt, ticks the ledger', () => {
+    const book = liveBook();
+    const res = markLive(book, 'v0001', 'https://gumroad.com/l/abc', 9, '2026-01-01T00:00:00.000Z');
+    expect(res.ok).toBe(true);
+    const v = findVenture(book, 'v0001')!;
+    expect(v.status).toBe('active');
+    expect(v.liveUrl).toBe('https://gumroad.com/l/abc');
+    expect(v.listedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(book.ledger['digital-product']!.approved).toBe(1);
+  });
+
+  it('rejects an unknown id and ignores a non-http url', () => {
+    const book = liveBook();
+    expect(markLive(book, 'nope', 'https://x.com', 1, 'now').ok).toBe(false);
+    markLive(book, 'v0001', 'javascript:alert(1)', 1, 'now');
+    expect(findVenture(book, 'v0001')!.liveUrl).toBeUndefined(); // unsafe url dropped
+    expect(findVenture(book, 'v0001')!.status).toBe('active');   // still activated
+  });
+
+  it('computes days-live and flags kill-due only past the window without revenue', () => {
+    const book = liveBook();
+    const listed = '2026-01-01T00:00:00.000Z';
+    markLive(book, 'v0001', 'https://gumroad.com/l/abc', 1, listed);
+    const v = findVenture(book, 'v0001')!;
+
+    // 10 days in, reachable, no revenue → not kill-due yet
+    updateVentureMonitor(v, true, Date.parse('2026-01-11T00:00:00.000Z'), 60);
+    expect(v.monitor!.daysLive).toBe(10);
+    expect(v.monitor!.reachable).toBe(true);
+    expect(v.monitor!.killDue).toBe(false);
+
+    // 61 days in, still no revenue → kill-due
+    updateVentureMonitor(v, true, Date.parse('2026-03-03T00:00:00.000Z'), 60);
+    expect(v.monitor!.killDue).toBe(true);
+
+    // but revenue reported cancels the kill flag
+    v.revenueUsd = 12;
+    updateVentureMonitor(v, true, Date.parse('2026-03-03T00:00:00.000Z'), 60);
+    expect(v.monitor!.killDue).toBe(false);
   });
 });
 

@@ -89,7 +89,9 @@
       .modal ol.steps a:hover { text-decoration: underline; }
       .modal .m-kill { font-size: 12px; color: var(--muted); margin-top: 14px; }
       .modal .m-close { float: right; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
-      .modal .m-approve { font-size: 12px; color: var(--muted); margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+      .modal .m-approve { font-size: 12px; color: var(--muted); margin-top: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+      .modal .m-livebtn { display: inline-block; margin-top: 6px; background: var(--long); color: #05210f; font-weight: 700; font-size: 14px; text-decoration: none; padding: 9px 16px; border-radius: 9px; }
+      .modal .m-livebtn:hover { filter: brightness(1.08); }
       .modal code { color: var(--accent); }
     </style>
   </head>
@@ -372,6 +374,36 @@
         return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
       }
 
+      var VENTURE_REPO = 'BASBRWS/ApexAutomaton';
+      function markLiveIssueUrl(v) {
+        const title = 'venture-live: ' + (v.id || '');
+        const body =
+          'url: (paste your public Gumroad/Etsy sales link here, then submit)\n\n' +
+          'Submitting this issue marks venture ' + (v.id || '') + ' — "' + (v.title || '') + '" — LIVE and starts the agent monitoring it ' +
+          '(uptime + the kill-criteria clock). Report sales later by editing revenueUsd or telling Claude.';
+        return 'https://github.com/' + VENTURE_REPO + '/issues/new?title=' +
+          encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
+      }
+      function ventureActionHtml(v, st) {
+        if (st === 'active') {
+          const m = v.monitor || {};
+          const url = safeUrl(v.liveUrl);
+          const reach = m.reachable ? '<span class="pos">reachable</span>' : '<span class="neg">unreachable</span>';
+          const kill = m.killDue ? ' · <span class="neg">past kill window — decide</span>' : '';
+          return '<div class="m-sec">Live — the agent is monitoring this</div>' +
+            '<div class="m-thesis">' +
+              (url ? `Listing: <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a><br>` : '') +
+              (v.listedAt ? `Listed: ${fmtTime(v.listedAt)}<br>` : '') +
+              (m.lastCheckedAt ? `Last check: ${fmtTime(m.lastCheckedAt)} — ${reach} · ${Number(m.daysLive)||0}d live${kill}` : 'Awaiting first monitor cycle…') +
+            '</div>' +
+            '<div class="m-approve">Report sales any time (edit <code>revenueUsd</code> in <code>state/ventures.json</code> or tell Claude) — real revenue folds into the combined scoreboard, kept separate from the paper book.</div>';
+        }
+        const issue = markLiveIssueUrl(v);
+        return '<div class="m-sec">When it is live</div>' +
+          `<a class="m-livebtn" href="${escapeHtml(issue)}" target="_blank" rel="noopener noreferrer">✅ Mark this venture live</a>` +
+          '<div class="m-approve">Opens a pre-filled GitHub issue — paste your public sales link and submit. A workflow then flips this venture to LIVE and the agent starts monitoring it (uptime + kill-clock). No account or secret needed.</div>';
+      }
+
       function openVentureModal(v) {
         const body = document.getElementById('venture-modal-body');
         const st = String(v.status || '');
@@ -392,7 +424,7 @@
           (v.deliverable ? `<div class="m-sec">What the agent built</div><div class="m-deliverable">${escapeHtml(v.deliverable)}</div>` : '') +
           `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml +
           (v.killCriteria ? `<div class="m-kill">Kill if: ${escapeHtml(v.killCriteria)}</div>` : '') +
-          '<div class="m-approve">Once it is live, approve it in <code>state/ventures.json</code> (set this venture\'s <code>status</code> to <code>"approved"</code>); report real sales in <code>revenueUsd</code> and they fold into the book.</div>';
+          ventureActionHtml(v, st);
         document.getElementById('m-close').onclick = closeVentureModal;
         document.getElementById('venture-modal').classList.add('open');
       }
