@@ -34,7 +34,14 @@
       "accountedRevenueUsd": 0,
       "liveUrl": "https://boombastic05.gumroad.com/",
       "listedAt": "2026-09-23T06:20:48.419Z",
-      "decidedAtCycle": -1
+      "decidedAtCycle": -1,
+      "monitor": {
+        "lastCheckedAt": "2026-09-23T06:29:00.225Z",
+        "reachable": true,
+        "daysLive": 0,
+        "killDue": false,
+        "note": "0d live"
+      }
     },
     {
       "id": "v0002",
