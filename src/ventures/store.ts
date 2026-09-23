@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { STATE_DIR, VENTURES_FILE } from '../paths.js';
-import type { AutonomyEntry, Venture, VentureBook, VentureStatus } from './types.js';
+import type { AutonomyEntry, LaunchStep, Venture, VentureBook, VentureStatus } from './types.js';
 
 /**
  * ventures/store.ts — the venture pipeline's persistence AND its pure logic.
@@ -52,6 +52,27 @@ export interface ProposalInput {
   estCostUsd: number;
   estRevenueUsd: number;
   killCriteria: string;
+  launchSteps?: unknown;
+}
+
+const MAX_LAUNCH_STEPS = 8;
+
+/** Keep only well-formed steps and http/https links (never javascript:/data:), so
+ * a proposal can never inject an unsafe URL into the dashboard popup. */
+function sanitizeLaunchSteps(raw: unknown): LaunchStep[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: LaunchStep[] = [];
+  for (const item of raw) {
+    if (out.length >= MAX_LAUNCH_STEPS) break;
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const label = typeof rec.label === 'string' ? rec.label.trim().slice(0, 240) : '';
+    if (!label) continue;
+    const rawUrl = typeof rec.url === 'string' ? rec.url.trim() : '';
+    const url = /^https:\/\/|^http:\/\//i.test(rawUrl) ? rawUrl.slice(0, 400) : undefined;
+    out.push(url ? { label, url } : { label });
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 export interface AddProposalResult {
@@ -90,6 +111,7 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     thesis: (input.thesis ?? '').trim().slice(0, 1200),
     deliverable: deliverable.slice(0, DELIVERABLE_MAX),
     humanAction: humanAction.slice(0, 800),
+    launchSteps: sanitizeLaunchSteps(input.launchSteps),
     estCostUsd: cleanNum(input.estCostUsd),
     estRevenueUsd: cleanNum(input.estRevenueUsd),
     killCriteria: (input.killCriteria ?? '').trim().slice(0, 600),

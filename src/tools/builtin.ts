@@ -195,9 +195,12 @@ const proposeVenture: Tool = {
   movesValue: false,
   inputHint:
     '{ "category": "digital-product", "title": "...", "thesis": "why it earns, legally", ' +
-    '"deliverable": "the ACTUAL drafted product/plan/copy/code", "humanAction": "the one ' +
-    'step you must take at the money/identity edge", "estCostUsd": 0, "estRevenueUsd": 50, ' +
-    '"killCriteria": "when to abandon it" }',
+    '"deliverable": "the ACTUAL drafted product/plan/copy/code", "humanAction": "one-line ' +
+    'summary of the human step", "launchSteps": [ { "label": "Create a Gumroad account", "url": ' +
+    '"https://gumroad.com/signup" }, { "label": "Connect payout", "url": ' +
+    '"https://app.gumroad.com/settings/payments" }, { "label": "Create product + upload the file", ' +
+    '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
+    '"estRevenueUsd": 50, "killCriteria": "when to abandon it" }',
   async execute(input, ctx) {
     if (!ctx.ventureBook) {
       return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
@@ -208,6 +211,7 @@ const proposeVenture: Tool = {
       thesis: str(input.thesis),
       deliverable: str(input.deliverable),
       humanAction: str(input.humanAction),
+      launchSteps: input.launchSteps,
       estCostUsd: Number(input.estCostUsd),
       estRevenueUsd: Number(input.estRevenueUsd),
       killCriteria: str(input.killCriteria),

@@ -41,6 +41,30 @@ describe('venture proposals', () => {
     expect(book.ventures).toHaveLength(0);
   });
 
+  it('keeps well-formed launch steps and drops unsafe/invalid URLs', () => {
+    const book = emptyVentureBook();
+    const res = addProposal(book, proposal({
+      launchSteps: [
+        { label: 'Create a Gumroad account', url: 'https://gumroad.com/signup' },
+        { label: 'Publish' }, // no url is fine
+        { label: 'Evil', url: 'javascript:alert(1)' }, // unsafe → url stripped, label kept
+        { label: '' }, // no label → dropped
+        { url: 'https://x.com' }, // no label → dropped
+      ],
+    }), 1, 'now');
+    const steps = res.venture?.launchSteps ?? [];
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toEqual({ label: 'Create a Gumroad account', url: 'https://gumroad.com/signup' });
+    expect(steps[1]).toEqual({ label: 'Publish' });
+    expect(steps[2]).toEqual({ label: 'Evil' }); // javascript: URL removed, no url key
+  });
+
+  it('leaves launchSteps undefined when none are valid or none given', () => {
+    const book = emptyVentureBook();
+    expect(addProposal(book, proposal(), 1, 'now').venture?.launchSteps).toBeUndefined();
+    expect(addProposal(book, proposal({ launchSteps: 'nope' }), 2, 'now').venture?.launchSteps).toBeUndefined();
+  });
+
   it('caps the number of open proposals so the queue stays a decision list', () => {
     const book = emptyVentureBook();
     for (let i = 0; i < 5; i++) expect(addProposal(book, proposal(), i, 'now').ok).toBe(true);

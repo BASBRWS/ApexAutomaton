@@ -70,6 +70,27 @@
       .msg-think { font-size: 13px; line-height: 1.5; margin-top: 7px; white-space: pre-wrap; opacity: .95; border-left: 2px solid var(--accent-dim); padding-left: 10px; }
       .msg-sum { font-size: 12px; color: var(--muted); margin-top: 6px; }
       .msg-note { font-size: 11px; color: var(--muted); margin-top: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
+      .msg.clickable { cursor: pointer; }
+      .msg.clickable:hover { background: rgba(127,127,127,.06); }
+      .open-hint { font-size: 11px; color: var(--accent); margin-top: 6px; }
+
+      /* Venture popup */
+      .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 50; }
+      .modal-overlay.open { display: flex; }
+      .modal { background: var(--card); border: 1px solid var(--line); border-radius: 14px; max-width: 760px; width: 100%; padding: 22px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+      .modal h3 { margin: 0 0 4px; font-size: 20px; }
+      .modal .m-meta { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+      .modal .m-sec { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
+      .modal .m-thesis { font-size: 14px; line-height: 1.5; }
+      .modal .m-deliverable { font-size: 13px; line-height: 1.55; white-space: pre-wrap; background: rgba(127,127,127,.07); border-radius: 10px; padding: 12px 14px; max-height: 320px; overflow-y: auto; }
+      .modal ol.steps { margin: 0; padding-left: 20px; }
+      .modal ol.steps li { font-size: 14px; line-height: 1.5; margin-bottom: 10px; }
+      .modal ol.steps a { color: var(--accent); text-decoration: none; word-break: break-all; }
+      .modal ol.steps a:hover { text-decoration: underline; }
+      .modal .m-kill { font-size: 12px; color: var(--muted); margin-top: 14px; }
+      .modal .m-close { float: right; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+      .modal .m-approve { font-size: 12px; color: var(--muted); margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+      .modal code { color: var(--accent); }
     </style>
   </head>
   <body>
@@ -112,6 +133,10 @@
       </div>
 
       <p id="status" class="muted" style="margin-top:16px"></p>
+    </div>
+
+    <div id="venture-modal" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="modal" id="venture-modal-body"></div>
     </div>
 
     <script>
@@ -341,6 +366,42 @@
         }[s] || String(s || '');
       }
 
+      function safeUrl(u) {
+        return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
+      }
+
+      function openVentureModal(v) {
+        const body = document.getElementById('venture-modal-body');
+        const st = String(v.status || '');
+        const steps = Array.isArray(v.launchSteps) ? v.launchSteps : [];
+        const stepsHtml = steps.length
+          ? '<ol class="steps">' + steps.map((s) => {
+              const label = escapeHtml((s && s.label) || '');
+              const url = safeUrl(s && s.url);
+              return '<li>' + label + (url ? ` — <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>` : '') + '</li>';
+            }).join('') + '</ol>'
+          : (v.humanAction ? `<div class="m-thesis">${escapeHtml(v.humanAction)}</div>` : '<div class="empty">No launch steps provided.</div>');
+        body.innerHTML =
+          '<button class="m-close" id="m-close">✕ close</button>' +
+          `<h3>${escapeHtml(v.title || '')}</h3>` +
+          `<div class="m-meta">${escapeHtml(v.id || '')} · ${escapeHtml(v.category || '')} · ${escapeHtml(ventureStatusLabel(st))} · ` +
+            ((Number(v.revenueUsd) || 0) > 0 ? `earned ${usd(v.revenueUsd)}` : `est ${usd(v.estRevenueUsd)}`) + '</div>' +
+          (v.thesis ? `<div class="m-sec">Why it can earn</div><div class="m-thesis">${escapeHtml(v.thesis)}</div>` : '') +
+          (v.deliverable ? `<div class="m-sec">What the agent built</div><div class="m-deliverable">${escapeHtml(v.deliverable)}</div>` : '') +
+          `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml +
+          (v.killCriteria ? `<div class="m-kill">Kill if: ${escapeHtml(v.killCriteria)}</div>` : '') +
+          '<div class="m-approve">Once it is live, approve it in <code>state/ventures.json</code> (set this venture\'s <code>status</code> to <code>"approved"</code>); report real sales in <code>revenueUsd</code> and they fold into the book.</div>';
+        document.getElementById('m-close').onclick = closeVentureModal;
+        document.getElementById('venture-modal').classList.add('open');
+      }
+      function closeVentureModal() {
+        document.getElementById('venture-modal').classList.remove('open');
+      }
+      document.getElementById('venture-modal').addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'venture-modal') closeVentureModal();
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVentureModal(); });
+
       function renderVentures(book) {
         const host = document.getElementById('ventures');
         const sub = document.getElementById('ventures-sub');
@@ -361,11 +422,12 @@
 
         ventures.slice().reverse().forEach((v) => {
           const div = document.createElement('div');
-          div.className = 'msg';
+          div.className = 'msg clickable';
           const st = String(v.status || '');
           const money = (Number(v.revenueUsd) || 0) > 0
             ? `earned ${usd(v.revenueUsd)}`
             : `est ${usd(v.estRevenueUsd)}`;
+          const nSteps = Array.isArray(v.launchSteps) ? v.launchSteps.length : 0;
           div.innerHTML =
             '<div class="msg-head">' +
               `<span class="cyc">${escapeHtml(v.id || '')}</span>` +
@@ -374,9 +436,8 @@
               `<span>${escapeHtml(money)}</span>` +
             '</div>' +
             `<div class="msg-why"><strong>${escapeHtml(v.title || '')}</strong> — ${escapeHtml(v.thesis || '')}</div>` +
-            (v.deliverable ? `<div class="msg-think">${escapeHtml(v.deliverable)}</div>` : '') +
-            (v.humanAction ? `<div class="msg-sum">Your move: ${escapeHtml(v.humanAction)}</div>` : '') +
-            (v.killCriteria ? `<div class="msg-note">kill if: ${escapeHtml(v.killCriteria)}</div>` : '');
+            `<div class="open-hint">▸ Open for the full build + your ${nSteps ? nSteps + ' launch steps with links' : 'launch steps'}</div>`;
+          div.onclick = () => openVentureModal(v);
           host.appendChild(div);
         });
       }

@@ -28,6 +28,17 @@ export type VentureStatus =
 /** The set of statuses a human sets by editing state/ventures.json (the queue). */
 export const HUMAN_DECISION_STATUSES: VentureStatus[] = ['approved', 'rejected', 'killed'];
 
+/** One concrete step the human must take at the money/identity edge, with a
+ * direct link to the exact page for it where one exists (create the account,
+ * connect payout, create + upload the product, publish). This is what turns
+ * "approve" into a followable instruction. */
+export interface LaunchStep {
+  label: string;
+  /** direct URL to the right page; http/https only. Omitted when no single page
+   * applies (then the label carries the nav path). */
+  url?: string;
+}
+
 export interface Venture {
   id: string;
   createdAtCycle: number;
@@ -43,8 +54,12 @@ export interface Venture {
    * left before it can earn. */
   deliverable: string;
   /** the exact step the human must take at the money/identity edge to launch it
-   * (open the account, accept ToS, connect Stripe, publish, ship). */
+   * (open the account, accept ToS, connect Stripe, publish, ship). A one-line
+   * summary; `launchSteps` carries the full, linked checklist. */
   humanAction: string;
+  /** the full launch checklist: each human step with a direct link to the right
+   * page. This is the "instruction with links" surfaced in the dashboard popup. */
+  launchSteps?: LaunchStep[];
   /** honest estimate of the human's out-of-pocket cost to launch, USD. */
   estCostUsd: number;
   /** honest estimate of revenue potential, USD. */
