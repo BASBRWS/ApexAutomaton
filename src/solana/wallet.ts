@@ -6,6 +6,7 @@ import {
   TransactionInstruction,
   type Keypair,
 } from '@solana/web3.js';
+import bs58 from 'bs58';
 import { assertDevnet, type Config } from '../config.js';
 
 /**
@@ -15,6 +16,15 @@ import { assertDevnet, type Config } from '../config.js';
 
 /** SPL Memo program — used to attach a human-readable memo to transfers. */
 const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+export const DEVNET_GENESIS_HASH = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
+
+/** Verify the chain itself, not merely the name of its RPC endpoint. */
+export async function assertDevnetConnection(connection: Pick<Connection, 'getGenesisHash'>): Promise<void> {
+  const hash = await connection.getGenesisHash();
+  if (hash !== DEVNET_GENESIS_HASH) {
+    throw new Error(`FATAL: RPC is not Solana devnet (genesis hash ${hash}).`);
+  }
+}
 
 export function makeConnection(cfg: Config): Connection {
   // Re-assert devnet at the point of connection: defense in depth.
@@ -85,15 +95,22 @@ export async function sendTransfer(
   connection: Connection,
   tx: Transaction,
   signers: Keypair[],
+  onSigned?: (signature: string) => void,
 ): Promise<string> {
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   tx.recentBlockhash = blockhash;
   tx.sign(...signers);
+  const signedSignature = tx.signature;
+  if (!signedSignature) throw new Error('transaction has no signature');
+  onSigned?.(bs58.encode(signedSignature));
   const signature = await connection.sendRawTransaction(tx.serialize());
-  await connection.confirmTransaction(
+  const confirmation = await connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
     'confirmed',
   );
+  if (confirmation.value.err) {
+    throw new Error(`transaction ${signature} failed: ${JSON.stringify(confirmation.value.err)}`);
+  }
   return signature;
 }
 
@@ -107,12 +124,16 @@ export async function operatorAirdrop(
   to: string | PublicKey,
   lamports: number,
 ): Promise<string> {
+  await assertDevnetConnection(connection);
   const key = typeof to === 'string' ? new PublicKey(to) : to;
   const signature = await connection.requestAirdrop(key, lamports);
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-  await connection.confirmTransaction(
+  const confirmation = await connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
     'confirmed',
   );
+  if (confirmation.value.err) {
+    throw new Error(`airdrop ${signature} failed: ${JSON.stringify(confirmation.value.err)}`);
+  }
   return signature;
 }

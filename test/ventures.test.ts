@@ -117,6 +117,21 @@ describe('venture decisions + revenue folding', () => {
     expect(folded).toBe(40);
   });
 
+  it('uses the persisted credit ledger after a state save when the venture file was not saved', () => {
+    const book = emptyVentureBook();
+    addProposal(book, proposal(), 1, 'now');
+    book.ventures[0]!.status = 'active';
+    book.ventures[0]!.revenueUsd = 25;
+    const oldVentureFile = structuredClone(book);
+    const credits: Record<string, number> = {};
+    let folded = 0;
+    applyDecisions(book, 2, 10, (usd) => { folded += usd; }, credits);
+    expect(credits.v0001).toBe(25);
+    applyDecisions(oldVentureFile, 3, 10, (usd) => { folded += usd; }, credits);
+    expect(folded).toBe(25);
+    expect(oldVentureFile.ledger['digital-product']!.earnedUsd).toBe(25);
+  });
+
   it('never folds revenue for a venture that was never activated', () => {
     const book = emptyVentureBook();
     addProposal(book, proposal(), 1, 'now');

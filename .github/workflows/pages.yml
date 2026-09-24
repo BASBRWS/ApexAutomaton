@@ -1,10 +1,6 @@
 name: deploy-dashboard
 
-# Publishes the dashboard (and, by the owner's choice, the setup wizard) to
-# GitHub Pages — a VPS-free way to watch the agent. It serves the dashboard, the
-# committed /state, and the setup wizard. Child secrets are never committed, so
-# they never reach Pages. The setup wizard makes NO network calls, so anything
-# typed into it stays in the visitor's browser — but it is marked noindex.
+# Publishes only the dashboard and public state. The key setup wizard remains local.
 #
 # One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
 # (Pages on a private repo requires a paid GitHub plan; a public repo is free.)
@@ -18,7 +14,6 @@ on:
     branches: [main]
     paths:
       - 'dashboard/**'
-      - 'setup/**'
       - 'state/**'
       - '.github/workflows/pages.yml'
   workflow_run:
@@ -46,11 +41,10 @@ jobs:
         with:
           ref: main
 
-      - name: Assemble the site (dashboard + state + setup wizard)
+      - name: Assemble the site (dashboard + public state)
         run: |
-          mkdir -p _site/dashboard _site/state _site/setup
+          mkdir -p _site/dashboard _site/state
           cp dashboard/index.html _site/dashboard/index.html
-          cp setup/index.html _site/setup/index.html
           # Copy committed state (may be just a README before the first tick).
           cp -r state/. _site/state/ 2>/dev/null || true
           # Child secrets are gitignored and never committed, but be defensive.
@@ -62,8 +56,7 @@ jobs:
           <title>Apex Automaton</title>
           <a href="./dashboard/">Go to the dashboard</a>
           HTML
-          # Discourage indexing of the state snapshot and the setup wizard.
-          printf 'User-agent: *\nDisallow: /state/\nDisallow: /setup/\n' > _site/robots.txt
+          printf 'User-agent: *\nDisallow: /state/\n' > _site/robots.txt
 
       - uses: actions/upload-pages-artifact@v3
         with:

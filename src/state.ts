@@ -34,6 +34,7 @@ export function freshState(cfg: Config): AutomatonState {
     caps: freshCaps(),
     recentSignatures: [],
     score: initialScore(0),
+    creditedVentureRevenueUsd: {},
     sustainedSovereignCycles: 0,
     dead: false,
   };
@@ -59,7 +60,9 @@ export function ensureCapsForToday(state: AutomatonState): AutomatonState {
 
 export function saveState(state: AutomatonState): void {
   fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf8');
+  const temporary = `${STATE_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(state, null, 2) + '\n', 'utf8');
+  fs.renameSync(temporary, STATE_FILE);
 }
 
 /** Keep only the most recent N tx records in state to bound file growth. The

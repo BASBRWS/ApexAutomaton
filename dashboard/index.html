@@ -97,15 +97,13 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton</h1>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.2.0</span></h1>
       <div class="muted">Autonomous agent growing a paper book of <b>2 SOL</b> against real prices (SOL/USD frozen at genesis) · the market decides, grow or die.</div>
-      <div id="nav" class="muted" style="margin-top:6px">
-        <a href="../setup/">⚙ Setup wizard (build your .env)</a>
-      </div>
+      <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
       <div id="tiles" class="grid"></div>
 
-      <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· % change in book equity (rate-frozen, so SOL = USD %)</span></h2>
+      <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
 
       <h2>Book equity over time (SOL)</h2>
@@ -290,7 +288,7 @@
         const vrev = Number(desk.ventureRevenueUsd) || 0;
         document.getElementById('book-cash').innerHTML =
           `<b>Cash:</b> ${usd(cash)} uninvested` +
-          (staked > 0 ? ` &nbsp;|&nbsp; <b>Staked:</b> ${usd(staked)} <span class="pos">(real yield)</span>` : '') +
+          (staked > 0 ? ` &nbsp;|&nbsp; <b>Staked:</b> ${usd(staked)} <span class="pos">(modeled yield)</span>` : '') +
           (vrev > 0 ? ` &nbsp;|&nbsp; <b>Venture revenue:</b> ${usd(vrev)} <span class="pos">(real, kept separate)</span>` : '');
         const entries = Object.entries(desk.positions ?? {});
         if (entries.length === 0) {
@@ -330,10 +328,7 @@
         count.textContent = `· ${kids.length} offspring`;
         if (kids.length === 0) {
           host.innerHTML =
-            '<div class="empty">No offspring yet. Replication is <b>enabled</b>, but the agent only ' +
-            'spawns a child after sustained growth to the SOVEREIGN tier (5+ SOL) — birth is gated on ' +
-            'success, never on scarcity. Each child is funded by a real devnet transfer and inherits the ' +
-            'parent strategy with exactly one mutated parameter.</div>';
+            '<div class="empty">Replication is disabled until children can run and be measured independently.</div>';
           return;
         }
         const rows = kids
@@ -577,6 +572,12 @@
             tile('open positions', openPositions),
             tile('cycles traded', s.tradeCycles ?? 0),
             tile('compute burn', usd(s.cumulativeBurnUsd)),
+            tile('pending transfer', state.pendingTransfer ? shortKey(state.pendingTransfer.signature) : 'none'),
+            tile('paper equity', usd(s.paperEquityUsd ?? tradingUsd)),
+            tile('reported revenue', usd(s.reportedVentureRevenueUsd ?? vrev)),
+            tile('cash baseline', usd(s.cashBenchmarkUsd ?? s.startEquityUsd)),
+            tile('hold SOL baseline', s.solHoldBenchmarkUsd == null ? 'no fresh quote' : usd(s.solHoldBenchmarkUsd)),
+            tile('paper vs hold SOL', s.paperAlphaVsSolUsd == null ? 'no fresh quote' : signed(s.paperAlphaVsSolUsd, usd)),
             tile(
               'ventures',
               (ventures?.ventures ?? []).filter((v) => v.status === 'active').length + ' live',

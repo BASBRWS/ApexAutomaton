@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CompositePriceSource,
   parseYahooChartPrice,
+  yahooQuoteIsRecent,
   YAHOO_TICKERS,
   type PriceSnapshot,
   type PriceSource,
@@ -18,6 +19,15 @@ describe('Yahoo (beyond-crypto) price parsing', () => {
     expect(parseYahooChartPrice({ chart: { result: [] } })).toBeUndefined();
     expect(parseYahooChartPrice({ chart: { result: [{ meta: { regularMarketPrice: 0 } }] } })).toBeUndefined();
     expect(parseYahooChartPrice({ chart: { result: [{ meta: { regularMarketPrice: 'x' } }] } })).toBeUndefined();
+  });
+
+  it('refuses old closing prices as executable quotes', () => {
+    const now = Date.parse('2026-09-24T12:00:00Z');
+    const recent = { chart: { result: [{ meta: { regularMarketTime: now / 1000 - 60 } }] } };
+    const closed = { chart: { result: [{ meta: { regularMarketTime: now / 1000 - 3600 } }] } };
+    expect(yahooQuoteIsRecent(recent, now)).toBe(true);
+    expect(yahooQuoteIsRecent(closed, now)).toBe(false);
+    expect(yahooQuoteIsRecent({}, now)).toBe(false);
   });
 
   it('covers forex, commodities and equities (distinct asset classes)', () => {

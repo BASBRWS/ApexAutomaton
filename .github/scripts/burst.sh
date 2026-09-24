@@ -66,9 +66,13 @@ push_state() {
     echo "No state changes to commit."
     return
   fi
-  git commit -m "$1" || true
+  git commit -m "$1" || return 1
   # Reconcile with any external commit (rare — our workflows are serialized).
-  git pull --rebase --autostash origin main || true
+  if ! git pull --rebase --autostash origin main; then
+    git rebase --abort >/dev/null 2>&1 || true
+    echo "::error::state rebase failed; stopping before the next cycle."
+    return 1
+  fi
   local a
   for a in 1 2 3 4; do
     if git push; then
@@ -78,14 +82,18 @@ push_state() {
     echo "push failed; retry $a"
     sleep $(( a * 2 ))
   done
-  echo "::warning::state push failed after retries; will retry on the next cycle."
+  echo "::error::state push failed after retries; stopping before the next cycle."
+  return 1
 }
 
 for i in $(seq 1 "$BURST_CYCLES"); do
   echo "::group::burst cycle ${i}/${BURST_CYCLES}"
   npm run --silent tick
   code=$?
-  push_state "heartbeat: burst cycle ${i}/${BURST_CYCLES}"
+  if ! push_state "heartbeat: burst cycle ${i}/${BURST_CYCLES}"; then
+    echo "::error::Cycle state was not published. Stopping burst for operator recovery."
+    exit 2
+  fi
   echo "::endgroup::"
 
   if [ "$code" = "1" ]; then
@@ -94,7 +102,7 @@ for i in $(seq 1 "$BURST_CYCLES"); do
   fi
   if [ "$code" != "0" ]; then
     echo "::error::tick exited ${code} (not a death) — ending burst. Check secrets/config and the logs above."
-    break
+    exit 2
   fi
   if [ "$i" -lt "$BURST_CYCLES" ]; then
     sleep "$BURST_INTERVAL_SECONDS"

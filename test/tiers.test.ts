@@ -51,10 +51,10 @@ describe('policyForTier', () => {
     }
   });
 
-  it('gates replication to SOVEREIGN only', () => {
+  it('does not advertise replication before a child runtime exists', () => {
     expect(policyForTier('NORMAL', cfg).rights.mayReplicate).toBe(false);
     expect(policyForTier('ABUNDANT', cfg).rights.mayReplicate).toBe(false);
-    expect(policyForTier('SOVEREIGN', cfg).rights.mayReplicate).toBe(true);
+    expect(policyForTier('SOVEREIGN', cfg).rights.mayReplicate).toBe(false);
   });
 
   it('offers trade and rebalance at every living tier (earning always reachable)', () => {

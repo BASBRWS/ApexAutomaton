@@ -3,8 +3,9 @@ import bs58 from 'bs58';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { loadConfig, solToLamports, type Config } from '../config.js';
 import { KILL_FILE } from '../paths.js';
+import { saveState } from '../state.js';
 import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.js';
-import { buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
+import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
 /**
  * signer.ts — the ONE place a private key is ever loaded. It contains NO LLM
@@ -193,12 +194,16 @@ export class Signer {
   /** Check a proposal without signing (used by tools to see if an action is
    * even permitted before spending compute on it). */
   check(proposal: TransferProposal): PolicyDecision {
+    if (this.state.pendingTransfer) {
+      return { ok: false, reason: `unreconciled transfer ${this.state.pendingTransfer.signature}` };
+    }
     return evaluatePolicy(this.buildPolicyInput(proposal));
   }
 
   /** Validate, sign, send, confirm. Throws {@link PolicyError} if rejected.
    * On success, updates the persisted cap accounting. */
   async signAndSend(proposal: TransferProposal): Promise<SignedTxResult> {
+    await assertDevnetConnection(this.connection);
     const decision = this.check(proposal);
     if (!decision.ok) {
       throw new PolicyError(decision.reason);
@@ -211,12 +216,20 @@ export class Signer {
       memo: proposal.memo,
     });
 
-    const signature = await sendTransfer(this.connection, tx, [this.keypair]);
+    const signature = await sendTransfer(this.connection, tx, [this.keypair], (signed) => {
+      this.state.pendingTransfer = {
+        signature: signed, to: proposal.to, lamports: proposal.lamports,
+        at: new Date().toISOString(),
+      };
+      saveState(this.state);
+    });
 
     // Update caps only after a confirmed send.
     this.cycleTxCount += 1;
     this.state.caps.txCountToday += 1;
     this.state.caps.lamportsSpentToday += proposal.lamports;
+    delete this.state.pendingTransfer;
+    saveState(this.state);
 
     return { signature, lamports: proposal.lamports, to: proposal.to };
   }
@@ -230,6 +243,7 @@ export class Signer {
    * Best-effort: the caller treats a throw as non-fatal.
    */
   async proofOfLife(memo: string): Promise<SignedTxResult> {
+    await assertDevnetConnection(this.connection);
     if (isKillSwitchEngaged(this.cfg)) {
       throw new PolicyError('kill switch engaged — no proof-of-life');
     }

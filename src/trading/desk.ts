@@ -23,7 +23,7 @@ export interface Desk {
   cashUsd: number;
   /** positions keyed by uppercase symbol. */
   positions: Record<string, Position>;
-  /** USD parked in the real-yield carry sleeve (earns yieldApy over time). Not
+  /** USD parked in the modeled-yield carry sleeve (earns configured yieldApy). Not
    * exposed to crypto price; a low-risk, non-directional survival stance. */
   stakedUsd: number;
   /** REAL revenue reported from launched ventures, USD. Tracked SEPARATELY from
@@ -53,6 +53,9 @@ export interface ApplyContext {
   tradableAssets: string[];
   maxGrossExposureUsd: number;
   allowShort: boolean;
+  feeBps?: number;
+  spreadBps?: number;
+  slippageBps?: number;
 }
 
 export function initDesk(capitalUsd: number, cycle: number): Desk {
@@ -129,7 +132,7 @@ export function equityUsd(desk: Desk, prices: PriceMap): number {
 }
 
 /**
- * Accrue real yield on the staked sleeve for `dtYears` of elapsed wall-clock
+ * Accrue configured simulated yield on the staked sleeve for `dtYears` of elapsed wall-clock
  * time at `apyAnnual` (simple, pro-rated). Mutates and returns the USD earned.
  * Time-based (not per-cycle), so it is honest regardless of how often the loop
  * runs. Never negative; a non-positive dt, apy, or staked balance is a no-op.
@@ -143,6 +146,18 @@ export function accrueYield(desk: Desk, apyAnnual: number, dtYears: number): num
   const earned = staked * apyAnnual * dtYears;
   desk.stakedUsd = staked + earned;
   return earned;
+}
+
+/** Borrow cost is charged on the current marked value of every short. */
+export function accrueShortBorrow(desk: Desk, prices: PriceMap, apyAnnual: number, dtYears: number): number {
+  if (!(apyAnnual > 0) || !(dtYears > 0)) return 0;
+  let shortNotional = 0;
+  for (const asset of Object.keys(desk.positions)) {
+    shortNotional += Math.max(0, -positionValueUsd(desk, asset, prices));
+  }
+  const cost = shortNotional * apyAnnual * dtYears;
+  desk.cashUsd -= cost;
+  return cost;
 }
 
 /**
@@ -184,21 +199,26 @@ export function netPnlUsd(desk: Desk, prices: PriceMap): number {
 }
 
 /** Move one asset's exposure to `targetUsd` at the current price (mutates). */
-function setTarget(desk: Desk, asset: string, targetUsd: number, price: number): void {
+function setTarget(desk: Desk, asset: string, targetUsd: number, price: number, ctx: ApplyContext): void {
   const prev = desk.positions[asset];
   const prevUnits = prev?.units ?? 0;
-  const currentValue = prevUnits * price;
-  const delta = targetUsd - currentValue; // >0 buys, <0 sells/shorts
-  desk.cashUsd -= delta;
   const newUnits = targetUsd / price;
+  const deltaUnits = newUnits - prevUnits;
+  const impactBps = (ctx.spreadBps ?? 0) + (ctx.slippageBps ?? 0);
+  const fillPrice = price * (1 + Math.sign(deltaUnits) * impactBps / 10_000);
+  const fee = Math.abs(deltaUnits * fillPrice) * (ctx.feeBps ?? 0) / 10_000;
+  desk.cashUsd -= deltaUnits * fillPrice + fee;
   if (Math.abs(newUnits) < 1e-12) {
     delete desk.positions[asset];
     return;
   }
   const signFlipOrOpen = prevUnits === 0 || Math.sign(prevUnits) !== Math.sign(newUnits);
+  const increased = prevUnits !== 0 && Math.sign(prevUnits) === Math.sign(newUnits) && Math.abs(newUnits) > Math.abs(prevUnits);
   desk.positions[asset] = {
     units: newUnits,
-    entryPriceUsd: signFlipOrOpen ? price : (prev?.entryPriceUsd ?? price),
+    entryPriceUsd: signFlipOrOpen ? fillPrice : increased
+      ? (Math.abs(prevUnits) * (prev?.entryPriceUsd ?? price) + Math.abs(deltaUnits) * fillPrice) / Math.abs(newUnits)
+      : (prev?.entryPriceUsd ?? fillPrice),
   };
 }
 
@@ -240,19 +260,47 @@ export function applyOrders(desk: Desk, orders: Order[], ctx: ApplyContext): Ord
       if (other === asset) continue;
       prospectiveGross += Math.abs(positionValueUsd(desk, other, ctx.prices));
     }
-    if (prospectiveGross > ctx.maxGrossExposureUsd + 1e-6) {
+    const currentGross = grossExposureUsd(desk, ctx.prices);
+    const effectiveCap = Math.min(ctx.maxGrossExposureUsd, Math.max(0, equityUsd(desk, ctx.prices)));
+    if (prospectiveGross > effectiveCap + 1e-6 && prospectiveGross > currentGross + 1e-6) {
       outcomes.push({
         order,
         ok: false,
-        reason: `gross exposure cap: ${prospectiveGross.toFixed(2)} > ${ctx.maxGrossExposureUsd} USD`,
+        reason: `gross exposure cap: ${prospectiveGross.toFixed(2)} > ${effectiveCap.toFixed(2)} USD`,
       });
       continue;
     }
 
-    setTarget(desk, asset, targetUsd, price);
+    setTarget(desk, asset, targetUsd, price, ctx);
     outcomes.push({ order, ok: true, reason: 'applied' });
   }
   return outcomes;
+}
+
+/** Rebalance as one transaction in the paper book: either all targets apply or none do. */
+export function applyPortfolio(desk: Desk, orders: Order[], ctx: ApplyContext): OrderOutcome[] {
+  const tradable = new Set(ctx.tradableAssets.map((asset) => asset.toUpperCase()));
+  const targets = new Map<string, number>();
+  for (const order of orders) {
+    const asset = order.asset.toUpperCase();
+    const price = ctx.prices[asset];
+    const needsPrice = order.targetUsd !== 0 || Boolean(desk.positions[asset]);
+    if (!tradable.has(asset) || (needsPrice && (typeof price !== 'number' || !Number.isFinite(price) || !(price > 0))) ||
+        !Number.isFinite(order.targetUsd) || (order.targetUsd < 0 && !ctx.allowShort) || targets.has(asset)) {
+      return orders.map((o) => ({ order: o, ok: false, reason: `invalid portfolio target: ${asset}` }));
+    }
+    targets.set(asset, order.targetUsd);
+  }
+  const finalGross = [...targets.values()].reduce((sum, target) => sum + Math.abs(target), 0);
+  const cap = Math.min(ctx.maxGrossExposureUsd, Math.max(0, equityUsd(desk, ctx.prices)));
+  if (finalGross > cap + 1e-6) {
+    return orders.map((order) => ({ order, ok: false, reason: `gross exposure cap: ${finalGross.toFixed(2)} > ${cap.toFixed(2)} USD` }));
+  }
+  for (const [asset, target] of targets) {
+    if (target === 0 && !desk.positions[asset]) continue;
+    setTarget(desk, asset, target, ctx.prices[asset]!, ctx);
+  }
+  return orders.map((order) => ({ order, ok: true, reason: 'applied' }));
 }
 
 /**

@@ -4,7 +4,7 @@ import type { Market } from '../market.js';
 import type { PriceMap } from '../marketdata.js';
 import type { RevenueAdapter } from '../revenue/adapter.js';
 import type { Signer } from '../solana/signer.js';
-import type { AutomatonState, Tier } from '../types.js';
+import type { AutomatonState, SignedTxResult, Tier } from '../types.js';
 import type { TierPolicy } from '../tiers.js';
 import type { VentureBook } from '../ventures/types.js';
 
@@ -25,7 +25,7 @@ export interface ToolContext {
   revenue?: RevenueAdapter;
   /** real market prices this cycle (USD/unit), for the trade tool. */
   prices: PriceMap;
-  /** gross-exposure cap in USD for THIS cycle (the SOL cap × live SOL price). */
+  /** gross-exposure cap in USD for THIS cycle (the SOL cap × genesis SOL price). */
   maxGrossExposureUsd: number;
   tier: Tier;
   policy: TierPolicy;
@@ -44,6 +44,7 @@ export interface ToolResult {
   taskCompleted?: boolean;
   /** on-chain signatures produced by the action. */
   signatures?: string[];
+  transfer?: SignedTxResult;
   /** whether SOUL.md was rewritten. */
   soulUpdated?: boolean;
   /** whether the agent adjusted its market exposure this cycle (feeds score). */

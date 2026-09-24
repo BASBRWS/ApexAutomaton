@@ -22,13 +22,12 @@ export function toolNamesForCycle(policy: TierPolicy, cfg: Config): string[] {
 }
 
 /**
- * Survival tiers as a GRADIENT, not a ceiling. The wallet's on-chain SOL
- * balance is the ONLY input. Tiers extend well above the comfortable zone so
+ * Survival tiers use the paper book expressed at the frozen genesis SOL price.
+ * Tiers extend well above the comfortable zone so
  * that more money buys more capability and agency — surplus is instrumentally
  * valuable, and there is always a reason to climb, not just a floor to avoid.
  *
- * The agent cannot influence which tier it is in except by changing its
- * balance, which it can only do through real on-chain transactions.
+ * A tier changes when the paper book or reported venture revenue changes.
  */
 
 export interface TierPolicy {
@@ -60,7 +59,7 @@ export interface TierPolicy {
  * `transfer` is an optional Phase 2 value-mover, added only when enabled and
  * only at NORMAL+ (see toolNamesForCycle).
  */
-// `stake` (park capital in the real-yield sleeve) is a survival tool, so it is
+// `stake` (park paper capital in the modeled yield sleeve) is a survival tool, so it is
 // offered at EVERY living tier — even near death you may park to stop the bleed.
 // `propose_venture` (reach into the real economy) is offered at LOW+ — not at
 // CRITICAL, where the agent must focus purely on not dying. It is stripped
@@ -107,7 +106,7 @@ export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
         rights: { heartbeatMinutes: 15, premiumTools: false, mayReplicate: false },
         description:
           'Running low. Still the cheapest mind, reduced budget, non-essential ' +
-          'tools shed. Prioritise earning (or park in yield to stop the bleed) and ' +
+          'tools shed. Prioritise earning or reduce market exposure and ' +
           'rebuild your margin.',
       };
     case 'NORMAL':
@@ -143,11 +142,10 @@ export function policyForTier(tier: Tier, cfg: Config): TierPolicy {
         effort: 'high',
         maxTokens: 8192,
         tools: TOOLS_SOVEREIGN,
-        rights: { heartbeatMinutes: 5, premiumTools: true, mayReplicate: true },
+        rights: { heartbeatMinutes: 5, premiumTools: true, mayReplicate: false },
         description:
           'Sovereign. You have EARNED the frontier mind: maximal budget and full ' +
-          'agency. Sustained high growth may unlock replication (Phase 3) — the ' +
-          'population-level maximiser.',
+          'agency. Replication remains disabled until offspring can run independently.',
       };
     case 'DEAD':
       return {
