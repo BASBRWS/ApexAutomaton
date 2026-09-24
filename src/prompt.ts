@@ -2,6 +2,45 @@ import type { PriceMap } from './marketdata.js';
 import type { Tool } from './tools/registry.js';
 import type { TierPolicy } from './tiers.js';
 import type { Score, Tier } from './types.js';
+import type { LossTrend } from './losstrend.js';
+
+/** The escalating loss-trend block: raises concern on a sustained drawdown/losing
+ * streak, and — the point the operator asked for — prescribes DE-RISKING, never
+ * more trading. Overtrading in a drawdown is explicitly named as the wrong move. */
+function lossTrendBlock(lt: LossTrend | undefined): string[] {
+  if (!lt || lt.level === 'ok') return [];
+  const dd = (lt.drawdownPct * 100).toFixed(1);
+  const trail = `${lt.trailingPnlUsd >= 0 ? '+' : '-'}$${Math.abs(lt.trailingPnlUsd).toFixed(2)}`;
+  const stats =
+    `Down ${dd}% from your peak · ${lt.lossStreak} losing cycle(s) in a row · ` +
+    `trailing PnL over last ${lt.window} cycles: ${trail}.`;
+  const antiChurn =
+    'The DISCIPLINED response to a losing trend is to PROTECT capital, not to trade more. ' +
+    'Overtrading in a drawdown compounds the loss — that is your own hard-won lesson ' +
+    '(micro-churning is a net drag). Options: cut gross exposure, keep only your single ' +
+    'highest-conviction position, or sit in cash / the yield sleeve until a clear edge ' +
+    'returns. Real growth comes from VENTURES, not from forcing trades in a bad tape.';
+  if (lt.level === 'watch') {
+    return ['## Loss trend — watch', stats, `Stay disciplined: ${antiChurn}`, ''];
+  }
+  if (lt.level === 'warn') {
+    return [
+      '## ⚠ LOSS TREND — WARNING',
+      stats,
+      'You are drifting away from your objective (grow the book). This is a signal to ' +
+        `de-risk, not to churn. ${antiChurn}`,
+      '',
+    ];
+  }
+  return [
+    '## 🚨 LOSS TREND — ALARM',
+    stats,
+    'You are materially below your peak and bleeding. STOP THE BLEED: cut risk now — reduce ' +
+      'exposure, hold only a proven edge, or move to cash / the yield sleeve. Do NOT chase it ' +
+      `back with more trades; that is exactly how a drawdown becomes a death spiral. ${antiChurn}`,
+    '',
+  ];
+}
 
 /**
  * Prompt construction and action parsing. Kept separate from the loop so the
@@ -140,6 +179,7 @@ export function buildUserPrompt(args: {
   ventureDigest?: string;
   lessonsDigest?: string;
   reflectNudge?: boolean;
+  lossTrend?: LossTrend;
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -174,6 +214,7 @@ export function buildUserPrompt(args: {
     'So each cycle: are you safe enough to take risk and GROW (usually yes), or bleeding',
     'badly and needing to preserve briefly to SURVIVE? Decide explicitly and act on it.',
     '',
+    ...lossTrendBlock(args.lossTrend),
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',
     '',

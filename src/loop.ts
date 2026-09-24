@@ -5,7 +5,8 @@ import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
 import { loadConstitution } from './constitution/index.js';
 import { readSoul, ensureSoul } from './soul.js';
-import { appendEntry, digestRecent, obituaryDigest, writeObituary } from './journal.js';
+import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } from './journal.js';
+import { assessLossTrend } from './losstrend.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
 import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
@@ -288,6 +289,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     // No soft nudge: reflection is now GUARANTEED by the auto-reflect step below,
     // so we never spend the agent's action on it. The reflect tool stays available.
     reflectNudge: false,
+    // Sustained-loss signal: escalates concern on a drawdown / losing streak, and
+    // the prompt prescribes DE-RISKING (not more trading) as the response.
+    lossTrend: assessLossTrend({
+      equityUsd: equityPre,
+      peakEquityUsd: state.score.peakEquityUsd,
+      recentPnls: readRecent(10).map((e) => Number(e.cyclePnlUsd) || 0),
+    }),
   });
 
   // --- Think: one LLM call, priced by the tier's model. ---------------------
