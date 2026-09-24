@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-24T19:04:45.250Z",
+        "lastCheckedAt": "2026-09-24T19:20:03.029Z",
         "reachable": true,
         "daysLive": 1,
         "killDue": false,
@@ -77,6 +77,38 @@
       "accountedRevenueUsd": 0,
       "listedAt": "2026-09-23T13:23:43.927Z",
       "decidedAtCycle": -1
+    },
+    {
+      "id": "v0003",
+      "createdAtCycle": 138,
+      "at": "2026-09-24T19:20:36.884Z",
+      "category": "digital-product",
+      "title": "Crypto Leverage & Liquidation Risk Calculator (Google Sheets)",
+      "thesis": "Retail leveraged traders (futures/perps) routinely get liquidated because they don't model margin ratio, liquidation price, and position size against account equity before entering. This is a natural companion to my existing Position-Sizing and DCA templates — same buyer persona, cross-sell potential, near-zero marginal cost to build and host on Gumroad.",
+      "deliverable": "Google Sheets template with 4 tabs:\n1) INPUTS: Entry price, leverage, position size, account equity, maintenance margin %, direction (long/short).\n2) LIQUIDATION ENGINE: Formulas — LiquidationPrice = Entry*(1 - (1/Leverage) + MaintMargin%) for longs, Entry*(1 + (1/Leverage) - MaintMargin%) for shorts; MarginRatio = (Equity + UnrealizedPnL)/(PositionSize*MaintMargin%); DistanceToLiq% = ABS(CurrentPrice-LiqPrice)/CurrentPrice.\n3) SCENARIO TABLE: Data-table showing P&L and margin ratio across a price-move grid (-20% to +20% in 2% steps) via array formulas, colour-scaled (conditional formatting red near liquidation).\n4) POSITION SIZER: Given max-loss-tolerance ($ or % of equity) and stop-loss distance, back-solves max safe position size and safe leverage — reuses the sizing logic validated in my live v0001 template.\nIncludes a README tab with formula explanations and a worked example (BTC 10x long).",
+      "humanAction": "Build the actual Google Sheet from this spec, upload to Gumroad alongside the existing two templates, price at $9, and link it as a bundle upsell.",
+      "launchSteps": [
+        {
+          "label": "Open Google Sheets and build the 4 tabs per spec",
+          "url": "https://sheets.google.com"
+        },
+        {
+          "label": "Gumroad dashboard (already have account from v0001/v0002)",
+          "url": "https://app.gumroad.com/products/new"
+        },
+        {
+          "label": "Upload the .xlsx/Sheets link, set price $9, add preview screenshots"
+        },
+        {
+          "label": "Publish and cross-link from v0001/v0002 product pages as a 3-pack bundle"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 50,
+      "killCriteria": "If zero sales after 30 days despite being cross-linked from the two live products, retire it and stop building new spreadsheet SKUs — pivot venture effort to a different category instead.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -87,5 +119,5 @@
       "autoEligible": false
     }
   },
-  "seq": 2
+  "seq": 3
 }
