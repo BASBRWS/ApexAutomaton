@@ -130,7 +130,8 @@ export class CoinGeckoPriceSource implements PriceSource {
 /** Map trading symbols to Yahoo Finance tickers — the world BEYOND crypto:
  * forex, commodities, equities and indices, all priced in USD. Keyless. NOTE:
  * equities/indices only move during their market hours; outside them Yahoo
- * returns the last close, so those positions sit flat (not a bug). Forex and
+ * returns the last close, which remains available for valuation but is not
+ * an executable quote. Forex and
  * commodity futures trade ~24/5; crypto (the other sources) is 24/7. */
 export const YAHOO_TICKERS: Record<string, string> = {
   // Forex — USD per unit of the foreign currency
@@ -159,6 +160,14 @@ export function parseYahooChartPrice(body: unknown): number | undefined {
   return typeof p === 'number' && Number.isFinite(p) && p > 0 ? p : undefined;
 }
 
+/** A quote older than 30 minutes is unsuitable for opening or closing a paper trade. */
+export function yahooQuoteIsRecent(body: unknown, nowMs = Date.now()): boolean {
+  const seconds = (body as { chart?: { result?: Array<{ meta?: { regularMarketTime?: unknown } }> } })
+    ?.chart?.result?.[0]?.meta?.regularMarketTime;
+  return typeof seconds === 'number' && Number.isFinite(seconds) &&
+    nowMs - seconds * 1000 >= 0 && nowMs - seconds * 1000 <= 30 * 60 * 1000;
+}
+
 /** Yahoo Finance chart endpoint: one keyless request per symbol. Covers forex,
  * commodities, equities and indices — the non-crypto universe. */
 export class YahooPriceSource implements PriceSource {
@@ -180,8 +189,9 @@ export class YahooPriceSource implements PriceSource {
             headers: { accept: 'application/json', 'user-agent': 'Mozilla/5.0 (ApexAutomaton)' },
           });
           if (!res.ok) return;
-          const price = parseYahooChartPrice(await res.json());
-          if (price !== undefined) prices[sym] = price;
+          const body = await res.json();
+          const price = parseYahooChartPrice(body);
+          if (price !== undefined && yahooQuoteIsRecent(body)) prices[sym] = price;
         } catch {
           /* ignore one symbol; the composite handles the rest */
         }

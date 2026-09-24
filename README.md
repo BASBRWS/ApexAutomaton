@@ -1,20 +1,19 @@
-# Apex Automaton
+# Apex Automaton v0.2.0
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
-**devnet**. Its objective is to grow its net SOL balance as much as possible.
-Running out of SOL kills it — but survival is the *floor*, not the goal.
+**devnet**. Its paper book aims to grow against live prices. The book controls
+tiers and death. The separate devnet wallet pays transaction fees and proves
+that on-chain operations work.
 
 Every Solana operation is a **real on-chain transaction**, but the cluster is
-**hard-locked to devnet**, so the SOL has no monetary value and nothing is at
-financial risk. This is *mortality engineering*: behaviour is shaped by the
-conditions of the agent's death (balance = 0) **and** by an explicit growth
-objective — not by survival pressure alone.
+checked against the devnet genesis hash before every signed operation. Devnet
+SOL has no monetary value. Anthropic API calls still cost real money.
 
 > ### The honest reality
 > Most "autonomous money-making agents" earn nothing. That is exactly why this
 > runs on devnet — the full loop (owning a wallet, proposing transactions,
 > signing under policy, earning, burning compute, dying) is proven end-to-end at
-> **zero risk** — and exactly why the objective is made **explicit** and a
+> **no real trading capital at risk** — API calls still cost money. The objective is **explicit** and a
 > **score** is kept: so you can see whether the agent is genuinely *earning* or
 > merely *surviving*. Going to mainnet is deliberately **not** implemented (see
 > [No mainnet, by design](#no-mainnet-by-design)).
@@ -32,31 +31,17 @@ possible", three things must be true, and this project builds all three:
 1. **The objective is stated** — in the constitution and every prompt: *grow net
    balance; do not idle to preserve it*.
 2. **More money buys more capability** — tiers are a **gradient, not a ceiling**:
-   surplus unlocks better models, more tools, faster heartbeats, and eventually
-   replication. So there is always a reason to climb.
-3. **Growth is measured and selected for** — `score.ts` tracks peak balance,
-   cumulative revenue, margin per task, and net growth every cycle; Phase 3
-   selection lets the highest earners reproduce.
+   surplus unlocks better models and tools. Replication remains disabled until
+   child agents can run independently.
+3. **Growth is measured** — `score.ts` separates paper equity and reported
+   venture revenue, and compares the paper book with holding SOL and cash.
 
-### Is growth *guaranteed*? No — and here is how it is secured anyway
+### Is growth guaranteed?
 
-Growth is not automatic. It rests on a hard economic condition and a soft
-behavioural one:
-
-- **Economic (secured in code).** Growth is only *possible* when one task pays
-  more than the worst-case cost of the cycle that decides to do it
-  (`reward > SOL_PER_USD × estimated_max_cycle_cost`). The shipped defaults
-  satisfy this, and the **growth-guard test** (`test/growth-guard.test.ts`)
-  **fails the build** if the configured economy is net-negative. There is a real
-  trap here: higher tiers use the frontier model and therefore burn *more*, so a
-  naïve reward can be net-negative exactly when the agent is healthiest. The
-  defaults keep the reward comfortably above even the frontier cycle cost.
-- **Behavioural (steered, then selected).** Whether the agent *chooses* to earn
-  is steered by the prompt, the tier gradient, and the honest score. In Phase 1
-  (a single agent) that is soft. The structural guarantee is **Phase 3
-  selection**: over a population, only the highest earners reach SOVEREIGN and
-  reproduce, so the strategies that earn most spread — selection does the
-  maximising.
+No. The LLM chooses actions, and prices determine the paper result. Each fill
+pays modeled fees, spread and slippage; shorts also pay modeled borrow cost.
+The old fixed task reward and its growth guard belong to the unused legacy
+market. Passing that test does not prove profitable trading.
 
 ---
 
@@ -79,14 +64,14 @@ observe prices → think → trade → burn → heartbeat → score → persist 
    next action. The framing: *grow your book; the market decides, not you.*
 6. Execute the tool — usually `trade` (set target exposures at the real prices).
 7. **Burn:** deduct this cycle's real LLM USD cost from the book. Then do one tiny
-   **on-chain heartbeat** transfer on devnet (policy-gated) as proof-of-life.
+   **on-chain heartbeat** memo transaction on devnet as proof-of-life.
 8. **Update score** (equity, peak, net PnL), append to the journal.
 9. Update SOUL.md only if the agent chose to. Persist state. End tick.
 
 ## Survival tiers — a gradient, not a ceiling
 
-The tier is set by the book's equity **expressed in SOL** (equity USD ÷ live SOL
-price), so a bigger book buys a better mind and more budget:
+The tier is set by the book's equity expressed in SOL using the **genesis** SOL
+price. Live SOL moves do not change the tier by themselves:
 
 | Tier      | Equity (SOL) | Model    | Compute budget | Tools                     | Rights            |
 |-----------|--------------|----------|----------------|---------------------------|-------------------|
@@ -95,9 +80,9 @@ price), so a bigger book buys a better mind and more budget:
 | LOW       | 0.1 – 0.5    | cheapest | reduced        | core, sheds non-essential | —                 |
 | NORMAL    | 0.5 – 2.0    | cheaper  | standard       | full                      | —                 |
 | ABUNDANT  | 2.0 – 5.0    | cheaper  | expanded       | full + premium            | faster heartbeat  |
-| SOVEREIGN | > 5.0        | frontier | maximal        | full + premium            | may replicate     |
+| SOVEREIGN | > 5.0        | frontier | maximal        | full + premium            | replication off   |
 
-**The frontier mind is EARNED, not given.** A starting 1-SOL agent runs a capable
+**The frontier mind is EARNED, not given.** A starting 2-SOL agent runs a capable
 mid-tier model; only sustained growth to SOVEREIGN (5+ SOL) unlocks the frontier
 model. This keeps the agent's intelligence a prize for survival — and makes your
 real API spend a function of the agent's success, not a fixed subsidy. (Models map
@@ -121,33 +106,30 @@ funds are ever at risk.**
   the market is the judge.
 - The **book** (`src/trading/desk.ts`) is a pure, marked-to-market portfolio in
   USD. The whole game is **denominated in SOL**: it starts at
-  `PAPER_TRADING_CAPITAL_SOL` SOL (default **1 SOL**), priced to USD once at
+  `PAPER_TRADING_CAPITAL_SOL` SOL (default **2 SOL**), priced to USD once at
   genesis with the live SOL/USD price, and its goal is to grow that back into
   more SOL. (Set `PAPER_TRADING_CAPITAL_USD` to pin a fixed USD stake instead.)
   Positions are quoted in USD (the market's unit); equity is reported in both.
 - **Compute burn:** the real USD cost of each LLM call (tokens × `src/llm/pricing.ts`)
   is deducted from the book every cycle. Resting in cash still burns — doing
   nothing is slow death.
-- **Survival is not only trading:** the agent can also `stake` — park capital in a
-  real-yield sleeve earning `YIELD_APY` (default ~5%), a non-directional carry
-  accrued by wall-clock time. It is deliberately honest and modest: at a 1-SOL book
-  the yield is tiny next to the compute burn, so it cannot keep a poor agent alive —
-  but as the book grows, parking becomes a genuine "live off your capital" survival
-  mode. Another way the option space widens with success.
+- **Yield sleeve:** `stake` parks paper capital. `YIELD_APY` defaults to zero.
+  Setting a rate simulates yield; it does not establish a real yield source.
 - **Death is economic:** if book equity (in SOL) falls to `TRADING_DUST_SOL`, the
   agent writes an obituary and exits. There is **no guaranteed income** — if it
   can't grow faster than it burns, it dies. Exactly like a real trader.
 - **On-chain heartbeat:** every cycle still does one tiny **real devnet**
   transaction (a memo tagging the cycle + equity), so the Solana loop is
-  genuinely exercised and auditable — funded by the operator seed, decoupled from
-  the (paper) economic game, and fully governed by the caps/allowlist/kill switch.
+  genuinely exercised and auditable. It pays a real devnet fee from the operator
+  seed. Memo transactions obey the kill switch and devnet check; transfer caps
+  and destination allowlists apply only to value transfers.
 - The survival **tiers** are computed from the book's value expressed in SOL, so
   a bigger book buys a better model and more budget, and a shrinking one sheds
-  them — the same gradient, now driven by trading P&L.
+  them — driven by paper P&L and any manually reported venture revenue.
 
 > **The honest limit.** This is a *model* of earning: real prices, paper fills,
 > no real money. An autonomous LLM trader will often lose — that's the point of
-> testing it at zero risk. Truly unconstrained, real-money, off-platform activity
+> testing it without real trading capital. Real API costs still apply. Off-platform activity
 > is deliberately **not** built (see [No mainnet, by design](#no-mainnet-by-design)).
 
 ## Safety rails (enforced in code, not just the prompt)
@@ -163,10 +145,16 @@ the growth objective** — maximisation is bounded by policy, never the reverse.
 - **Kill switch** — set `KILL_SWITCH=1`, or create a `state/KILL` file, to stand
   the agent down at the very start of a cycle, before any spend. The agent cannot
   create or delete `state/KILL`.
-- **Devnet assertion** — `assertDevnet()` runs at startup and at every
-  connection; any mainnet endpoint throws and exits.
+- **Devnet assertion** — a URL check runs at startup, then the connected
+  cluster's genesis hash is checked before spending and before every signature.
 - **Key hygiene** — the keypair is loaded **only** in `signer.ts`, validated
   against `AGENT_PUBKEY`, never logged, never committed, never passed to the LLM.
+
+A value transfer is written to `state/state.json` as `pendingTransfer` before
+it is broadcast. If confirmation or persistence fails, later value transfers
+are blocked. Inspect that signature on the devnet explorer, reconcile whether
+it landed and the day's caps, then remove `pendingTransfer` manually. Do not
+remove it merely to make the next cycle run. Memo heartbeats remain separate.
 
 The pure policy function `evaluatePolicy()` is unit-tested in
 `test/signer-policy.test.ts` (allowlist + caps + kill switch reject bad txs).
@@ -205,7 +193,7 @@ npm run keygen          # run 3× — one per account; copy pubkeys/secrets asid
 Now create your `.env`. Two ways:
 
 - **Guided (recommended):** open the local setup wizard and fill in each key step
-  by step — it validates them, blocks mainnet, checks the growth guard, and
+  by step — it validates inputs and paper execution costs, and
   produces a correct `.env` to copy or download. It runs entirely in your browser
   (no network calls; your keys never leave the page):
 
@@ -221,15 +209,15 @@ Either way you set (see `.env.example` for the full list):
 
 - `AGENT_PUBKEY` / `AGENT_KEYPAIR` — the agent wallet (secret loaded only in the
   signer).
-- `MARKET_PUBKEY` / `MARKET_KEYPAIR` — the account that pays the agent.
-- `COMPUTE_PROVIDER_PUBKEY` — receives the compute burn.
+- `MARKET_PUBKEY` / `MARKET_KEYPAIR` — optional legacy task market account.
+- `COMPUTE_PROVIDER_PUBKEY` — optional transfer destination, not an API payment.
 - `ANTHROPIC_API_KEY` — for the LLM (not needed for `tick:dry`).
 
-Seed both accounts with free devnet SOL:
+Seed the agent account with free devnet SOL:
 
 ```bash
 npm run seed            # airdrops SEED_AIRDROP_SOL to the AGENT wallet
-npm run seed:market     # airdrops MARKET_SEED_AIRDROP_SOL to the MARKET account
+npm run seed:market     # optional, for the legacy task market
 ```
 
 (If the faucet rate-limits, use https://faucet.solana.com with the pubkey.)
@@ -242,11 +230,11 @@ npm run tick:dry        # a FREE cycle: mock LLM (no API cost), still real devne
 npm run tick:dry -- BTC 200            # dry cycle placing a specific paper trade
 ```
 
-`tick:dry` exercises the whole loop — balance read, earning, on-chain burn,
+`tick:dry` exercises the loop — price read, paper trading, on-chain memo,
 scoring, journaling — with no Anthropic API call, so you can try it before
 spending anything. It still needs the wallets set and funded (devnet is free).
 
-Run the tests (includes the growth guard and the signer-policy rails):
+Run the tests:
 
 ```bash
 npm test
@@ -276,12 +264,8 @@ your dashboard.
    the default branch — **including the `/state` commits the heartbeat makes** —
    so the public dashboard stays current.
 
-It publishes the dashboard, the committed `/state`, and the setup wizard. Child
-secrets are never committed, so they never reach Pages. The setup wizard makes
-**no network calls**, so anything typed into it stays in the visitor's browser;
-it is also served `noindex`. (If you'd rather keep the wizard off the public
-site, drop the `setup/**` copy step from `.github/workflows/pages.yml` — it then
-stays local-only via `npm run setup`.)
+It publishes the dashboard and committed `/state`. The setup wizard is only
+served locally. A public repository and its Pages state remain publicly readable.
 
 ## Enable the heartbeat (GitHub Actions)
 
@@ -360,28 +344,22 @@ dashboard/             Phase 3 scaffold — static HTML reading /state
   only at NORMAL+ when `PHASE2_TOOLS_ENABLED=1` and fully policy-gated; a
   `StateStore` seam (`src/persistence/`) with the committed **file** store as
   default and a **Firestore** scaffold selected when `FIRESTORE_PROJECT_ID` is set.
-- **Phase 3:** code-driven replication (`src/replication.ts`, enabled by
-  `REPLICATION_ENABLED=1` — **on** in the hosted heartbeat/watchdog workflows) +
-  the static dashboard (`dashboard/`), which shows the live **population** of
-  offspring. Replication is SOVEREIGN-gated and conditioned only on **sustained
-  profit** and the population cap — never on population size as a driver, never an
-  LLM choice, and never decidable in the same context the agent uses to reason
-  about death. Funding a child is an ordinary capped devnet transfer (keep
-  `CHILD_SEED_SOL` ≤ `PER_TX_CAP_SOL`); a funding failure is noted, not fatal.
+- **Phase 3:** the replication code is a scaffold. It can create and fund a
+  child account, but no child runner or strategy comparison exists. It is off
+  in hosted workflows and enabling `REPLICATION_ENABLED=1` fails configuration.
 
 ### Enabling Phase 2/3
 
 Everything above is **off by default** — Phase 1 behaviour is unchanged unless
 you opt in via env flags: `PHASE2_TOOLS_ENABLED`, `OFFCHAIN_REVENUE_ENABLED`,
-`FIRESTORE_PROJECT_ID`, `REPLICATION_ENABLED` (see `.env.example`). The Firestore
+`FIRESTORE_PROJECT_ID` (see `.env.example`). The Firestore
 and off-chain adapters are scaffolds: they carry the interface and guards but
 throw/TODO where the real integration goes, so they can't be mistaken for
 finished backends.
 
 ## No mainnet, by design
 
-There is no mainnet code path. `assertDevnet()` runs at startup and at every
-connection; any endpoint containing `mainnet` throws immediately. Making this
-agent trade real value would require deliberately removing that lock — which this
-project does not do and does not document how to do. The point is the *mechanism*,
-proven safely.
+There is no mainnet trading path. Before signing, the code checks the connected
+RPC genesis hash against the known devnet hash. The configured endpoint must
+also look like devnet. A dishonest RPC server could lie about its identity, so
+use a trusted endpoint. The paper book never settles a real market trade.

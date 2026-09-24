@@ -2,6 +2,7 @@ import { solToLamports } from '../config.js';
 import { writeSoul } from '../soul.js';
 import {
   applyOrders,
+  applyPortfolio,
   equityUsd as deskEquityUsd,
   setStake,
   stakedUsdOf,
@@ -53,6 +54,9 @@ const trade: Tool = {
       tradableAssets: ctx.cfg.trading.assets,
       maxGrossExposureUsd: ctx.maxGrossExposureUsd,
       allowShort: ctx.cfg.trading.allowShort,
+      feeBps: ctx.cfg.trading.feeBps,
+      spreadBps: ctx.cfg.trading.spreadBps,
+      slippageBps: ctx.cfg.trading.slippageBps,
     });
     const applied = outcomes.filter((o) => o.ok);
     const rejected = outcomes.filter((o) => !o.ok);
@@ -97,18 +101,21 @@ const rebalance: Tool = {
     }
     const equity = deskEquityUsd(ctx.state.desk, ctx.prices);
     const orders = weightsToOrders(ctx.cfg.trading.assets, weights, equity);
-    const outcomes = applyOrders(ctx.state.desk, orders, {
+    const outcomes = applyPortfolio(ctx.state.desk, orders, {
       prices: ctx.prices,
       tradableAssets: ctx.cfg.trading.assets,
       maxGrossExposureUsd: ctx.maxGrossExposureUsd,
       allowShort: ctx.cfg.trading.allowShort,
+      feeBps: ctx.cfg.trading.feeBps,
+      spreadBps: ctx.cfg.trading.spreadBps,
+      slippageBps: ctx.cfg.trading.slippageBps,
     });
     const rejected = outcomes.filter((o) => !o.ok);
     return {
       summary:
         `rebalanced to ${Object.keys(weights).length} target weights` +
         (rejected.length ? ` (rejected ${rejected.length})` : ''),
-      traded: true,
+      traded: outcomes.some((o) => o.ok),
       note: `book after: ${summarizeDesk(ctx.state.desk, ctx.prices).replace(/\n/g, ' | ')}`,
     };
   },
@@ -117,8 +124,8 @@ const rebalance: Tool = {
 const stake: Tool = {
   name: 'stake',
   description:
-    'Park capital in a real-yield sleeve to earn a modest, non-directional carry ' +
-    '(a real ~annual rate, accrued by elapsed time) instead of taking market risk. ' +
+    'Park paper capital in a modeled-yield sleeve (default 0% APY). ' +
+    'The configured rate is simulated and accrued by elapsed time. ' +
     'Set the TOTAL USD you want staked (0 unstakes everything back to cash). Staked ' +
     'capital is not exposed to crypto prices and is not available for trading until ' +
     'you unstake it. A low-risk way to survive — but at a small book the yield is ' +
@@ -276,6 +283,7 @@ const transfer: Tool = {
     return {
       summary: `transferred ${solRaw} SOL to ${to}`,
       signatures: [res.signature],
+      transfer: res,
       note: `transfer: ${reason}`,
     };
   },

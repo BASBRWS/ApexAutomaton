@@ -88,6 +88,11 @@ export interface Score {
   cumulativeBurnUsd: number;
   /** cycle index at which net PnL first went positive; null until then. */
   firstProfitAtCycle: number | null;
+  paperEquityUsd?: number;
+  reportedVentureRevenueUsd?: number;
+  cashBenchmarkUsd?: number;
+  solHoldBenchmarkUsd?: number | null;
+  paperAlphaVsSolUsd?: number | null;
 }
 
 export interface AutomatonState {
@@ -107,6 +112,12 @@ export interface AutomatonState {
   caps: DailyCaps;
   recentSignatures: TxRecord[];
   score: Score;
+  /** Authoritative revenue credits, persisted with the desk so retries cannot
+   * count the same externally reported sale twice. */
+  creditedVentureRevenueUsd?: Record<string, number>;
+  /** Durable intent written before broadcasting a value transfer. An ambiguous
+   * result blocks later transfers until the operator reconciles the signature. */
+  pendingTransfer?: { signature: string; to: string; lamports: number; at: string };
   /** consecutive cycles at/above the replicate threshold (Phase 3 gating). */
   sustainedSovereignCycles: number;
   dead: boolean;

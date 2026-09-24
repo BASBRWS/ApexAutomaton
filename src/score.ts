@@ -14,6 +14,11 @@ export function initialScore(startEquityUsd: number): Score {
     tradeCycles: 0,
     cumulativeBurnUsd: 0,
     firstProfitAtCycle: null,
+    paperEquityUsd: startEquityUsd,
+    reportedVentureRevenueUsd: 0,
+    cashBenchmarkUsd: startEquityUsd,
+    solHoldBenchmarkUsd: null,
+    paperAlphaVsSolUsd: null,
   };
 }
 
@@ -22,6 +27,9 @@ export interface ScoreInput {
   equityUsd: number;
   burnUsd: number;
   traded: boolean;
+  paperEquityUsd?: number;
+  reportedVentureRevenueUsd?: number;
+  solHoldBenchmarkUsd?: number | null;
 }
 
 export function updateScore(prev: Score, input: ScoreInput): Score {
@@ -36,5 +44,11 @@ export function updateScore(prev: Score, input: ScoreInput): Score {
     tradeCycles: prev.tradeCycles + (input.traded ? 1 : 0),
     cumulativeBurnUsd: prev.cumulativeBurnUsd + input.burnUsd,
     firstProfitAtCycle,
+    paperEquityUsd: input.paperEquityUsd ?? input.equityUsd,
+    reportedVentureRevenueUsd: input.reportedVentureRevenueUsd ?? 0,
+    cashBenchmarkUsd: prev.startEquityUsd,
+    solHoldBenchmarkUsd: input.solHoldBenchmarkUsd ?? prev.solHoldBenchmarkUsd ?? null,
+    paperAlphaVsSolUsd: input.solHoldBenchmarkUsd == null ? null :
+      (input.paperEquityUsd ?? input.equityUsd) - input.solHoldBenchmarkUsd,
   };
 }

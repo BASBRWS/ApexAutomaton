@@ -71,7 +71,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton — setup</h1>
+      <h1>Apex Automaton — setup <span class="muted" style="font-size:12px">v0.2.0</span></h1>
       <div class="muted">Fill in your keys step by step. This page builds a correct
         <code>.env</code> for you. It runs entirely in your browser — nothing is
         sent anywhere. · <a href="../dashboard/">View dashboard →</a></div>
@@ -115,9 +115,8 @@
 
       <!-- STEP 3 -->
       <div class="step">
-        <div class="step-head"><span class="num">3</span><h2>The market (pays the agent)</h2></div>
-        <p class="hint">A separate account that pays the agent for completed tasks —
-          the only source of revenue. Fund it later with <code>npm run seed:market</code>.</p>
+        <div class="step-head"><span class="num">3</span><h2>Legacy market account, optional</h2></div>
+        <p class="hint">The current paper trading loop does not use this account.</p>
         <button type="button" class="ghost" data-gen="market">✨ Generate market keypair</button>
         <label>Market public key <span class="k">MARKET_PUBKEY</span></label>
         <input id="MARKET_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
@@ -130,8 +129,7 @@
       <!-- STEP 4 -->
       <div class="step">
         <div class="step-head"><span class="num">4</span><h2>Compute-provider &amp; operator</h2></div>
-        <p class="hint">The compute-provider <b>receives</b> the compute burn each cycle —
-          only its public key is needed. The operator key is optional.</p>
+        <p class="hint">The compute-provider is an allowed destination for optional devnet transfers. The API cost is deducted from the paper book, not paid to this account.</p>
         <button type="button" class="ghost" data-gen="compute">✨ Generate compute-provider key</button>
         <label>Compute-provider public key <span class="k">COMPUTE_PROVIDER_PUBKEY</span></label>
         <input id="COMPUTE_PROVIDER_PUBKEY" data-kind="pubkey" placeholder="base58 public key" autocomplete="off" spellcheck="false" />
@@ -157,21 +155,20 @@
 
       <!-- STEP 6 -->
       <div class="step">
-        <div class="step-head"><span class="num">6</span><h2>Economy (defaults are fine)</h2></div>
-        <p class="hint">These control the survival pressure. The defaults keep the economy
-          net-positive; the check below must stay green.</p>
+        <div class="step-head"><span class="num">6</span><h2>Paper trading costs</h2></div>
+        <p class="hint">These are simulated execution costs. They reduce the paper book when it trades. No setting guarantees profit.</p>
         <div class="row">
           <div>
-            <label>SOL per USD <span class="k">SOL_PER_USD</span></label>
-            <input id="SOL_PER_USD" data-kind="num" value="1.0" inputmode="decimal" />
+            <label>Fee, bps <span class="k">TRADING_FEE_BPS</span></label>
+            <input id="TRADING_FEE_BPS" data-kind="num" value="10" inputmode="decimal" />
           </div>
           <div>
-            <label>Task reward (SOL) <span class="k">MARKET_TASK_REWARD_SOL</span></label>
-            <input id="MARKET_TASK_REWARD_SOL" data-kind="num" value="0.2" inputmode="decimal" />
+            <label>Spread, bps <span class="k">TRADING_SPREAD_BPS</span></label>
+            <input id="TRADING_SPREAD_BPS" data-kind="num" value="5" inputmode="decimal" />
           </div>
         </div>
-        <label>Estimated max cycle cost (USD) <span class="k">ESTIMATED_MAX_CYCLE_COST_USD</span></label>
-        <input id="ESTIMATED_MAX_CYCLE_COST_USD" data-kind="num" value="0.08" inputmode="decimal" />
+        <label>Slippage, bps <span class="k">TRADING_SLIPPAGE_BPS</span></label>
+        <input id="TRADING_SLIPPAGE_BPS" data-kind="num" value="5" inputmode="decimal" />
         <div id="guard" class="guard ok"></div>
       </div>
 
@@ -197,10 +194,10 @@
       const ids = [
         'AGENT_PUBKEY','AGENT_KEYPAIR','MARKET_PUBKEY','MARKET_KEYPAIR',
         'COMPUTE_PROVIDER_PUBKEY','OPERATOR_PUBKEY','ANTHROPIC_API_KEY',
-        'SOLANA_RPC_URL','SOL_PER_USD','MARKET_TASK_REWARD_SOL','ESTIMATED_MAX_CYCLE_COST_USD',
+        'SOLANA_RPC_URL','TRADING_FEE_BPS','TRADING_SPREAD_BPS','TRADING_SLIPPAGE_BPS',
       ];
       const required = [
-        'AGENT_PUBKEY','AGENT_KEYPAIR','MARKET_PUBKEY','MARKET_KEYPAIR','COMPUTE_PROVIDER_PUBKEY',
+        'AGENT_PUBKEY','AGENT_KEYPAIR','COMPUTE_PROVIDER_PUBKEY',
       ];
       const val = (id) => document.getElementById(id).value.trim();
       const setMsg = (id, cls, text) => {
@@ -216,7 +213,7 @@
 
       function validate() {
         // pubkeys
-        for (const id of ['AGENT_PUBKEY','MARKET_PUBKEY','COMPUTE_PROVIDER_PUBKEY']) {
+        for (const id of ['AGENT_PUBKEY','COMPUTE_PROVIDER_PUBKEY']) {
           const v = val(id);
           if (!v) setMsg(id, 'bad', 'required');
           else if (!looksLikePubkey(v)) setMsg(id, 'warn', 'does not look like a base58 public key');
@@ -227,7 +224,7 @@
         setMsg('OPERATOR_PUBKEY', op ? (looksLikePubkey(op) ? 'ok' : 'warn') : 'ok',
           op ? (looksLikePubkey(op) ? 'looks valid' : 'does not look like a base58 public key') : 'optional — ok to leave blank');
         // secrets
-        for (const id of ['AGENT_KEYPAIR','MARKET_KEYPAIR']) {
+        for (const id of ['AGENT_KEYPAIR']) {
           const v = val(id);
           if (!v) setMsg(id, 'bad', 'required');
           else if (!looksLikeSecret(v)) setMsg(id, 'warn', 'does not look like a base58/JSON secret key');
@@ -245,19 +242,13 @@
         else if (!/devnet|localhost|127\.0\.0\.1/i.test(rpc)) setMsg('SOLANA_RPC_URL', 'warn', 'not obviously devnet — the code requires devnet');
         else setMsg('SOLANA_RPC_URL', 'ok', 'devnet — ok');
 
-        // growth guard
-        const reward = parseFloat(val('MARKET_TASK_REWARD_SOL'));
-        const perUsd = parseFloat(val('SOL_PER_USD'));
-        const est = parseFloat(val('ESTIMATED_MAX_CYCLE_COST_USD'));
+        // Validate the simulated cost inputs without implying a profit guarantee.
+        const costs = ['TRADING_FEE_BPS','TRADING_SPREAD_BPS','TRADING_SLIPPAGE_BPS'].map((id) => Number(val(id)));
         const guard = document.getElementById('guard');
-        if ([reward, perUsd, est].some((n) => !isFinite(n))) {
-          guard.className = 'guard bad'; guard.textContent = 'enter numbers for the economy fields';
+        if (costs.some((n) => !Number.isFinite(n) || n < 0) || costs[1] + costs[2] >= 10000) {
+          guard.className = 'guard bad'; guard.textContent = 'Enter valid non-negative execution costs.';
         } else {
-          const worst = perUsd * est;
-          if (reward > worst) { guard.className = 'guard ok';
-            guard.textContent = `growth possible: reward ${reward} SOL > worst-case burn ${worst.toFixed(4)} SOL`; }
-          else { guard.className = 'guard bad';
-            guard.textContent = `NET-NEGATIVE: reward ${reward} SOL <= worst-case burn ${worst.toFixed(4)} SOL — the agent can only die slower`; }
+          guard.className = 'guard ok'; guard.textContent = 'Execution costs will be deducted from the paper book.';
         }
         return rpcOk;
       }
@@ -279,10 +270,11 @@
         lines.push('# --- LLM ---');
         lines.push(`ANTHROPIC_API_KEY=${get('ANTHROPIC_API_KEY')}`);
         lines.push('');
-        lines.push('# --- Economy ---');
-        lines.push(`SOL_PER_USD=${get('SOL_PER_USD')}`);
-        lines.push(`MARKET_TASK_REWARD_SOL=${get('MARKET_TASK_REWARD_SOL')}`);
-        lines.push(`ESTIMATED_MAX_CYCLE_COST_USD=${get('ESTIMATED_MAX_CYCLE_COST_USD')}`);
+        lines.push('# --- Paper execution ---');
+        lines.push(`TRADING_FEE_BPS=${get('TRADING_FEE_BPS')}`);
+        lines.push(`TRADING_SPREAD_BPS=${get('TRADING_SPREAD_BPS')}`);
+        lines.push(`TRADING_SLIPPAGE_BPS=${get('TRADING_SLIPPAGE_BPS')}`);
+        lines.push('YIELD_APY=0');
         lines.push('');
         lines.push('# --- Seeding (devnet airdrops) ---');
         lines.push('SEED_AIRDROP_SOL=1.0');

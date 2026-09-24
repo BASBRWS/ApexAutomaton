@@ -1,5 +1,5 @@
 import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
-import { makeConnection } from './solana/wallet.js';
+import { assertDevnetConnection, makeConnection } from './solana/wallet.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
@@ -19,6 +19,7 @@ import {
   isFunded,
   fundDesk,
   accrueYield,
+  accrueShortBorrow,
 } from './trading/desk.js';
 import {
   makePriceSource,
@@ -95,6 +96,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     return { exitCode: 0, summary: 'kill switch engaged — stood down' };
   }
 
+  await assertDevnetConnection(connection);
+  if (state.dead) {
+    return { exitCode: 1, summary: 'DEAD — operator intervention required' };
+  }
+
   state.cycle += 1;
   const cycle = state.cycle;
 
@@ -102,10 +108,12 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const prevPrices: PriceMap = { ...state.lastPrices };
   const priceSource = deps.priceSource ?? makePriceSource(cfg);
   const prices: PriceMap = { ...state.lastPrices };
+  let executablePrices: PriceMap = {};
   let priceNote: string;
   try {
     const snap = await priceSource.getPrices(requiredSymbols(cfg));
     Object.assign(prices, snap.prices);
+    executablePrices = snap.prices;
     priceNote = `prices @ ${snap.at}`;
   } catch (err) {
     priceNote = `price fetch failed (${errMsg(err)}) — using cached prices`;
@@ -117,6 +125,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // SOL/USD rate. The book is born unfunded; the first cycle that sees a real SOL
   // price funds it with `capitalSol` SOL worth of USD and records that price.
   if (!isFunded(state.desk)) {
+    if (!(typeof executablePrices.SOL === 'number' && executablePrices.SOL > 0)) {
+      throw new Error('Genesis requires a fresh SOL quote; no capital was created from cached or fallback prices.');
+    }
     const capUsd = genesisCapitalUsd(cfg, liveSolPrice);
     state.desk = fundDesk(state.desk, capUsd, cycle);
     state.score = initialScore(capUsd);
@@ -128,7 +139,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // rate never moves the survival game — only the agent's own trading does.
   const solPrice = state.genesisSolPriceUsd > 0 ? state.genesisSolPriceUsd : liveSolPrice;
 
-  // --- Real yield: accrue carry on the staked sleeve by elapsed wall-clock
+  // --- Modeled yield: accrue carry on the staked sleeve by elapsed wall-clock
   // time (honest regardless of how irregular the cron is). Counts toward equity
   // this cycle, so parking in yield is a genuine — if modest — survival stance. -
   const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -136,6 +147,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const dtYears = Number.isFinite(prevRunMs) ? Math.max(0, (Date.now() - prevRunMs) / MS_PER_YEAR) : 0;
   const yieldEarnedUsd = accrueYield(state.desk, cfg.trading.yieldApy, dtYears);
   const yieldNote = yieldEarnedUsd > 0 ? `yield +$${yieldEarnedUsd.toFixed(4)}` : undefined;
+  const borrowCostUsd = accrueShortBorrow(state.desk, prices, cfg.trading.shortBorrowApy, dtYears);
+  const borrowNote = borrowCostUsd > 0 ? `short borrow -$${borrowCostUsd.toFixed(4)}` : undefined;
 
   // --- Ventures: apply the human's queue decisions and fold any newly-reported
   // REAL revenue into the book BEFORE the death check, so real income counts (and
@@ -144,6 +157,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const ventureBook = cfg.ventures.enabled ? loadVentureBook() : null;
   let ventureNote: string | undefined;
   if (ventureBook) {
+    state.creditedVentureRevenueUsd ??= Object.fromEntries(
+      ventureBook.ventures.map((venture) => [venture.id, venture.accountedRevenueUsd ?? 0]),
+    );
     const decisions = applyDecisions(
       ventureBook,
       cycle,
@@ -154,6 +170,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       (usd) => {
         addVentureRevenue(state.desk, usd);
       },
+      state.creditedVentureRevenueUsd,
     );
     const parts: string[] = [];
     if (decisions.activated.length > 0) parts.push(`ventures live +${decisions.activated.length}`);
@@ -191,7 +208,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (parts.length > 0) ventureNote = parts.join('; ');
   }
 
-  // Gross-exposure cap for this cycle: the SOL cap priced at the live SOL price.
+  // Gross-exposure cap for this cycle: the SOL cap priced at the genesis SOL price.
   const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
 
   // Paper book (pure) — drives the metabolic cost and trade sizing. The
@@ -278,7 +295,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     avgBurnUsd,
     runwayCycles,
     metabolicDailyPct: cfg.trading.metabolicRatePerCycle * 96 * 100, // ~cycles/day
-    prices,
+    prices: executablePrices,
     prevPrices,
     deskSummary: summarizeDesk(state.desk, prices),
     score: state.score,
@@ -324,7 +341,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     cfg,
     state,
     signer,
-    prices,
+    prices: executablePrices,
     maxGrossExposureUsd,
     tier,
     policy,
@@ -368,13 +385,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // Record any on-chain transfer the tool made (e.g. Phase 2 transfer).
   if (tool.movesValue) {
-    for (const sig of toolResult.signatures ?? []) {
+    if (toolResult.transfer) {
       recordTx(state, {
         kind: 'transfer',
-        signature: sig,
-        lamports: 0,
+        signature: toolResult.transfer.signature,
+        lamports: toolResult.transfer.lamports,
         from: cfg.agentPubkey,
-        to: '(allowlisted)',
+        to: toolResult.transfer.to,
         cycle,
         at: now(),
         note: toolResult.note,
@@ -453,6 +470,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     equityUsd: equityPost,
     burnUsd: costUsd + reflectCostUsd,
     traded,
+    paperEquityUsd: paperEquityPost,
+    reportedVentureRevenueUsd: ventureRevUsd,
+    solHoldBenchmarkUsd: typeof executablePrices.SOL === 'number' && state.genesisSolPriceUsd > 0
+      ? state.desk.capitalUsd * executablePrices.SOL / state.genesisSolPriceUsd
+      : null,
   });
   state.lastPrices = prices;
 
@@ -508,6 +530,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     coerceNote,
     priceNote,
     yieldNote,
+    borrowNote,
     metabolicNote,
     ventureNote,
     reflectNote,
@@ -532,12 +555,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     score: state.score,
     note: noteParts.join(' | ') || undefined,
   };
-  appendEntry(entry);
-
-  if (ventureBook) saveVentureBook(ventureBook);
-
   state.lastRunAt = now();
   await store.save(state);
+  if (ventureBook) saveVentureBook(ventureBook);
+  appendEntry(entry);
 
   return {
     exitCode: 0,

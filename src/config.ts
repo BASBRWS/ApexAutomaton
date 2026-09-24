@@ -148,6 +148,12 @@ export interface Config {
     assets: string[];
     /** whether the agent may hold short (negative) positions. */
     allowShort: boolean;
+    /** Simulated execution costs in basis points, each charged on traded notional. */
+    feeBps: number;
+    spreadBps: number;
+    slippageBps: number;
+    /** Simulated annual borrow cost on open shorts. */
+    shortBorrowApy: number;
     /** economic death threshold: book equity at/below this (in SOL) is DEAD. */
     dustSol: number;
     /** real annual yield (as a fraction, e.g. 0.05 = 5% APY) earned on capital
@@ -282,8 +288,12 @@ export function loadConfig(): Config {
         .map((s) => s.trim().toUpperCase())
         .filter((s) => s.length > 0),
       allowShort: envBool('ALLOW_SHORT', true),
+      feeBps: envNum('TRADING_FEE_BPS', 10),
+      spreadBps: envNum('TRADING_SPREAD_BPS', 5),
+      slippageBps: envNum('TRADING_SLIPPAGE_BPS', 5),
+      shortBorrowApy: envNum('SHORT_BORROW_APY', 0.08),
       dustSol: envNum('TRADING_DUST_SOL', 0.02),
-      yieldApy: envNum('YIELD_APY', 0.05),
+      yieldApy: envNum('YIELD_APY', 0),
       metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
@@ -319,6 +329,14 @@ export function loadConfig(): Config {
 
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
+  if (cfg.features.replicationEnabled) {
+    throw new Error('Replication is disabled until children have an independent runtime and measurable strategy.');
+  }
+  if (cfg.trading.capitalSol <= 0 || cfg.trading.dustSol < 0 || cfg.trading.maxGrossExposureSol <= 0 ||
+      [cfg.trading.feeBps, cfg.trading.spreadBps, cfg.trading.slippageBps, cfg.trading.shortBorrowApy, cfg.trading.yieldApy].some((n) => !Number.isFinite(n) || n < 0) ||
+      cfg.trading.spreadBps + cfg.trading.slippageBps >= 10_000) {
+    throw new Error('Config error: invalid trading capital, caps, execution costs, or yield.');
+  }
   const { dustThresholdSol, criticalMinSol, normalMinSol, abundantMinSol, sovereignMinSol } =
     cfg.tiers;
   const ordered =
@@ -335,12 +353,7 @@ export function validateConfig(cfg: Config): void {
   }
 }
 
-/**
- * The necessary condition for growth: one task must pay more than the worst-case
- * cost of the cycle that decides to do it. This does NOT guarantee the agent
- * will earn — only that earning is not mathematically self-defeating. The
- * growth-guard test asserts this so a net-negative economy fails the build.
- */
+/** Legacy task-market arithmetic. The trading loop does not use this as a growth guarantee. */
 export function worstCaseCycleBurnSol(cfg: Config): number {
   return cfg.economy.solPerUsd * cfg.economy.estimatedMaxCycleCostUsd;
 }

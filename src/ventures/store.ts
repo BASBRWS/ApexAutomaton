@@ -19,23 +19,19 @@ export function emptyVentureBook(): VentureBook {
 }
 
 export function loadVentureBook(): VentureBook {
-  try {
-    if (!fs.existsSync(VENTURES_FILE)) return emptyVentureBook();
-    const parsed = JSON.parse(fs.readFileSync(VENTURES_FILE, 'utf8')) as Partial<VentureBook>;
-    return {
-      ventures: Array.isArray(parsed.ventures) ? parsed.ventures : [],
-      ledger: parsed.ledger && typeof parsed.ledger === 'object' ? parsed.ledger : {},
-      seq: typeof parsed.seq === 'number' ? parsed.seq : 0,
-    };
-  } catch {
-    // A corrupt file must not crash the cycle; start clean rather than throw.
-    return emptyVentureBook();
+  if (!fs.existsSync(VENTURES_FILE)) return emptyVentureBook();
+  const parsed = JSON.parse(fs.readFileSync(VENTURES_FILE, 'utf8')) as Partial<VentureBook>;
+  if (!Array.isArray(parsed.ventures) || !parsed.ledger || typeof parsed.seq !== 'number') {
+    throw new Error('Invalid venture book. Refusing to replace it with an empty book.');
   }
+  return parsed as VentureBook;
 }
 
 export function saveVentureBook(book: VentureBook): void {
   fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.writeFileSync(VENTURES_FILE, JSON.stringify(book, null, 2) + '\n', 'utf8');
+  const temporary = `${VENTURES_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(book, null, 2) + '\n', 'utf8');
+  fs.renameSync(temporary, VENTURES_FILE);
 }
 
 /** How many proposals are still awaiting a human decision. */
@@ -166,6 +162,7 @@ export function applyDecisions(
   cycle: number,
   autonomyThreshold: number,
   foldRevenue: (usd: number) => void,
+  creditedRevenueUsd?: Record<string, number>,
 ): DecisionOutcome {
   const activated: Venture[] = [];
   const rejected: Venture[] = [];
@@ -191,13 +188,26 @@ export function applyDecisions(
 
     // Fold newly-reported real revenue for live ventures (only ever forward).
     if (v.status === 'active') {
-      const unaccounted = cleanNum(v.revenueUsd) - cleanNum(v.accountedRevenueUsd);
+      const previouslyCredited = creditedRevenueUsd?.[v.id] ?? cleanNum(v.accountedRevenueUsd);
+      const unaccounted = cleanNum(v.revenueUsd) - previouslyCredited;
       if (unaccounted > 0) {
         foldRevenue(unaccounted);
         v.accountedRevenueUsd = cleanNum(v.revenueUsd);
+        if (creditedRevenueUsd) creditedRevenueUsd[v.id] = v.accountedRevenueUsd;
         revenueAddedUsd += unaccounted;
         ensureLedger(book, v.category).earnedUsd += unaccounted;
       }
+    }
+  }
+
+  if (creditedRevenueUsd) {
+    const byCategory: Record<string, number> = {};
+    for (const v of book.ventures) {
+      byCategory[v.category] = (byCategory[v.category] ?? 0) + (creditedRevenueUsd[v.id] ?? 0);
+    }
+    for (const [category, credited] of Object.entries(byCategory)) {
+      const ledger = ensureLedger(book, category);
+      ledger.earnedUsd = Math.max(ledger.earnedUsd, credited);
     }
   }
 

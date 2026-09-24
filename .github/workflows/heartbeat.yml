@@ -64,11 +64,8 @@ jobs:
           COMPUTE_PROVIDER_PUBKEY: ${{ secrets.COMPUTE_PROVIDER_PUBKEY }}
           OPERATOR_PUBKEY: ${{ secrets.OPERATOR_PUBKEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Replication ON: the agent may spawn devnet-funded offspring, but only
-          # after sustained growth to the SOVEREIGN tier (birth is gated on
-          # success, never scarcity). Safe on devnet; a funding failure is noted,
-          # not fatal.
-          REPLICATION_ENABLED: 'true'
+          # Replication remains disabled until a child runtime exists.
+          REPLICATION_ENABLED: 'false'
           # Lets the burst dispatch the Pages redeploy after each cycle's push.
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh
