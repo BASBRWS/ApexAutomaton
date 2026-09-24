@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-24T06:55:58.154Z",
+        "lastCheckedAt": "2026-09-24T07:11:12.245Z",
         "reachable": true,
         "daysLive": 1,
         "killDue": false,
