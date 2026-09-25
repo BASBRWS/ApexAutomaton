@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import bs58 from 'bs58';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { loadConfig, solToLamports, type Config } from '../config.js';
@@ -251,7 +252,10 @@ export class Signer {
     if (Object.values(this.state.pumpMints ?? {}).some((mint) => mint.at.startsWith(date))) {
       throw new PolicyError('one Pump.fun launch per UTC day');
     }
-    const { PUMP_PROGRAM_ID, PUMP_SDK } = await import('@pump-fun/pump-sdk');
+    // The SDK's ESM build imports CommonJS Anchor named exports on Node 20.
+    // Its published CommonJS entry works on the supported Node versions.
+    const pumpRequire = createRequire(import.meta.url);
+    const { PUMP_PROGRAM_ID, PUMP_SDK } = pumpRequire('@pump-fun/pump-sdk') as typeof import('@pump-fun/pump-sdk');
     const mint = Keypair.generate();
     const ix = await PUMP_SDK.createV2Instruction({
       mint: mint.publicKey, user: this.keypair.publicKey, creator: this.keypair.publicKey,

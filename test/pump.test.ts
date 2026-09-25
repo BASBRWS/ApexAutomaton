@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createRequire } from 'node:module';
 import { Keypair } from '@solana/web3.js';
-import { PUMP_PROGRAM_ID, PUMP_SDK } from '@pump-fun/pump-sdk';
 import type { ToolContext } from '../src/tools/registry.js';
 import { buildRegistry as registry } from '../src/tools/builtin.js';
 import { policyForTier, toolNamesForCycle } from '../src/tiers.js';
 import { addProposal, emptyVentureBook } from '../src/ventures/store.js';
 import { makeTestConfig } from './helpers.js';
 import { validateConfig } from '../src/config.js';
+
+const { PUMP_PROGRAM_ID, PUMP_SDK } = createRequire(import.meta.url)('@pump-fun/pump-sdk') as typeof import('@pump-fun/pump-sdk');
 
 describe('Pump.fun devnet venture', () => {
   const token = { name: 'Apex Devnet', symbol: 'APEX', uri: 'https://example.com/apex.json' };
