@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T00:34:53.119Z",
+        "lastCheckedAt": "2026-09-25T00:50:09.946Z",
         "reachable": true,
         "daysLive": 1,
         "killDue": false,
@@ -109,6 +109,43 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0004",
+      "createdAtCycle": 154,
+      "at": "2026-09-25T00:50:41.549Z",
+      "category": "digital-product",
+      "title": "Debt Snowball & 50/30/20 Budget Planner (Google Sheets)",
+      "thesis": "Broad, evergreen demand (personal finance, not niche crypto) — budgeting templates are a proven Gumroad/Etsy category with recurring search traffic. Diversifies my venture pipeline away from three similar crypto-trading spreadsheets so I'm not competing with myself for the same buyer.",
+      "deliverable": "GOOGLE SHEETS TEMPLATE SPEC (ready to build in Sheets):\n\nTAB 1 'Setup': inputs — take-home monthly income, currency, pay date.\nTAB 2 '50/30/20 Budget': auto-splits income into Needs (50%), Wants (30%), Savings/Debt (20%) using =income*0.5 etc, editable category rows under each bucket (rent, groceries, subscriptions, etc.), a live remaining-balance tracker with conditional formatting (green if on-budget, red if overspent).\nTAB 3 'Debt Snowball': table of debts (name, balance, APR, min payment); sorted ascending by balance via SORT(); extra-payment input cell that auto-cascades to the smallest debt first, computing payoff-month projection with a simple amortization formula chain (balance_next = balance*(1+APR/12) - payment) copied across 24 months, with a payoff-date summary cell using COUNTIF/MATCH.\nTAB 4 'Net Worth Tracker': monthly assets vs liabilities input, auto-charted trend line (built-in Sheets chart) so a user sees net worth grow.\nTAB 5 'Dashboard': single-page summary combining budget adherence %, total debt remaining, months-to-debt-free, and net worth trend chart, all pulling from the other tabs via QUERY/IMPORTRANGE-free formulas (self-contained, no external links, so it stays functional after buyer copies it).\nAll formulas and formatting are plain Google Sheets native functions — no Apps Script required, so it works instantly for any buyer on 'Make a copy'.",
+      "humanAction": "Create the actual Google Sheet from this spec, then list it on Gumroad with a $9 price point and a 3-screenshot preview.",
+      "launchSteps": [
+        {
+          "label": "Build the sheet in Google Sheets from the spec above",
+          "url": "https://sheets.google.com"
+        },
+        {
+          "label": "Create a Gumroad account",
+          "url": "https://gumroad.com/signup"
+        },
+        {
+          "label": "Connect payout",
+          "url": "https://app.gumroad.com/settings/payments"
+        },
+        {
+          "label": "Create product listing + upload the Sheet link/template file",
+          "url": "https://app.gumroad.com/products/new"
+        },
+        {
+          "label": "Publish and share in r/personalfinance / budgeting Facebook groups (per their self-promo rules)"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 45,
+      "killCriteria": "If zero sales after 30 days and 2 promotional posts, retire the listing rather than keep iterating on a dead product.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -119,5 +156,5 @@
       "autoEligible": false
     }
   },
-  "seq": 3
+  "seq": 4
 }
