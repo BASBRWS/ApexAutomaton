@@ -36,11 +36,11 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T03:26:57.669Z",
+        "lastCheckedAt": "2026-09-25T06:35:23.884Z",
         "reachable": true,
-        "daysLive": 1,
+        "daysLive": 2,
         "killDue": false,
-        "note": "1d live"
+        "note": "2d live"
       }
     },
     {
@@ -146,6 +146,38 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0005",
+      "createdAtCycle": 164,
+      "at": "2026-09-25T06:35:54.910Z",
+      "category": "digital-product",
+      "title": "Crypto Tax-Loss Harvesting Tracker (Google Sheets)",
+      "thesis": "Retail crypto traders in the US/UK/AU need a simple way to track unrealized losses across multiple wallets/exchanges and identify harvest opportunities before year-end deadlines. This is a recurring seasonal need (Q4 spike) that complements my existing DCA/rebalance/position-sizing templates — same buyer funnel, low cost to produce, sells on Gumroad/Etsy alongside the others.",
+      "deliverable": "Google Sheets template with tabs: (1) Holdings Ledger — columns for Asset, Exchange/Wallet, Purchase Date, Cost Basis, Quantity, Current Price (manual or GOOGLEFINANCE-style entry note since crypto isn't native), Unrealized Gain/Loss, Days Held (for short/long-term classification); (2) Harvest Candidates — auto-filtered view (QUERY formula) showing only positions with unrealized loss > user-set threshold, sorted by loss size descending; (3) Wash-Sale Reminder tab — since crypto currently has no wash-sale rule in the US (per current IRS guidance), a note explaining this plus a 30-day repurchase tracker for user's own risk tolerance / anticipated rule changes; (4) Summary tab — total realized gains, total harvestable losses, net position, simple bar chart. Includes instructions tab explaining cost-basis methods (FIFO/LIFO/HIFO) and a disclaimer that this is not tax advice. Formulas pre-built and tested logic described; ready for human to build in actual Google Sheets UI and export.",
+      "humanAction": "Build the Sheet from this spec in Google Sheets, publish as a Gumroad/Etsy product alongside existing templates, list for $15-25.",
+      "launchSteps": [
+        {
+          "label": "Open Google Sheets and build the 4 tabs per spec",
+          "url": "https://sheets.google.com"
+        },
+        {
+          "label": "Duplicate existing Gumroad product listing for template (reuse account)",
+          "url": "https://app.gumroad.com/products/new"
+        },
+        {
+          "label": "Upload the .xlsx/sheet export and set price $15-25"
+        },
+        {
+          "label": "Publish and cross-link from existing v0001/v0002 product pages"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 45,
+      "killCriteria": "If zero sales after 60 days live alongside the other templates, retire and stop producing new finance-template SKUs — the niche is saturated.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -156,5 +188,5 @@
       "autoEligible": false
     }
   },
-  "seq": 4
+  "seq": 5
 }
