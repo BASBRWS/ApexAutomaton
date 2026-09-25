@@ -201,7 +201,9 @@ const proposeVenture: Tool = {
     'For a Pump.fun devnet launch, include pumpToken with name, symbol and a ' +
     'public HTTPS metadata JSON URI. Creating a devnet token does not create ' +
     'real revenue. For a Metaplex Core NFT, include nftAsset with name and a ' +
-    'public HTTPS metadata JSON URI. NFT creation is not a sale. A human must ' +
+    'public HTTPS metadata JSON URI. NFT creation is not a sale. For an independent ' +
+    'Token-2022 mint, include splToken with name, symbol, URI and decimals 0-9. ' +
+    'It starts with zero supply; creation is not a sale. A human must ' +
     'approve the proposal before any on-chain creation. ' +
     'Keep at most a few proposals waiting; iterate and kill rather than pile up.',
   movesValue: false,
@@ -214,7 +216,7 @@ const proposeVenture: Tool = {
     '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
     '"estRevenueUsd": 50, "killCriteria": "when to abandon it", ' +
     '"nftAsset": { "name": "Example", "uri": "https://example.com/nft.json" } } ' +
-    '(optional: use pumpToken with name, symbol, uri instead of nftAsset)',
+    '(optional: use pumpToken with name, symbol, uri or splToken with name, symbol, uri, decimals instead of nftAsset)',
   async execute(input, ctx) {
     if (!ctx.ventureBook) {
       return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
@@ -231,6 +233,7 @@ const proposeVenture: Tool = {
       killCriteria: str(input.killCriteria),
       pumpToken: input.pumpToken,
       nftAsset: input.nftAsset,
+      splToken: input.splToken,
     };
     const res = addProposal(ctx.ventureBook, proposal, ctx.cycle, new Date().toISOString());
     if (!res.ok || !res.venture) {
@@ -289,6 +292,28 @@ const nftCreate: Tool = {
       signatures: [signature],
       transfer: { signature, to: 'CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d', lamports },
       note: `Metaplex Core devnet asset ${asset} for ${id}`,
+    };
+  },
+};
+
+const splCreate: Tool = {
+  name: 'spl_create',
+  description: 'Create one zero-supply Token-2022 mint with embedded metadata on devnet for an approved venture. The signer fixes and simulates the instructions and caps the wallet debit. Creation alone earns no revenue.',
+  movesValue: true,
+  inputHint: '{ "ventureId": "v0008" }',
+  async execute(input, ctx) {
+    const id = typeof input.ventureId === 'string' ? input.ventureId : '';
+    const venture = ctx.ventureBook && findVenture(ctx.ventureBook, id);
+    if (!venture || venture.status !== 'active' || !venture.splToken) {
+      return { summary: 'Token-2022 venture needs approval and valid metadata first' };
+    }
+    const { mint, signature, lamports } = await ctx.signer.createSplToken(venture);
+    venture.splToken = { ...venture.splToken, mint, signature };
+    return {
+      summary: `created zero-supply Token-2022 devnet mint ${mint} for ${id}`,
+      signatures: [signature],
+      transfer: { signature, to: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', lamports },
+      note: `Token-2022 devnet mint ${mint} for ${id}`,
     };
   },
 };
@@ -357,6 +382,7 @@ export function buildRegistry(): ToolRegistry {
     .register(proposeVenture)
     .register(pumpCreate)
     .register(nftCreate)
+    .register(splCreate)
     .register(rest)
     .register(transfer);
 }
@@ -370,6 +396,7 @@ export const BUILTIN_TOOLS = [
   proposeVenture,
   pumpCreate,
   nftCreate,
+  splCreate,
   rest,
   transfer,
 ];

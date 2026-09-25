@@ -99,6 +99,8 @@ export interface Venture {
   pumpToken?: { name: string; symbol: string; uri: string; mint?: string; signature?: string };
   /** Approved Metaplex Core devnet asset metadata. The signer owns creation. */
   nftAsset?: { name: string; uri: string; asset?: string; signature?: string };
+  /** Operator-approved Token-2022 mint with metadata stored on-chain. */
+  splToken?: { name: string; symbol: string; uri: string; decimals: number; mint?: string; signature?: string };
 }
 
 /** Per-category autonomy tracking. The "earn more autonomy" path: once a category

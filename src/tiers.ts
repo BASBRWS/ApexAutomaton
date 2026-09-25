@@ -7,7 +7,7 @@ import type { Tier } from './types.js';
  * NORMAL and above — never when the agent is fighting to survive. This is the
  * single source of truth the loop uses to filter and validate the LLM's choice.
  */
-export function toolNamesForCycle(policy: TierPolicy, cfg: Config, pumpReady = false, nftReady = false): string[] {
+export function toolNamesForCycle(policy: TierPolicy, cfg: Config, pumpReady = false, nftReady = false, splReady = false): string[] {
   let names = [...policy.tools];
   const survivalTiers: Tier[] = ['CRITICAL', 'LOW'];
   if (cfg.features.extraToolsEnabled && !survivalTiers.includes(policy.tier)) {
@@ -20,6 +20,7 @@ export function toolNamesForCycle(policy: TierPolicy, cfg: Config, pumpReady = f
   }
   if (cfg.pump?.enabled && pumpReady && !survivalTiers.includes(policy.tier)) names.push('pump_create');
   if (cfg.nft?.enabled && nftReady && !survivalTiers.includes(policy.tier)) names.push('nft_create');
+  if (cfg.spl?.enabled && splReady && !survivalTiers.includes(policy.tier)) names.push('spl_create');
   return names;
 }
 

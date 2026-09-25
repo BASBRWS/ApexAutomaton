@@ -10,7 +10,9 @@ import { KILL_FILE } from '../paths.js';
 import { saveState } from '../state.js';
 import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.js';
 import type { Venture } from '../ventures/types.js';
-import { validNftAsset, validPumpToken } from '../ventures/store.js';
+import { validNftAsset, validPumpToken, validSplToken } from '../ventures/store.js';
+import { buildSplMintTx, splMintSpace } from './spl-mint.js';
+import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
 /**
@@ -362,6 +364,51 @@ export class Signer {
     delete this.state.pendingTransfer;
     saveState(this.state);
     return { asset: assetKeypair.publicKey.toBase58(), signature, lamports: debit };
+  }
+
+  /** Create a zero-supply Token-2022 mint with metadata embedded on-chain. */
+  async createSplToken(venture: Venture): Promise<{ mint: string; signature: string; lamports: number }> {
+    await assertDevnetConnection(this.connection);
+    if (!this.cfg.spl.enabled) throw new PolicyError('Token-2022 devnet feature disabled');
+    if (venture.status !== 'active' || !venture.splToken) throw new PolicyError('venture is not approved for Token-2022 creation');
+    const metadata = validSplToken(venture.splToken);
+    if (!metadata) throw new PolicyError('invalid approved Token-2022 metadata');
+    if (venture.splToken.mint || this.state.splMints?.[venture.id]) throw new PolicyError('venture already minted');
+    if (this.state.pendingTransfer) throw new PolicyError('unreconciled signed transaction');
+
+    const mint = Keypair.generate();
+    const { rentSpace } = splMintSpace(metadata, mint.publicKey, this.keypair.publicKey);
+    const rent = await this.connection.getMinimumBalanceForRentExemption(rentSpace, 'confirmed');
+    const tx = buildSplMintTx(metadata, mint.publicKey, this.keypair.publicKey, rent);
+    tx.feePayer = this.keypair.publicKey;
+    tx.recentBlockhash = (await this.connection.getLatestBlockhash('confirmed')).blockhash;
+    const balanceBefore = await this.connection.getBalance(this.keypair.publicKey, 'confirmed');
+    const simulation = await this.connection.simulateTransaction(tx, [this.keypair, mint], [this.keypair.publicKey]);
+    if (simulation.value.err) throw new PolicyError(`Token-2022 simulation failed: ${JSON.stringify(simulation.value.err)}`);
+    const balanceAfter = simulation.value.accounts?.[0]?.lamports;
+    if (typeof balanceAfter !== 'number' || balanceAfter > balanceBefore) {
+      throw new PolicyError('Token-2022 simulation did not return a usable wallet balance');
+    }
+    const debit = balanceBefore - balanceAfter + 100_000;
+    const destination = TOKEN_2022_PROGRAM_ID.toBase58();
+    const decision = evaluatePolicy({
+      ...this.buildPolicyInput({ to: destination, lamports: debit, reason: `Token-2022 ${venture.id}` }),
+      allowlist: [destination],
+    });
+    if (!decision.ok) throw new PolicyError(decision.reason);
+    if (debit > solToLamports(this.cfg.spl.maxCreateSol)) throw new PolicyError('Token-2022 creation exceeds protocol cap');
+    const signature = await sendTransfer(this.connection, tx, [this.keypair, mint], (signed) => {
+      this.state.pendingTransfer = { signature: signed, to: destination, lamports: debit, at: new Date().toISOString() };
+      saveState(this.state);
+    });
+    this.cycleTxCount += 1;
+    this.state.caps.txCountToday += 1;
+    this.state.caps.lamportsSpentToday += debit;
+    this.state.splMints ??= {};
+    this.state.splMints[venture.id] = { mint: mint.publicKey.toBase58(), signature, at: new Date().toISOString() };
+    delete this.state.pendingTransfer;
+    saveState(this.state);
+    return { mint: mint.publicKey.toBase58(), signature, lamports: debit };
   }
 
   /**
