@@ -25,7 +25,7 @@ export interface ToolContext {
   revenue?: RevenueAdapter;
   /** real market prices this cycle (USD/unit), for the trade tool. */
   prices: PriceMap;
-  /** gross-exposure cap in USD for THIS cycle (the SOL cap × genesis SOL price). */
+  /** gross-exposure cap in USD for THIS cycle (the SOL cap × observed SOL price). */
   maxGrossExposureUsd: number;
   tier: Tier;
   policy: TierPolicy;

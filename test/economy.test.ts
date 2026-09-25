@@ -34,4 +34,9 @@ describe('equity → SOL → tier', () => {
     // dust
     expect(tierForEquity(0.1, 150, cfg)).toBe('DEAD');
   });
+  it('measures the SOL goal at the observed price rather than the genesis quote', () => {
+    const equityUsd = 216.38;
+    expect(equityToSol(equityUsd, 120.97)).toBeCloseTo(1.7887, 3);
+    expect(equityToSol(equityUsd, 116.96)).toBeGreaterThan(1.85);
+  });
 });

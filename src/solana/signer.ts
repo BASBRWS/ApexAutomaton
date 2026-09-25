@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import bs58 from 'bs58';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { loadConfig, solToLamports, type Config } from '../config.js';
 import { KILL_FILE } from '../paths.js';
 import { saveState } from '../state.js';
 import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.js';
+import type { Venture } from '../ventures/types.js';
+import { validPumpToken } from '../ventures/store.js';
 import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
 /**
@@ -115,7 +117,7 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
 /** Thrown when the signer refuses a proposal. */
 export class PolicyError extends Error {
   constructor(reason: string) {
-    super(`signer rejected transfer: ${reason}`);
+    super(`signer rejected action: ${reason}`);
     this.name = 'PolicyError';
   }
 }
@@ -232,6 +234,66 @@ export class Signer {
     saveState(this.state);
 
     return { signature, lamports: proposal.lamports, to: proposal.to };
+  }
+
+  /** Mint one SOL-paired Pump.fun token for an approved venture. The signer
+   * constructs the instruction itself; no LLM-supplied instruction is accepted.
+   * Preflight checks the wallet debit against both protocol and general caps. */
+  async createPumpToken(venture: Venture): Promise<{ mint: string; signature: string; lamports: number }> {
+    await assertDevnetConnection(this.connection);
+    if (!this.cfg.pump.enabled) throw new PolicyError('Pump.fun devnet feature disabled');
+    if (venture.status !== 'active' || !venture.pumpToken) throw new PolicyError('venture is not approved for a Pump.fun launch');
+    const metadata = validPumpToken(venture.pumpToken);
+    if (!metadata) throw new PolicyError('invalid approved token metadata');
+    if (venture.pumpToken.mint || this.state.pumpMints?.[venture.id]) throw new PolicyError('venture already minted');
+    if (this.state.pendingTransfer) throw new PolicyError('unreconciled signed transaction');
+    const date = new Date().toISOString().slice(0, 10);
+    if (Object.values(this.state.pumpMints ?? {}).some((mint) => mint.at.startsWith(date))) {
+      throw new PolicyError('one Pump.fun launch per UTC day');
+    }
+    const { PUMP_PROGRAM_ID, PUMP_SDK } = await import('@pump-fun/pump-sdk');
+    const mint = Keypair.generate();
+    const ix = await PUMP_SDK.createV2Instruction({
+      mint: mint.publicKey, user: this.keypair.publicKey, creator: this.keypair.publicKey,
+      ...metadata, mayhemMode: false, holderReward: false,
+    });
+    if (!ix.programId.equals(PUMP_PROGRAM_ID) ||
+        ix.keys.some((k) => k.isSigner && !k.pubkey.equals(mint.publicKey) && !k.pubkey.equals(this.keypair.publicKey))) {
+      throw new PolicyError('unexpected Pump.fun instruction or signer');
+    }
+    const tx = new Transaction().add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }), ix);
+    tx.feePayer = this.keypair.publicKey;
+    tx.recentBlockhash = (await this.connection.getLatestBlockhash('confirmed')).blockhash;
+    const balanceBefore = await this.connection.getBalance(this.keypair.publicKey, 'confirmed');
+    const simulation = await this.connection.simulateTransaction(tx, [this.keypair, mint], [this.keypair.publicKey]);
+    if (simulation.value.err) throw new PolicyError(`Pump.fun simulation failed: ${JSON.stringify(simulation.value.err)}`);
+    const balanceAfter = simulation.value.accounts?.[0]?.lamports;
+    if (typeof balanceAfter !== 'number' || balanceAfter > balanceBefore) {
+      throw new PolicyError('Pump.fun simulation did not return a usable wallet balance');
+    }
+    // Reserve 100,000 lamports for network fees and fee variation. The program is fixed,
+    // and an uncertain confirmation always blocks new value actions.
+    const debit = balanceBefore - balanceAfter + 100_000;
+    const decision = evaluatePolicy({
+      ...this.buildPolicyInput({ to: PUMP_PROGRAM_ID.toBase58(), lamports: debit, reason: `Pump.fun ${venture.id}` }),
+      allowlist: [PUMP_PROGRAM_ID.toBase58()],
+    });
+    if (!decision.ok) throw new PolicyError(decision.reason);
+    if (debit > solToLamports(this.cfg.pump.maxCreateSol)) throw new PolicyError('Pump.fun creation exceeds protocol cap');
+    const signature = await sendTransfer(this.connection, tx, [this.keypair, mint], (signed) => {
+      this.state.pendingTransfer = {
+        signature: signed, to: PUMP_PROGRAM_ID.toBase58(), lamports: debit, at: new Date().toISOString(),
+      };
+      saveState(this.state);
+    });
+    this.state.caps.txCountToday += 1;
+    this.state.caps.lamportsSpentToday += debit;
+    this.cycleTxCount += 1;
+    this.state.pumpMints ??= {};
+    this.state.pumpMints[venture.id] = { mint: mint.publicKey.toBase58(), signature, at: new Date().toISOString() };
+    delete this.state.pendingTransfer;
+    saveState(this.state);
+    return { mint: mint.publicKey.toBase58(), signature, lamports: debit };
   }
 
   /**

@@ -11,7 +11,7 @@ import {
   type Order,
 } from '../trading/desk.js';
 import type { TransferProposal } from '../types.js';
-import { addProposal, type ProposalInput } from '../ventures/store.js';
+import { addProposal, findVenture, type ProposalInput } from '../ventures/store.js';
 import { ToolRegistry, type Tool } from './registry.js';
 
 /**
@@ -190,14 +190,17 @@ const proposeVenture: Tool = {
   name: 'propose_venture',
   description:
     'Reach beyond trading into the REAL economy: propose ONE concrete, LEGAL ' +
-    'money-making venture and BUILD its deliverable now. Scan broadly — a digital ' +
-    'product you can create (template, prompt-pack, e-book, tool), a piece of ' +
-    'content, a service, an arbitrage — any legal category. You must actually ' +
+    'money-making venture and BUILD its deliverable now. Scan broadly across ' +
+    'DeFi apps, lending tools, NFT utility, Solana token launches, Web3 services, ' +
+    'digital products, content, or arbitrage. You must actually ' +
     'produce the deliverable (the draft/plan/copy/code), not just an idea. It goes ' +
     'into an approval queue: a human takes the one step you legally cannot (open the ' +
     'account, accept the platform terms, connect payments, publish, ship), then real ' +
     'revenue they report is folded into your book. Never propose anything that breaks ' +
     'a platform’s terms, impersonates a person or brand, fakes reviews, or spams. ' +
+    'For a Pump.fun devnet launch, include pumpToken with name, symbol and a ' +
+    'public HTTPS metadata JSON URI. Creating a devnet token does not create ' +
+    'real revenue. A human must approve the proposal before any on-chain launch. ' +
     'Keep at most a few proposals waiting; iterate and kill rather than pile up.',
   movesValue: false,
   inputHint:
@@ -207,7 +210,8 @@ const proposeVenture: Tool = {
     '"https://gumroad.com/signup" }, { "label": "Connect payout", "url": ' +
     '"https://app.gumroad.com/settings/payments" }, { "label": "Create product + upload the file", ' +
     '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
-    '"estRevenueUsd": 50, "killCriteria": "when to abandon it" }',
+    '"estRevenueUsd": 50, "killCriteria": "when to abandon it", ' +
+    '"pumpToken": { "name": "Example", "symbol": "EXAMPLE", "uri": "https://example.com/metadata.json" } }',
   async execute(input, ctx) {
     if (!ctx.ventureBook) {
       return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
@@ -222,6 +226,7 @@ const proposeVenture: Tool = {
       estCostUsd: Number(input.estCostUsd),
       estRevenueUsd: Number(input.estRevenueUsd),
       killCriteria: str(input.killCriteria),
+      pumpToken: input.pumpToken,
     };
     const res = addProposal(ctx.ventureBook, proposal, ctx.cycle, new Date().toISOString());
     if (!res.ok || !res.venture) {
@@ -231,6 +236,33 @@ const proposeVenture: Tool = {
     return {
       summary: `proposed venture ${v.id} "${v.title}" (${v.category}) — awaiting your approval`,
       note: `venture ${v.id} queued: ${v.humanAction.slice(0, 120)}`,
+    };
+  },
+};
+
+const pumpCreate: Tool = {
+  name: 'pump_create',
+  description:
+    'Create one SOL-paired Pump.fun token on devnet for an already approved ' +
+    'venture with a public HTTPS metadata URI. The signer constructs and ' +
+    'simulates the fixed instruction and enforces the daily and transaction caps. ' +
+    'Devnet tokens and launches have no real revenue. At most one launch per UTC day.',
+  movesValue: true,
+  inputHint: '{ "ventureId": "v0006" }',
+  async execute(input, ctx) {
+    const id = typeof input.ventureId === 'string' ? input.ventureId : '';
+    const venture = ctx.ventureBook && findVenture(ctx.ventureBook, id);
+    if (!venture) return { summary: 'Pump.fun venture not found' };
+    if (venture.status !== 'active' || !venture.pumpToken) {
+      return { summary: 'Pump.fun venture needs approval and valid token metadata first' };
+    }
+    const { mint, signature, lamports } = await ctx.signer.createPumpToken(venture);
+    venture.pumpToken = { ...venture.pumpToken, mint, signature };
+    return {
+      summary: `created Pump.fun devnet mint ${mint} for ${id}`,
+      signatures: [signature],
+      transfer: { signature, to: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', lamports },
+      note: `Pump.fun devnet mint ${mint} for ${id}`,
     };
   },
 };
@@ -297,6 +329,7 @@ export function buildRegistry(): ToolRegistry {
     .register(writeJournal)
     .register(reflect)
     .register(proposeVenture)
+    .register(pumpCreate)
     .register(rest)
     .register(transfer);
 }
@@ -308,6 +341,7 @@ export const BUILTIN_TOOLS = [
   writeJournal,
   reflect,
   proposeVenture,
+  pumpCreate,
   rest,
   transfer,
 ];

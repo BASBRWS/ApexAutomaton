@@ -71,7 +71,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton — setup <span class="muted" style="font-size:12px">v0.2.0</span></h1>
+      <h1>Apex Automaton — setup <span class="muted" style="font-size:12px">v0.3.0</span></h1>
       <div class="muted">Fill in your keys step by step. This page builds a correct
         <code>.env</code> for you. It runs entirely in your browser — nothing is
         sent anywhere. · <a href="../dashboard/">View dashboard →</a></div>
@@ -275,6 +275,8 @@
         lines.push(`TRADING_SPREAD_BPS=${get('TRADING_SPREAD_BPS')}`);
         lines.push(`TRADING_SLIPPAGE_BPS=${get('TRADING_SLIPPAGE_BPS')}`);
         lines.push('YIELD_APY=0');
+        lines.push('PUMP_DEVNET_ENABLED=0');
+        lines.push('PUMP_MAX_CREATE_SOL=0.05');
         lines.push('');
         lines.push('# --- Seeding (devnet airdrops) ---');
         lines.push('SEED_AIRDROP_SOL=1.0');

@@ -70,10 +70,30 @@ describe('venture proposals', () => {
 
   it('caps the number of open proposals so the queue stays a decision list', () => {
     const book = emptyVentureBook();
-    for (let i = 0; i < 5; i++) expect(addProposal(book, proposal(), i, 'now').ok).toBe(true);
+    for (let i = 0; i < 5; i++) expect(addProposal(book, proposal({ category: `category-${i}` }), i, 'now').ok).toBe(true);
     const sixth = addProposal(book, proposal(), 6, 'now');
     expect(sixth.ok).toBe(false);
     expect(sixth.reason).toMatch(/queue full/i);
+  });
+
+  it('requires valid metadata and approval for a Pump.fun venture', () => {
+    const book = emptyVentureBook();
+    expect(addProposal(book, proposal({ category: 'pumpfun', pumpToken: {
+      name: 'Apex Test', symbol: 'APEX', uri: 'https://example.com/apex.json',
+    } }), 1, 'now').venture?.pumpToken).toEqual({
+      name: 'Apex Test', symbol: 'APEX', uri: 'https://example.com/apex.json',
+    });
+    expect(addProposal(book, proposal({ category: 'pumpfun', pumpToken: {
+      name: 'Bad', symbol: 'BAD', uri: 'http://example.com/metadata.json',
+    } }), 2, 'now').ok).toBe(false);
+    expect(markLive(book, 'v0001', 'https://example.com/listing', 2, 'now').reason).toMatch(/approve Pump.fun metadata/);
+  });
+
+  it('limits open and active ventures per category to force broader exploration', () => {
+    const book = emptyVentureBook();
+    for (let i = 0; i < 3; i++) expect(addProposal(book, proposal({ title: `Idea ${i}` }), i, 'now').ok).toBe(true);
+    expect(addProposal(book, proposal({ title: 'Another template' }), 4, 'now').reason).toMatch(/another market/);
+    expect(addProposal(book, proposal({ category: 'defi-app' }), 5, 'now').ok).toBe(true);
   });
 });
 

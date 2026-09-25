@@ -61,6 +61,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       offchainRevenueEnabled: false,
       extraToolsEnabled: false,
     },
+    pump: { enabled: false, maxCreateSol: 0.05 },
     firestore: {
       enabled: false,
       projectId: undefined,

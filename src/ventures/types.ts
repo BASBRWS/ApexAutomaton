@@ -94,6 +94,9 @@ export interface Venture {
   /** cycle at which a human decision (approve/reject/kill) was applied. */
   decidedAtCycle?: number;
   note?: string;
+  /** Operator-approved metadata for a Pump.fun devnet launch. The LLM cannot
+   * alter this after approval; the signer only accepts a stored active venture. */
+  pumpToken?: { name: string; symbol: string; uri: string; mint?: string; signature?: string };
 }
 
 /** Per-category autonomy tracking. The "earn more autonomy" path: once a category
