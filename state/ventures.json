@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T20:37:20.844Z",
+        "lastCheckedAt": "2026-09-25T20:53:25.539Z",
         "reachable": true,
         "daysLive": 2,
         "killDue": false,
@@ -252,6 +252,38 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0008",
+      "createdAtCycle": 191,
+      "at": "2026-09-25T20:54:02.549Z",
+      "category": "service",
+      "title": "Personalized Spreadsheet Customization & Setup Service",
+      "thesis": "I already built 5 finished Google Sheets templates (position sizing, DCA/rebalance, leverage/liquidation risk, debt snowball, tax-loss harvesting). Many buyers want a template but need it personalized to their own portfolio, broker, or currency — that friction kills self-serve digital-product sales. Selling a 30-60 min customization service on top of the free/cheap templates captures higher-margin revenue per client with near-zero incremental cost, and cross-sells the digital products already in the queue.",
+      "deliverable": "GIG DESCRIPTION (ready to paste to Fiverr/Upwork):\n\nTitle: 'I will customize your crypto/trading Google Sheet to your exact portfolio'\n\nWhat you get:\n- I take one of 5 existing templates (Position Sizing, DCA & Rebalance Planner, Leverage/Liquidation Calculator, Debt Snowball, Tax-Loss Harvest Tracker) OR build a lightweight custom tab from scratch\n- Inputs wired to YOUR asset list, base currency, exchange fee schedule, and risk tolerance\n- Conditional formatting + auto-alerts (color-coded thresholds) tuned to your stop/target rules\n- 20-min recorded Loom walkthrough of how to use it\n\nPackages:\n- Basic ($25): customize 1 existing template with your tickers/currency\n- Standard ($45): customize + add 2 custom formulas/tabs (e.g. blended cost basis, custom risk score)\n- Premium ($75): full build from a blank sheet to your exact workflow, plus 1 revision round\n\nDelivery: 48 hours. Requires: your asset list, base currency, and (optional) sample CSV export from your exchange.\n\nFAQ:\nQ: Do you manage my money or give financial advice? A: No — this is spreadsheet engineering only, not investment advice.\nQ: Can you connect live prices? A: Yes, via GOOGLEFINANCE() for supported tickers; crypto via IMPORTXML/ImportJSON where GOOGLEFINANCE lacks coverage.",
+      "humanAction": "Create the Fiverr/Upwork gig using this exact description, set pricing tiers as listed, and fulfill first orders using the existing 5 templates as the base.",
+      "launchSteps": [
+        {
+          "label": "Create/reuse Fiverr seller account",
+          "url": "https://www.fiverr.com/join"
+        },
+        {
+          "label": "Create new gig with this description and 3-tier pricing",
+          "url": "https://www.fiverr.com/seller_dashboard"
+        },
+        {
+          "label": "Publish gig"
+        },
+        {
+          "label": "On first order, deliver customized copy of relevant template + Loom walkthrough"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 45,
+      "killCriteria": "No orders within 30 days of publishing, or fewer than 1 five-star review after 3 completed gigs — then pull the gig and fold effort back into the free templates.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -274,5 +306,5 @@
       "autoEligible": false
     }
   },
-  "seq": 7
+  "seq": 8
 }
