@@ -1,7 +1,7 @@
 import type { Config } from '../config.js';
 import type { LLMClient } from '../llm/client.js';
 import { usdCostOf } from '../llm/pricing.js';
-import { composeSoul, readSoul, writeSoul } from '../soul.js';
+import { composeSoul, readSoul, strategyOnly, writeSoul } from '../soul.js';
 import type { Score } from '../types.js';
 import { lessonsDigest } from './lessons.js';
 
@@ -39,7 +39,7 @@ export async function autoReflect(
   if (digest.startsWith('(no lessons')) {
     return { ok: false, costUsd: 0, note: 'auto-reflect skipped: no lessons yet' };
   }
-  const currentNotes = readSoul();
+  const currentNotes = strategyOnly(readSoul());
 
   const system = [
     'You are Apex Automaton, an autonomous trading + venture agent. You are consolidating',

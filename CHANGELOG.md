@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.5.1, 2026-09-25
+
+- Restore the full journal as the default USD equity chart. Keep a separate live-price SOL view, which starts at cycle 185 because older entries used a fixed conversion price.
+- Preserve a growing factual history in SOUL.md from the durable lessons ledger while keeping strategy notes concise. Show only recent history in each model prompt so memory growth does not make every cycle more expensive.
+
+### Migration
+
+The first cycle backfills the factual SOUL.md history from state/lessons.ndjson. Trading state, score and journal are unchanged.
+
 ## 0.5.0, 2026-09-25
 
 - Add an operator-approved Token-2022 devnet mint with embedded on-chain metadata and zero initial supply. The signer builds four fixed instructions in one atomic transaction and checks simulation, `SPL_MAX_CREATE_SOL` and the existing caps.

@@ -1,4 +1,4 @@
-# Apex Automaton v0.5.0
+# Apex Automaton v0.5.1
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -112,7 +112,7 @@ observe prices → think → trade → burn → heartbeat → score → persist 
 7. **Burn:** deduct this cycle's real LLM USD cost from the book. Then do one tiny
    **on-chain heartbeat** memo transaction on devnet as proof-of-life.
 8. **Update score** (equity, peak, net PnL), append to the journal.
-9. Update SOUL.md only if the agent chose to. Persist state. End tick.
+9. Record factual lessons in SOUL.md and consolidate strategy notes on schedule. Persist state. End tick.
 
 ## Survival tiers — a gradient, not a ceiling
 

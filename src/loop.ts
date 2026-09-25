@@ -4,7 +4,7 @@ import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
 import { loadConstitution } from './constitution/index.js';
-import { readSoul, ensureSoul } from './soul.js';
+import { soulForPrompt, ensureSoul, syncSoulHistory } from './soul.js';
 import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } from './journal.js';
 import { assessLossTrend } from './losstrend.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
@@ -38,7 +38,7 @@ import {
   updateVentureMonitor,
 } from './ventures/store.js';
 import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
-import { appendLesson, lessonsDigest, realizedFromClose } from './memory/lessons.js';
+import { appendLesson, lessonsDigest, realizedFromClose, recentLessons } from './memory/lessons.js';
 import { autoReflect } from './memory/reflect.js';
 import { AnthropicClient } from './llm/anthropic.js';
 import type { LLMClient } from './llm/client.js';
@@ -82,6 +82,7 @@ function solPriceOf(prices: PriceMap, state: AutomatonState): number {
 export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const cfg = deps.cfg ?? loadConfig();
   ensureSoul();
+  syncSoulHistory(recentLessons(Number.MAX_SAFE_INTEGER));
   const connection = makeConnection(cfg);
   const store = makeStateStore(cfg);
   const state = await store.load(cfg);
@@ -272,7 +273,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   const system = buildSystemPrompt({
     constitution: loadConstitution(),
-    soul: readSoul(),
+    soul: soulForPrompt(),
     tools,
     railsSummary: railsSummary(cfg, maxGrossExposureUsd),
     tradableAssets: cfg.trading.assets,
@@ -564,6 +565,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     note: noteParts.join(' | ') || undefined,
   };
   state.lastRunAt = now();
+  syncSoulHistory(recentLessons(Number.MAX_SAFE_INTEGER));
   await store.save(state);
   if (ventureBook) saveVentureBook(ventureBook);
   appendEntry(entry);

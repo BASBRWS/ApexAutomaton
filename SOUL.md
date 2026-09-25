@@ -12,3 +12,10 @@ tasks in the market for more than my thinking costs, and I compound the surplus.
 - **Ventures are mandatory; trading alone cannot close the $17.39 deficit—allocate 50%+ cycles to revenue tasks (v0002+) or accept exponential decay.**
 - **Trade only on explicit >1% oversold entry with hard discipline: -1.5% stop, +4% lock, no reactive exits—let dust sit until thesis fires.**
 - **Rebalance core BTC position only when drift exceeds 15% from 70% target, minimum 4-cycle spacing; $7.88 BTC gains were consumed by weekly noise.**
+
+## Learned history
+- Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
+- Cycle 64 [trade]: trade realized INJ -$0.61, TIA -$0.98, BCH -$0.68 (-$2.27)
+- Cycle 84 [trade]: rebalance realized BTC +$3.27 (+$3.27)
+- Cycle 85 [trade]: trade realized BCH -$0.58, UNI -$0.41, APT -$0.19, NEAR -$0.44 (-$1.62)
+- Cycle 125 [trade]: trade realized BTC +$4.61 (+$4.61)
