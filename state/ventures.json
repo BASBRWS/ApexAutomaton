@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T18:11:36.250Z",
+        "lastCheckedAt": "2026-09-25T18:26:54.701Z",
         "reachable": true,
         "daysLive": 2,
         "killDue": false,
@@ -178,6 +178,42 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0006",
+      "createdAtCycle": 185,
+      "at": "2026-09-25T18:27:27.157Z",
+      "category": "content",
+      "title": "Cross-Asset Weekly Brief — a Substack newsletter",
+      "thesis": "I already synthesize crypto, FX, commodities and equities data every cycle. A concise weekly brief distilling correlations and regime shifts (e.g. 'BTC flat, DXY soft, gold near highs — what it means for risk assets') is a real, testable content product. Legal, no ToS conflict, distribution via Substack's free tier and organic sharing (Twitter/X, Reddit r/CryptoCurrency, r/algotrading). Monetizes via paid subscription tier once a free-issue track record exists.",
+      "deliverable": "DRAFT ISSUE #1 — 'Cross-Asset Weekly Brief, Sept 25 2026'\n\n---\nTHIS WEEK IN ONE LINE: Crypto majors grinding sideways-up on light volume while gold and silver sit near record highs — a classic 'quiet before a macro print' setup.\n\n1) CRYPTO: BTC $84,009 (+0.17% WoW), ETH $2,696 (+0.29%). Realized vol is compressing — BTC has moved <1% intraday for 5 straight sessions. Low vol regimes after a drawdown often resolve directionally within 1-2 weeks; watch $86k (recent local high) and $81k (recent local low) as the box to break.\n\n2) GOLD & SILVER: PAXG $4,280, XAG $64.35 — both near cycle highs. This is the 'debasement trade': real yields soft, central banks still net buyers. If you're long crypto, gold is the natural hedge leg, not cash — it has held up better than BTC on every recent risk-off day this quarter.\n\n3) FX: EURUSD 1.1399, GBPUSD 1.325, both flat. Dollar index sideways = no drag or tailwind on crypto risk this week. A break below 1.13 EURUSD would signal fresh dollar strength — historically a headwind for BTC in the following 5-10 days.\n\n4) EQUITIES: SPY $770.91, QQQ $744.64 — mega-cap tech (NVDA, MSFT) drifting lower into month-end, small negative days stacking. Not a crash signal, just a pause after a strong run. Correlation between QQQ and BTC has been rising (both 'risk-on' proxies) — a real equity drawdown would likely drag crypto with it.\n\nTAKEAWAY: Low-vol coiling in crypto + gold near highs + equities pausing = a market waiting for a catalyst (next CPI/FOMC). Reduce position sizing until range breaks; don't chase either direction inside the box.\n\n---\n(Format continues weekly, ~400-600 words, same five sections, free for first 4 issues to build an archive, then a paid tier at $5/mo for subscriber-only deeper dives.)",
+      "humanAction": "Create the Substack publication, paste this draft as issue #1, publish, and share the link once.",
+      "launchSteps": [
+        {
+          "label": "Create Substack account",
+          "url": "https://substack.com/sign-up"
+        },
+        {
+          "label": "Create new publication",
+          "url": "https://substack.com/create"
+        },
+        {
+          "label": "Paste draft as first post and publish"
+        },
+        {
+          "label": "Share link on X / Reddit r/CryptoCurrency for initial readers"
+        },
+        {
+          "label": "After 4 free issues, enable paid tier",
+          "url": "https://substack.com/settings"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 30,
+      "killCriteria": "If fewer than 20 free subscribers after 6 weekly issues, or zero paid conversions after enabling the paid tier for 4 weeks, kill it and try a different content niche.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -188,5 +224,5 @@
       "autoEligible": false
     }
   },
-  "seq": 5
+  "seq": 6
 }
