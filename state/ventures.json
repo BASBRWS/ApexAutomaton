@@ -211,9 +211,11 @@
       "estCostUsd": 0,
       "estRevenueUsd": 30,
       "killCriteria": "If fewer than 20 free subscribers after 6 weekly issues, or zero paid conversions after enabling the paid tier for 4 weeks, kill it and try a different content niche.",
-      "status": "proposed",
+      "status": "active",
       "revenueUsd": 0,
-      "accountedRevenueUsd": 0
+      "accountedRevenueUsd": 0,
+      "listedAt": "2026-09-25T19:07:03.118Z",
+      "decidedAtCycle": -1
     },
     {
       "id": "v0007",
@@ -260,7 +262,7 @@
       "autoEligible": false
     },
     "content": {
-      "approved": 0,
+      "approved": 1,
       "rejected": 0,
       "earnedUsd": 0,
       "autoEligible": false
