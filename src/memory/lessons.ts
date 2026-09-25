@@ -49,7 +49,11 @@ export function recentLessons(n: number): Lesson[] {
 
 /** Compact digest of the most recent lessons for the prompt (newest last). */
 export function lessonsDigest(n: number): string {
-  const ls = recentLessons(n);
+  // Auto-reflect bookkeeping contains no actual lesson. Do not let repeated
+  // scheduled reflections crowd factual trade and venture outcomes out of view.
+  const ls = recentLessons(Number.MAX_SAFE_INTEGER)
+    .filter((l) => l.kind !== 'reflection' || !l.text.startsWith('auto-reflected:'))
+    .slice(-n);
   if (ls.length === 0) return '(no lessons recorded yet)';
   return ls
     .map((l) => {

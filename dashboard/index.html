@@ -40,6 +40,9 @@
       .tile .v { font-size: 22px; font-weight: 600; margin-top: 4px; }
       .tile .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
       svg { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+      .chart-controls { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+      .chart-controls button { cursor: pointer; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); padding: 5px 12px; }
+      .chart-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
       th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
       th:first-child, td:first-child { text-align: left; }
@@ -97,7 +100,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.3.0</span></h1>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.5.1</span></h1>
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
@@ -106,8 +109,13 @@
       <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
 
-      <h2>Book equity over time (SOL)</h2>
-      <svg id="chart" viewBox="0 0 900 260" aria-label="equity in SOL over cycles chart"></svg>
+      <h2>Book equity over time</h2>
+      <div class="chart-controls">
+        <button type="button" id="chart-usd" aria-pressed="true">USD, all cycles</button>
+        <button type="button" id="chart-sol" aria-pressed="false">SOL, live prices</button>
+        <span id="chart-note" class="muted"></span>
+      </div>
+      <svg id="chart" viewBox="0 0 900 260" aria-label="equity in USD over all cycles chart"></svg>
 
       <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's decision + its full deliberation, newest first</span></h2>
       <div id="reasoning" class="feed"></div>
@@ -216,7 +224,7 @@
         return el;
       }
 
-      function drawChart(entries) {
+      function drawChart(entries, unit) {
         const NS = 'http://www.w3.org/2000/svg';
         const svg = document.getElementById('chart');
         svg.innerHTML = '';
@@ -230,7 +238,9 @@
 
         const W = 900, H = 260, m = { l: 72, r: 16, t: 14, b: 40 };
         const iw = W - m.l - m.r, ih = H - m.t - m.b;
-        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: Number(e.equitySol) || 0 }));
+        const isUsd = unit === 'usd';
+        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: Number(isUsd ? e.equityUsd : e.equitySol) || 0 }));
+        const formatY = (value) => isUsd ? '$' + value.toFixed(2) : value.toFixed(3);
 
         if (pts.length === 0) {
           add('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 13 }, 'no cycles yet');
@@ -239,7 +249,10 @@
 
         const ys = pts.map((p) => p.y), xs = pts.map((p) => p.x);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
-        if (maxY - minY < 0.0002) { maxY += 0.05; minY = Math.max(0, minY - 0.05); }
+        if (maxY - minY < (isUsd ? 0.02 : 0.0002)) {
+          maxY += isUsd ? 5 : 0.05;
+          minY = Math.max(0, minY - (isUsd ? 5 : 0.05));
+        }
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const sx = (x) => m.l + (maxX === minX ? iw / 2 : ((x - minX) / (maxX - minX)) * iw);
         const sy = (y) => m.t + ih - ((y - minY) / (maxY - minY)) * ih;
@@ -250,7 +263,7 @@
           const v = minY + ((maxY - minY) * i) / yticks;
           const yy = sy(v);
           add('line', { x1: m.l, y1: yy, x2: m.l + iw, y2: yy, stroke: 'var(--line)', 'stroke-width': i === 0 ? 1 : 0.5, opacity: i === 0 ? 1 : 0.5 });
-          add('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, v.toFixed(3));
+          add('text', { x: m.l - 8, y: yy + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, formatY(v));
         }
         // X axis line
         add('line', { x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih, stroke: 'var(--line)', 'stroke-width': 1 });
@@ -262,14 +275,14 @@
         });
         // Axis titles
         add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, 'cycle');
-        add('text', { x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 16 ${m.t + ih / 2})` }, 'equity SOL');
+        add('text', { x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 16 ${m.t + ih / 2})` }, isUsd ? 'equity USD' : 'equity SOL');
 
         // Starting-stake reference line (genesis equity, the first point), if in range
         const startY = pts[0].y;
         if (startY >= minY && startY <= maxY) {
           const y1 = sy(startY);
           add('line', { x1: m.l, y1, x2: m.l + iw, y2: y1, stroke: 'var(--accent-dim)', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
-          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start ' + startY.toFixed(2));
+          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start ' + formatY(startY));
         }
 
         // Line + points
@@ -636,7 +649,22 @@
             growthTile('per month (30d)', liveSeries, eqSol, 30 * DAY),
           );
 
-          drawChart(liveSeries);
+          const chartUsd = document.getElementById('chart-usd');
+          const chartSol = document.getElementById('chart-sol');
+          const chartNote = document.getElementById('chart-note');
+          const chart = document.getElementById('chart');
+          function selectChart(unit) {
+            const isUsd = unit === 'usd';
+            chartUsd.setAttribute('aria-pressed', String(isUsd));
+            chartSol.setAttribute('aria-pressed', String(!isUsd));
+            chart.setAttribute('aria-label', isUsd ? 'equity in USD over all cycles chart' : 'equity in SOL at observed prices chart');
+            chartNote.textContent = isUsd ? `${journal.length} cycles` :
+              (liveSeries.length ? `${liveSeries.length} cycles, from #${liveSeries[0].cycle}` : 'no live SOL prices yet');
+            drawChart(isUsd ? journal : liveSeries, unit);
+          }
+          chartUsd.onclick = () => selectChart('usd');
+          chartSol.onclick = () => selectChart('sol');
+          selectChart('usd');
           renderReasoning(journal);
           renderLessons(lessons);
           renderBook(desk, prices);
@@ -656,7 +684,7 @@
             tbody.appendChild(tr);
           });
 
-          status.textContent = `Loaded ${journal.length} cycles. SOL chart starts at v0.3.0 because older entries used a fixed SOL price. Last run: ${state.lastRunAt ?? 'never'}.`;
+          status.textContent = `Loaded ${journal.length} cycles. USD shows the full history. SOL starts at cycle ${liveSeries[0]?.cycle ?? '—'} because older entries used a fixed conversion price. Last run: ${state.lastRunAt ?? 'never'}.`;
         } catch (err) {
           const notYet = /404/.test(String(err.message));
           status.className = notYet ? 'muted' : 'err';

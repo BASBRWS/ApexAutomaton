@@ -1,6 +1,6 @@
 {
   "name": "apex-automaton",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "A growth-seeking autonomous agent on Solana devnet. Its objective is to grow its net SOL balance; survival is the floor, not the goal. Mortality engineering at zero financial risk.",
   "type": "module",
