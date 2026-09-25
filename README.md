@@ -1,4 +1,4 @@
-# Apex Automaton v0.4.0
+# Apex Automaton v0.5.0
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -9,7 +9,7 @@ Every Solana operation is a **real on-chain transaction**, but the cluster is
 checked against the devnet genesis hash before every signed operation. Devnet
 SOL has no monetary value. Anthropic API calls still cost real money.
 
-## Solana ventures: tokens and NFTs on devnet
+## Solana ventures: three on-chain routes on devnet
 
 The venture prompt now considers DeFi lending tools, NFT utility, leverage risk
 tools, token launches, Web3 apps and services alongside digital products. A
@@ -38,8 +38,16 @@ simulates wallet debit, applies `NFT_MAX_CREATE_SOL` (default 0.03 SOL) and the
 general caps, and persists the pending signature and confirmed asset address.
 Minting an NFT does not mean that anyone purchased it or that revenue accrued.
 
+An independent **Token-2022 mint** is a third route. A proposal specifies
+`splToken` with `name`, `symbol`, a public HTTPS metadata URI and `decimals` from
+0 to 9. Once you approve it, `spl_create` creates a mint with embedded on-chain
+metadata and **zero supply**. No tokens are issued or sold. The signer checks
+simulation and both `SPL_MAX_CREATE_SOL` and the general transaction limits,
+then persists the signature and mint address against the approved venture.
+
 Set `PUMP_DEVNET_ENABLED=1` to expose this route. The hosted heartbeat and
-watchdog also set `NFT_DEVNET_ENABLED=1`; locally both flags default to off.
+watchdog also set `NFT_DEVNET_ENABLED=1` and `SPL_DEVNET_ENABLED=1`; locally all
+three flags default to off.
 No proposal is approved automatically. Review the
 metadata URI, name and symbol before setting `approved`. If confirmation is
 uncertain, reconcile `pendingTransfer` on-chain before another value action.

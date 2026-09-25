@@ -1,5 +1,19 @@
 # Release notes
 
+## 0.5.0, 2026-09-25
+
+- Add an operator-approved Token-2022 devnet mint with embedded on-chain metadata and zero initial supply. The signer builds four fixed instructions in one atomic transaction and checks simulation, `SPL_MAX_CREATE_SOL` and the existing caps.
+- Persist signed intent and confirmed mint per venture to prevent duplicate creation after a partial save. Gate `spl_create` at NORMAL+ while an approved mint awaits creation.
+- Show Token-2022 approvals and mint addresses in the dashboard, and extend the opportunity map and setup defaults.
+
+### Migration
+
+Existing state and ventures need no migration. A confirmed mint adds `splMints` to state. Set `SPL_DEVNET_ENABLED=1` locally and approve a venture with `splToken` metadata. Hosted workflows enable the feature, but no mint runs without approval. Keep `SPL_MAX_CREATE_SOL` at or below `PER_TX_CAP_SOL`.
+
+### Known limits
+
+The mint starts with zero supply. Issuance, transfers and marketplace execution need separate approval and accounting adapters. Metadata URI content needs operator review. A funded devnet mint has not been run from this environment.
+
 ## 0.4.0, 2026-09-25
 
 - Add Metaplex Core devnet NFT creation for an operator-approved venture with public HTTPS metadata. The signer builds the fixed instruction, validates signers and program, simulates debit and enforces `NFT_MAX_CREATE_SOL` plus general transaction caps.

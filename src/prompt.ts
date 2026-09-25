@@ -108,6 +108,8 @@ export function buildSystemPrompt(args: {
         '  metadata JSON URI. The program route is devnet only and spend capped.',
         '- Metaplex Core NFT creation likewise requires a human-approved venture',
         '  and a public HTTPS metadata JSON URI; minting is not a sale.',
+        '- Token-2022 mint creation requires a human-approved venture with name,',
+        '  symbol, HTTPS metadata URI and decimals. It begins with zero supply.',
       ]
     : [];
 

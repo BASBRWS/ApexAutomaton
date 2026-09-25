@@ -63,6 +63,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
     },
     pump: { enabled: false, maxCreateSol: 0.05 },
     nft: { enabled: false, maxCreateSol: 0.03 },
+    spl: { enabled: false, maxCreateSol: 0.03 },
     firestore: {
       enabled: false,
       projectId: undefined,

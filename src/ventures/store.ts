@@ -52,6 +52,7 @@ export interface ProposalInput {
   launchSteps?: unknown;
   pumpToken?: unknown;
   nftAsset?: unknown;
+  splToken?: unknown;
 }
 
 function validMetadataUri(raw: unknown): string | null {
@@ -80,6 +81,14 @@ export function validPumpToken(raw: unknown): { name: string; symbol: string; ur
   const uri = v.uri.trim();
   if (!name || Buffer.byteLength(name) > 32 || !/^[A-Z0-9]{2,10}$/.test(symbol) || uri.length > 200) return null;
   return validMetadataUri(uri) ? { name, symbol, uri } : null;
+}
+
+export function validSplToken(raw: unknown): { name: string; symbol: string; uri: string; decimals: number } | null {
+  const token = validPumpToken(raw);
+  if (!token || !raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const decimals = (raw as Record<string, unknown>).decimals;
+  return typeof decimals === 'number' && Number.isInteger(decimals) && decimals >= 0 && decimals <= 9
+    ? { ...token, decimals } : null;
 }
 
 const MAX_LAUNCH_STEPS = 8;
@@ -130,13 +139,19 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
   }
   const pumpToken = input.pumpToken === undefined ? undefined : validPumpToken(input.pumpToken);
   const nftAsset = input.nftAsset === undefined ? undefined : validNftAsset(input.nftAsset);
+  const splToken = input.splToken === undefined ? undefined : validSplToken(input.splToken);
   if (input.pumpToken !== undefined && !pumpToken) {
     return { ok: false, reason: 'invalid Pump.fun token metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9)' };
   }
   if (input.nftAsset !== undefined && !nftAsset) {
     return { ok: false, reason: 'invalid NFT metadata (HTTPS URI and name <=32 bytes)' };
   }
-  if (pumpToken && nftAsset) return { ok: false, reason: 'one venture may create either a token or an NFT' };
+  if (input.splToken !== undefined && !splToken) {
+    return { ok: false, reason: 'invalid Token-2022 metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9, decimals 0-9)' };
+  }
+  if ([pumpToken, nftAsset, splToken].filter(Boolean).length > 1) {
+    return { ok: false, reason: 'one venture may create only one on-chain asset type' };
+  }
   const category = slug(input.category || 'other');
   if (book.ventures.filter((v) => v.category === category &&
     (v.status === 'proposed' || v.status === 'approved' || v.status === 'active')).length >= MAX_LIVE_PER_CATEGORY) {
@@ -159,6 +174,7 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     status: 'proposed',
     ...(pumpToken ? { pumpToken } : {}),
     ...(nftAsset ? { nftAsset } : {}),
+    ...(splToken ? { splToken } : {}),
     revenueUsd: 0,
     accountedRevenueUsd: 0,
   };
@@ -289,7 +305,7 @@ export function markLive(
 ): MarkLiveResult {
   const v = findVenture(book, id);
   if (!v) return { ok: false, reason: `no venture with id ${id}` };
-  if ((v.pumpToken || v.nftAsset) && v.status === 'proposed') {
+  if ((v.pumpToken || v.nftAsset || v.splToken) && v.status === 'proposed') {
     return { ok: false, reason: 'approve on-chain metadata in ventures.json before marking this venture live' };
   }
   const url =

@@ -100,6 +100,17 @@ describe('venture proposals', () => {
     } }), 2, 'now').ok).toBe(false);
   });
 
+  it('validates Token-2022 decimals, metadata, approval and exclusive asset type', () => {
+    const book = emptyVentureBook();
+    const splToken = { name: 'Apex Credit', symbol: 'CREDIT', uri: 'https://example.com/credit.json', decimals: 6 };
+    expect(addProposal(book, proposal({ category: 'spl', splToken }), 1, 'now').venture?.splToken).toEqual(splToken);
+    expect(markLive(book, 'v0001', 'https://example.com', 2, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ category: 'bad-decimals', splToken: { ...splToken, decimals: 10 } }), 2, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ category: 'mixed', splToken, nftAsset: {
+      name: 'Pass', uri: 'https://example.com/pass.json',
+    } }), 2, 'now').ok).toBe(false);
+  });
+
   it('limits open and active ventures per category to force broader exploration', () => {
     const book = emptyVentureBook();
     for (let i = 0; i < 3; i++) expect(addProposal(book, proposal({ title: `Idea ${i}` }), i, 'now').ok).toBe(true);
