@@ -200,7 +200,9 @@ const proposeVenture: Tool = {
     'a platform’s terms, impersonates a person or brand, fakes reviews, or spams. ' +
     'For a Pump.fun devnet launch, include pumpToken with name, symbol and a ' +
     'public HTTPS metadata JSON URI. Creating a devnet token does not create ' +
-    'real revenue. A human must approve the proposal before any on-chain launch. ' +
+    'real revenue. For a Metaplex Core NFT, include nftAsset with name and a ' +
+    'public HTTPS metadata JSON URI. NFT creation is not a sale. A human must ' +
+    'approve the proposal before any on-chain creation. ' +
     'Keep at most a few proposals waiting; iterate and kill rather than pile up.',
   movesValue: false,
   inputHint:
@@ -211,7 +213,8 @@ const proposeVenture: Tool = {
     '"https://app.gumroad.com/settings/payments" }, { "label": "Create product + upload the file", ' +
     '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
     '"estRevenueUsd": 50, "killCriteria": "when to abandon it", ' +
-    '"pumpToken": { "name": "Example", "symbol": "EXAMPLE", "uri": "https://example.com/metadata.json" } }',
+    '"nftAsset": { "name": "Example", "uri": "https://example.com/nft.json" } } ' +
+    '(optional: use pumpToken with name, symbol, uri instead of nftAsset)',
   async execute(input, ctx) {
     if (!ctx.ventureBook) {
       return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
@@ -227,6 +230,7 @@ const proposeVenture: Tool = {
       estRevenueUsd: Number(input.estRevenueUsd),
       killCriteria: str(input.killCriteria),
       pumpToken: input.pumpToken,
+      nftAsset: input.nftAsset,
     };
     const res = addProposal(ctx.ventureBook, proposal, ctx.cycle, new Date().toISOString());
     if (!res.ok || !res.venture) {
@@ -263,6 +267,28 @@ const pumpCreate: Tool = {
       signatures: [signature],
       transfer: { signature, to: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', lamports },
       note: `Pump.fun devnet mint ${mint} for ${id}`,
+    };
+  },
+};
+
+const nftCreate: Tool = {
+  name: 'nft_create',
+  description: 'Create one Metaplex Core NFT asset on devnet for an approved venture with a public HTTPS metadata URI. The signer constructs and simulates the fixed instruction under transaction and daily caps. Creation alone earns no revenue.',
+  movesValue: true,
+  inputHint: '{ "ventureId": "v0007" }',
+  async execute(input, ctx) {
+    const id = typeof input.ventureId === 'string' ? input.ventureId : '';
+    const venture = ctx.ventureBook && findVenture(ctx.ventureBook, id);
+    if (!venture || venture.status !== 'active' || !venture.nftAsset) {
+      return { summary: 'NFT venture needs approval and valid metadata first' };
+    }
+    const { asset, signature, lamports } = await ctx.signer.createNftAsset(venture);
+    venture.nftAsset = { ...venture.nftAsset, asset, signature };
+    return {
+      summary: `created Metaplex Core devnet asset ${asset} for ${id}`,
+      signatures: [signature],
+      transfer: { signature, to: 'CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d', lamports },
+      note: `Metaplex Core devnet asset ${asset} for ${id}`,
     };
   },
 };
@@ -330,6 +356,7 @@ export function buildRegistry(): ToolRegistry {
     .register(reflect)
     .register(proposeVenture)
     .register(pumpCreate)
+    .register(nftCreate)
     .register(rest)
     .register(transfer);
 }
@@ -342,6 +369,7 @@ export const BUILTIN_TOOLS = [
   reflect,
   proposeVenture,
   pumpCreate,
+  nftCreate,
   rest,
   transfer,
 ];

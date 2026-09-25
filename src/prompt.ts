@@ -106,6 +106,8 @@ export function buildSystemPrompt(args: {
         '  or token creator fees without observations. Label unverified ideas as tests.',
         '- Pump.fun creation requires a human-approved venture and a real HTTPS',
         '  metadata JSON URI. The program route is devnet only and spend capped.',
+        '- Metaplex Core NFT creation likewise requires a human-approved venture',
+        '  and a public HTTPS metadata JSON URI; minting is not a sale.',
       ]
     : [];
 

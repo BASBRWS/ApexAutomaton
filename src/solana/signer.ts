@@ -1,13 +1,16 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import bs58 from 'bs58';
-import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { createV2, mplCore } from '@metaplex-foundation/mpl-core';
+import { createSignerFromKeypair, generateSigner } from '@metaplex-foundation/umi';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { loadConfig, solToLamports, type Config } from '../config.js';
 import { KILL_FILE } from '../paths.js';
 import { saveState } from '../state.js';
 import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.js';
 import type { Venture } from '../ventures/types.js';
-import { validPumpToken } from '../ventures/store.js';
+import { validNftAsset, validPumpToken } from '../ventures/store.js';
 import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
 /**
@@ -298,6 +301,67 @@ export class Signer {
     delete this.state.pendingTransfer;
     saveState(this.state);
     return { mint: mint.publicKey.toBase58(), signature, lamports: debit };
+  }
+
+  /** Create exactly one Metaplex Core asset for an operator-approved venture.
+   * The SDK only constructs an instruction; web3.js signs through this class. */
+  async createNftAsset(venture: Venture): Promise<{ asset: string; signature: string; lamports: number }> {
+    await assertDevnetConnection(this.connection);
+    if (!this.cfg.nft.enabled) throw new PolicyError('NFT devnet feature disabled');
+    if (venture.status !== 'active' || !venture.nftAsset) throw new PolicyError('venture is not approved for NFT creation');
+    const metadata = validNftAsset(venture.nftAsset);
+    if (!metadata) throw new PolicyError('invalid approved NFT metadata');
+    if (venture.nftAsset.asset || this.state.nftAssets?.[venture.id]) throw new PolicyError('venture already minted');
+    if (this.state.pendingTransfer) throw new PolicyError('unreconciled signed transaction');
+
+    const program = new PublicKey('CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d');
+    const umi = createUmi(this.cfg.rpcUrl).use(mplCore());
+    const payer = createSignerFromKeypair(umi, umi.eddsa.createKeypairFromSecretKey(this.keypair.secretKey));
+    const assetSigner = generateSigner(umi);
+    const builder = createV2(umi, { ...metadata, asset: assetSigner, payer, authority: payer });
+    if (builder.items.length !== 1) throw new PolicyError('unexpected NFT instruction count');
+    const generated = builder.items[0]!.instruction;
+    if (String(generated.programId) !== program.toBase58() ||
+        generated.keys.some((key) => key.isSigner &&
+          String(key.pubkey) !== this.keypair.publicKey.toBase58() && String(key.pubkey) !== String(assetSigner.publicKey))) {
+      throw new PolicyError('unexpected NFT program or signer');
+    }
+    const ix = new TransactionInstruction({
+      programId: program,
+      keys: generated.keys.map((key) => ({ pubkey: new PublicKey(String(key.pubkey)), isSigner: key.isSigner, isWritable: key.isWritable })),
+      data: Buffer.from(generated.data),
+    });
+    const assetKeypair = Keypair.fromSecretKey(assetSigner.secretKey);
+    const tx = new Transaction().add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }), ix);
+    tx.feePayer = this.keypair.publicKey;
+    tx.recentBlockhash = (await this.connection.getLatestBlockhash('confirmed')).blockhash;
+    const balanceBefore = await this.connection.getBalance(this.keypair.publicKey, 'confirmed');
+    const simulation = await this.connection.simulateTransaction(tx, [this.keypair, assetKeypair], [this.keypair.publicKey]);
+    if (simulation.value.err) throw new PolicyError(`NFT simulation failed: ${JSON.stringify(simulation.value.err)}`);
+    const balanceAfter = simulation.value.accounts?.[0]?.lamports;
+    if (typeof balanceAfter !== 'number' || balanceAfter > balanceBefore) {
+      throw new PolicyError('NFT simulation did not return a usable wallet balance');
+    }
+    const debit = balanceBefore - balanceAfter + 100_000;
+    const destination = program.toBase58();
+    const decision = evaluatePolicy({
+      ...this.buildPolicyInput({ to: destination, lamports: debit, reason: `NFT ${venture.id}` }),
+      allowlist: [destination],
+    });
+    if (!decision.ok) throw new PolicyError(decision.reason);
+    if (debit > solToLamports(this.cfg.nft.maxCreateSol)) throw new PolicyError('NFT creation exceeds protocol cap');
+    const signature = await sendTransfer(this.connection, tx, [this.keypair, assetKeypair], (signed) => {
+      this.state.pendingTransfer = { signature: signed, to: destination, lamports: debit, at: new Date().toISOString() };
+      saveState(this.state);
+    });
+    this.cycleTxCount += 1;
+    this.state.caps.txCountToday += 1;
+    this.state.caps.lamportsSpentToday += debit;
+    this.state.nftAssets ??= {};
+    this.state.nftAssets[venture.id] = { asset: assetKeypair.publicKey.toBase58(), signature, at: new Date().toISOString() };
+    delete this.state.pendingTransfer;
+    saveState(this.state);
+    return { asset: assetKeypair.publicKey.toBase58(), signature, lamports: debit };
   }
 
   /**

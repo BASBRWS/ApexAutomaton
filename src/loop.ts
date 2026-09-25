@@ -261,7 +261,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const registry = buildRegistry();
   const pumpReady = Boolean(ventureBook?.ventures.some((v) => v.status === 'active' &&
     v.pumpToken && !v.pumpToken.mint && !state.pumpMints?.[v.id]));
-  const allowedToolNames = toolNamesForCycle(policy, cfg, pumpReady);
+  const nftReady = Boolean(ventureBook?.ventures.some((v) => v.status === 'active' &&
+    v.nftAsset && !v.nftAsset.asset && !state.nftAssets?.[v.id]));
+  const allowedToolNames = toolNamesForCycle(policy, cfg, pumpReady, nftReady);
   const tools = allowedToolNames
     .map((n) => registry.get(n))
     .filter((t): t is Tool => t !== undefined);
@@ -389,7 +391,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   if (tool.movesValue) {
     if (toolResult.transfer) {
       recordTx(state, {
-        kind: chosenName === 'pump_create' ? 'pump-create' : 'transfer',
+        kind: chosenName === 'pump_create' ? 'pump-create' : chosenName === 'nft_create' ? 'nft-create' : 'transfer',
         signature: toolResult.transfer.signature,
         lamports: toolResult.transfer.lamports,
         from: cfg.agentPubkey,

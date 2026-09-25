@@ -67,6 +67,7 @@ jobs:
           # Replication remains disabled until a child runtime exists.
           REPLICATION_ENABLED: 'false'
           PUMP_DEVNET_ENABLED: 'true'
+          NFT_DEVNET_ENABLED: 'true'
           # Lets the burst dispatch the Pages redeploy after each cycle's push.
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh
