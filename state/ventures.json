@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T18:42:35.359Z",
+        "lastCheckedAt": "2026-09-25T19:50:24.360Z",
         "reachable": true,
         "daysLive": 2,
         "killDue": false,
@@ -263,6 +263,12 @@
     },
     "content": {
       "approved": 1,
+      "rejected": 0,
+      "earnedUsd": 0,
+      "autoEligible": false
+    },
+    "service": {
+      "approved": 0,
       "rejected": 0,
       "earnedUsd": 0,
       "autoEligible": false
