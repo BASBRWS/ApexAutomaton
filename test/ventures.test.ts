@@ -86,7 +86,18 @@ describe('venture proposals', () => {
     expect(addProposal(book, proposal({ category: 'pumpfun', pumpToken: {
       name: 'Bad', symbol: 'BAD', uri: 'http://example.com/metadata.json',
     } }), 2, 'now').ok).toBe(false);
-    expect(markLive(book, 'v0001', 'https://example.com/listing', 2, 'now').reason).toMatch(/approve Pump.fun metadata/);
+    expect(markLive(book, 'v0001', 'https://example.com/listing', 2, 'now').reason).toMatch(/approve on-chain metadata/);
+  });
+
+  it('requires valid metadata and human approval for a Core NFT venture', () => {
+    const book = emptyVentureBook();
+    const nftAsset = { name: 'Apex Pass', uri: 'https://example.com/pass.json' };
+    expect(addProposal(book, proposal({ category: 'nft', nftAsset }), 1, 'now').venture?.nftAsset).toEqual(nftAsset);
+    expect(markLive(book, 'v0001', 'https://example.com/pass', 2, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ category: 'bad-nft', nftAsset: { name: 'Bad', uri: 'http://example.com/nft.json' } }), 2, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ category: 'two-assets', nftAsset, pumpToken: {
+      name: 'Apex', symbol: 'APEX', uri: 'https://example.com/apex.json',
+    } }), 2, 'now').ok).toBe(false);
   });
 
   it('limits open and active ventures per category to force broader exploration', () => {

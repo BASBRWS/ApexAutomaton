@@ -1,4 +1,4 @@
-# Apex Automaton v0.3.0
+# Apex Automaton v0.4.0
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -9,7 +9,7 @@ Every Solana operation is a **real on-chain transaction**, but the cluster is
 checked against the devnet genesis hash before every signed operation. Devnet
 SOL has no monetary value. Anthropic API calls still cost real money.
 
-## Solana ventures and Pump.fun devnet
+## Solana ventures: tokens and NFTs on devnet
 
 The venture prompt now considers DeFi lending tools, NFT utility, leverage risk
 tools, token launches, Web3 apps and services alongside digital products. A
@@ -30,11 +30,20 @@ the existing per-transaction and daily limits, and records signed intent before
 broadcast. It permits one launch per UTC day and saves the mint and signature
 with the main state to stop duplicate launches after a partial save.
 
+The second on-chain route is **Metaplex Core NFT creation on devnet**. A venture
+can instead specify `nftAsset` with a name and a public HTTPS metadata JSON URI.
+After the operator sets its status to `approved`, `nft_create` can make exactly
+one asset for that venture. The signer constructs a fixed Core instruction,
+simulates wallet debit, applies `NFT_MAX_CREATE_SOL` (default 0.03 SOL) and the
+general caps, and persists the pending signature and confirmed asset address.
+Minting an NFT does not mean that anyone purchased it or that revenue accrued.
+
 Set `PUMP_DEVNET_ENABLED=1` to expose this route. The hosted heartbeat and
-watchdog set it to true, but no proposal is approved automatically. Review the
+watchdog also set `NFT_DEVNET_ENABLED=1`; locally both flags default to off.
+No proposal is approved automatically. Review the
 metadata URI, name and symbol before setting `approved`. If confirmation is
 uncertain, reconcile `pendingTransfer` on-chain before another value action.
-No buy, sell, lending, leverage or NFT market instructions are exposed yet.
+No buy, sell, lending, leverage or NFT marketplace instructions are exposed yet.
 See [Solana opportunity map](docs/solana-opportunities.md) for the next adapters
 and the distinction between a devnet test and real demand.
 

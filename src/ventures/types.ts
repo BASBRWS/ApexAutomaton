@@ -97,6 +97,8 @@ export interface Venture {
   /** Operator-approved metadata for a Pump.fun devnet launch. The LLM cannot
    * alter this after approval; the signer only accepts a stored active venture. */
   pumpToken?: { name: string; symbol: string; uri: string; mint?: string; signature?: string };
+  /** Approved Metaplex Core devnet asset metadata. The signer owns creation. */
+  nftAsset?: { name: string; uri: string; asset?: string; signature?: string };
 }
 
 /** Per-category autonomy tracking. The "earn more autonomy" path: once a category

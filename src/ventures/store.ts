@@ -51,6 +51,24 @@ export interface ProposalInput {
   killCriteria: string;
   launchSteps?: unknown;
   pumpToken?: unknown;
+  nftAsset?: unknown;
+}
+
+function validMetadataUri(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.trim().length > 200) return null;
+  const uri = raw.trim();
+  try {
+    const u = new URL(uri);
+    return u.protocol === 'https:' && u.hostname && !u.username && !u.password ? uri : null;
+  } catch { return null; }
+}
+
+export function validNftAsset(raw: unknown): { name: string; uri: string } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const v = raw as Record<string, unknown>;
+  const name = typeof v.name === 'string' ? v.name.trim() : '';
+  const uri = validMetadataUri(v.uri);
+  return name && Buffer.byteLength(name) <= 32 && uri ? { name, uri } : null;
 }
 
 export function validPumpToken(raw: unknown): { name: string; symbol: string; uri: string } | null {
@@ -61,11 +79,7 @@ export function validPumpToken(raw: unknown): { name: string; symbol: string; ur
   const symbol = v.symbol.trim();
   const uri = v.uri.trim();
   if (!name || Buffer.byteLength(name) > 32 || !/^[A-Z0-9]{2,10}$/.test(symbol) || uri.length > 200) return null;
-  try {
-    const u = new URL(uri);
-    if (u.protocol !== 'https:' || !u.hostname || u.username || u.password) return null;
-  } catch { return null; }
-  return { name, symbol, uri };
+  return validMetadataUri(uri) ? { name, symbol, uri } : null;
 }
 
 const MAX_LAUNCH_STEPS = 8;
@@ -115,9 +129,14 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     return { ok: false, reason: 'proposal needs at least a title, a deliverable, and a humanAction' };
   }
   const pumpToken = input.pumpToken === undefined ? undefined : validPumpToken(input.pumpToken);
+  const nftAsset = input.nftAsset === undefined ? undefined : validNftAsset(input.nftAsset);
   if (input.pumpToken !== undefined && !pumpToken) {
     return { ok: false, reason: 'invalid Pump.fun token metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9)' };
   }
+  if (input.nftAsset !== undefined && !nftAsset) {
+    return { ok: false, reason: 'invalid NFT metadata (HTTPS URI and name <=32 bytes)' };
+  }
+  if (pumpToken && nftAsset) return { ok: false, reason: 'one venture may create either a token or an NFT' };
   const category = slug(input.category || 'other');
   if (book.ventures.filter((v) => v.category === category &&
     (v.status === 'proposed' || v.status === 'approved' || v.status === 'active')).length >= MAX_LIVE_PER_CATEGORY) {
@@ -139,6 +158,7 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     killCriteria: (input.killCriteria ?? '').trim().slice(0, 600),
     status: 'proposed',
     ...(pumpToken ? { pumpToken } : {}),
+    ...(nftAsset ? { nftAsset } : {}),
     revenueUsd: 0,
     accountedRevenueUsd: 0,
   };
@@ -269,8 +289,8 @@ export function markLive(
 ): MarkLiveResult {
   const v = findVenture(book, id);
   if (!v) return { ok: false, reason: `no venture with id ${id}` };
-  if (v.pumpToken && v.status === 'proposed') {
-    return { ok: false, reason: 'approve Pump.fun metadata in ventures.json before marking this venture live' };
+  if ((v.pumpToken || v.nftAsset) && v.status === 'proposed') {
+    return { ok: false, reason: 'approve on-chain metadata in ventures.json before marking this venture live' };
   }
   const url =
     typeof liveUrl === 'string' && /^https?:\/\//i.test(liveUrl.trim())

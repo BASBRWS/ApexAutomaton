@@ -40,7 +40,7 @@ export interface SignedTxResult {
 
 /** A recorded on-chain action for the persisted state / journal. */
 export interface TxRecord {
-  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'pump-create' | 'heartbeat';
+  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'pump-create' | 'nft-create' | 'heartbeat';
   signature: string;
   lamports: number;
   from: string;
@@ -119,6 +119,7 @@ export interface AutomatonState {
   /** Confirmed Pump.fun launches. Persisted with the pending signature before
    * the venture book, so a failed book save cannot mint the same coin twice. */
   pumpMints?: Record<string, { mint: string; signature: string; at: string }>;
+  nftAssets?: Record<string, { asset: string; signature: string; at: string }>;
   /** consecutive cycles at/above the replicate threshold (Phase 3 gating). */
   sustainedSovereignCycles: number;
   dead: boolean;

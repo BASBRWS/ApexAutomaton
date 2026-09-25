@@ -403,6 +403,13 @@
         }[s] || String(s || '');
       }
 
+      function devnetVentureLabel(v, status) {
+        if (status !== 'active') return ventureStatusLabel(status);
+        if (v.pumpToken) return v.pumpToken.mint ? 'devnet minted' : 'approved for devnet';
+        if (v.nftAsset) return v.nftAsset.asset ? 'devnet asset created' : 'approved for devnet';
+        return ventureStatusLabel(status);
+      }
+
       function safeUrl(u) {
         return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
       }
@@ -418,6 +425,15 @@
           encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
       }
       function ventureActionHtml(v, st) {
+        if (v.nftAsset && st === 'proposed') {
+          return '<div class="m-sec">Approve the devnet NFT</div>' +
+            '<div class="m-approve">Check the name and public HTTPS metadata JSON. Then edit <code>state/ventures.json</code> and set <code>status</code> to <code>approved</code>. The signer can create one Core asset on devnet after the next tick. This is not a sale.</div>';
+        }
+        if (v.nftAsset && st === 'active') {
+          return '<div class="m-sec">Metaplex Core devnet</div>' +
+            `<div class="m-approve">${v.nftAsset.asset ? 'NFT asset created on devnet. ' : 'Approved. The agent may create the asset on the next cycle. '}` +
+            'Creation earns no revenue. Report actual sales separately.</div>';
+        }
         if (v.pumpToken && st === 'proposed') {
           return '<div class="m-sec">Approve the devnet token</div>' +
             '<div class="m-approve">Check the name, symbol, metadata JSON and its HTTPS URL. Then edit this venture in <code>state/ventures.json</code> and set <code>status</code> to <code>approved</code>. The signer can create one token on devnet after the next tick. This is not a sale.</div>';
@@ -461,11 +477,12 @@
         body.innerHTML =
           '<button class="m-close" id="m-close">✕ close</button>' +
           `<h3>${escapeHtml(v.title || '')}</h3>` +
-          `<div class="m-meta">${escapeHtml(v.id || '')} · ${escapeHtml(v.category || '')} · ${escapeHtml(v.pumpToken && st === 'active' ? (v.pumpToken.mint ? 'devnet minted' : 'approved for devnet') : ventureStatusLabel(st))} · ` +
+          `<div class="m-meta">${escapeHtml(v.id || '')} · ${escapeHtml(v.category || '')} · ${escapeHtml(devnetVentureLabel(v, st))} · ` +
             ((Number(v.revenueUsd) || 0) > 0 ? `earned ${usd(v.revenueUsd)}` : `est ${usd(v.estRevenueUsd)}`) + '</div>' +
           (v.thesis ? `<div class="m-sec">Why it can earn</div><div class="m-thesis">${escapeHtml(v.thesis)}</div>` : '') +
           (v.deliverable ? `<div class="m-sec">What the agent built</div><div class="m-deliverable">${escapeHtml(v.deliverable)}</div>` : '') +
           (v.pumpToken ? `<div class="m-sec">Pump.fun devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.pumpToken.name)} · Symbol: ${escapeHtml(v.pumpToken.symbol)}<br>URI: ${escapeHtml(v.pumpToken.uri)}${v.pumpToken.mint ? '<br>Mint: ' + escapeHtml(v.pumpToken.mint) : ''}</div>` : '') +
+          (v.nftAsset ? `<div class="m-sec">Metaplex Core devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.nftAsset.name)}<br>URI: ${escapeHtml(v.nftAsset.uri)}${v.nftAsset.asset ? '<br>Asset: ' + escapeHtml(v.nftAsset.asset) : ''}</div>` : '') +
           `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml +
           (v.killCriteria ? `<div class="m-kill">Kill if: ${escapeHtml(v.killCriteria)}</div>` : '') +
           ventureActionHtml(v, st);
@@ -515,8 +532,8 @@
           return;
         }
         const waiting = ventures.filter((v) => v.status === 'proposed').length;
-        const live = ventures.filter((v) => v.status === 'active' && !v.pumpToken).length;
-        const devnet = ventures.filter((v) => v.pumpToken && v.pumpToken.mint).length;
+        const live = ventures.filter((v) => v.status === 'active' && !v.pumpToken && !v.nftAsset).length;
+        const devnet = ventures.filter((v) => (v.pumpToken && v.pumpToken.mint) || (v.nftAsset && v.nftAsset.asset)).length;
         const earned = ventures.reduce((sum, v) => sum + (Number(v.revenueUsd) || 0), 0);
         const auto = Object.entries((book && book.ledger) || {})
           .filter(([, e]) => e && e.autoEligible)
@@ -535,7 +552,7 @@
           div.innerHTML =
             '<div class="msg-head">' +
               `<span class="cyc">${escapeHtml(v.id || '')}</span>` +
-              `<span class="badge ${st === 'proposed' ? 'reflect' : ''}">${escapeHtml(v.pumpToken && st === 'active' ? (v.pumpToken.mint ? 'devnet minted' : 'approved for devnet') : ventureStatusLabel(st))}</span>` +
+              `<span class="badge ${st === 'proposed' ? 'reflect' : ''}">${escapeHtml(devnetVentureLabel(v, st))}</span>` +
               `<span>${escapeHtml(v.category || '')}</span>` +
               `<span>${escapeHtml(money)}</span>` +
             '</div>' +

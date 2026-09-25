@@ -1,5 +1,19 @@
 # Release notes
 
+## 0.4.0, 2026-09-25
+
+- Add Metaplex Core devnet NFT creation for an operator-approved venture with public HTTPS metadata. The signer builds the fixed instruction, validates signers and program, simulates debit and enforces `NFT_MAX_CREATE_SOL` plus general transaction caps.
+- Record a pending signature before broadcast and persist confirmed NFT assets by venture ID to block duplicate creation after partial saves. Gate the tool at NORMAL+ and expose it only while an approved venture awaits creation.
+- Expand the Solana opportunity map with token gated access, liquidity provision and bounties; show devnet NFT approvals and results separately from live listings and reported revenue in the dashboard.
+
+### Migration
+
+Existing state and ventures require no migration. `nftAssets` is populated on the first confirmed asset creation. Local runs must explicitly set `NFT_DEVNET_ENABLED=1`; hosted workflows enable it, but creation still requires operator approval in `state/ventures.json`. Set `NFT_MAX_CREATE_SOL` at or below `PER_TX_CAP_SOL`.
+
+### Known limits
+
+NFT creation is not a sale and no devnet NFT marketplace, lending, leverage or liquidity adapter is implemented. A public metadata URI is syntactically checked, but its JSON content and availability must be reviewed by the operator. The SDK instruction was tested offline on Node 20; a funded devnet NFT mint has not been run from this environment. An ambiguous confirmation blocks later value actions pending reconciliation.
+
 ## 0.3.0, 2026-09-25
 
 - Broaden the agent's venture search to Solana DeFi, NFT, token creation and Web3 products. Limit one category to three active or pending ventures.
