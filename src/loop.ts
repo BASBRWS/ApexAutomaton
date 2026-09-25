@@ -121,7 +121,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   const liveSolPrice = solPriceOf(prices, state);
 
-  // --- Genesis: price the SOL-denominated stake to USD, once, and FREEZE the
+  // --- Genesis: price the SOL-denominated stake to USD once, and record the
   // SOL/USD rate. The book is born unfunded; the first cycle that sees a real SOL
   // price funds it with `capitalSol` SOL worth of USD and records that price.
   if (!isFunded(state.desk)) {
@@ -134,10 +134,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state.genesisSolPriceUsd = liveSolPrice;
   }
 
-  // The FROZEN SOL/USD rate values everything from here on: equity-in-SOL, the
-  // tiers, the death check, and the gross-exposure cap. So the SOL/USD exchange
-  // rate never moves the survival game — only the agent's own trading does.
-  const solPrice = state.genesisSolPriceUsd > 0 ? state.genesisSolPriceUsd : liveSolPrice;
+  // Value the book back in SOL at the latest observed rate. The genesis price
+  // only determines starting USD capital and the SOL-hold benchmark. Using it
+  // for tiers/death would overstate SOL holdings whenever SOL appreciates.
+  const solPrice = liveSolPrice;
 
   // --- Modeled yield: accrue carry on the staked sleeve by elapsed wall-clock
   // time (honest regardless of how irregular the cron is). Counts toward equity
@@ -208,7 +208,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (parts.length > 0) ventureNote = parts.join('; ');
   }
 
-  // Gross-exposure cap for this cycle: the SOL cap priced at the genesis SOL price.
+  // Gross-exposure cap for this cycle: the SOL cap at the observed SOL price.
   const maxGrossExposureUsd = cfg.trading.maxGrossExposureSol * solPrice;
 
   // Paper book (pure) — drives the metabolic cost and trade sizing. The
@@ -259,7 +259,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Set up tools for this cycle. -----------------------------------------
   const signer = new Signer(connection, cfg, state);
   const registry = buildRegistry();
-  const allowedToolNames = toolNamesForCycle(policy, cfg);
+  const pumpReady = Boolean(ventureBook?.ventures.some((v) => v.status === 'active' &&
+    v.pumpToken && !v.pumpToken.mint && !state.pumpMints?.[v.id]));
+  const allowedToolNames = toolNamesForCycle(policy, cfg, pumpReady);
   const tools = allowedToolNames
     .map((n) => registry.get(n))
     .filter((t): t is Tool => t !== undefined);
@@ -387,7 +389,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   if (tool.movesValue) {
     if (toolResult.transfer) {
       recordTx(state, {
-        kind: 'transfer',
+        kind: chosenName === 'pump_create' ? 'pump-create' : 'transfer',
         signature: toolResult.transfer.signature,
         lamports: toolResult.transfer.lamports,
         from: cfg.agentPubkey,
@@ -543,6 +545,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     at: now(),
     tier,
     equitySol: equityToSol(equityPost, solPrice),
+    solPriceUsd: solPrice,
     equityUsd: equityPost,
     model: policy.model,
     action: chosenName,

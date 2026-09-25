@@ -190,6 +190,13 @@ export interface Config {
     autonomyThreshold: number;
   };
 
+  pump: {
+    /** Off by default. Enables a one-coin-per-approved-venture devnet launch. */
+    enabled: boolean;
+    /** Absolute upper bound on simulated wallet debit for a launch. */
+    maxCreateSol: number;
+  };
+
   /** Phase 2/3 feature flags. All default OFF — Phase 1 behaviour is unchanged
    * unless these are explicitly enabled. */
   features: {
@@ -309,6 +316,11 @@ export function loadConfig(): Config {
       autonomyThreshold: Math.trunc(envNum('VENTURE_AUTONOMY_THRESHOLD', 10)),
     },
 
+    pump: {
+      enabled: envBool('PUMP_DEVNET_ENABLED', false),
+      maxCreateSol: envNum('PUMP_MAX_CREATE_SOL', 0.05),
+    },
+
     features: {
       replicationEnabled: envBool('REPLICATION_ENABLED', false),
       offchainRevenueEnabled: envBool('OFFCHAIN_REVENUE_ENABLED', false),
@@ -329,6 +341,10 @@ export function loadConfig(): Config {
 
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
+  if (cfg.pump.enabled && (!Number.isFinite(cfg.pump.maxCreateSol) || cfg.pump.maxCreateSol <= 0 ||
+      cfg.pump.maxCreateSol > cfg.rails.perTxCapSol)) {
+    throw new Error('PUMP_MAX_CREATE_SOL must be positive and at most PER_TX_CAP_SOL.');
+  }
   if (cfg.features.replicationEnabled) {
     throw new Error('Replication is disabled until children have an independent runtime and measurable strategy.');
   }

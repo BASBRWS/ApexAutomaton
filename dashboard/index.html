@@ -97,8 +97,8 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.2.0</span></h1>
-      <div class="muted">Autonomous agent growing a paper book of <b>2 SOL</b> against real prices (SOL/USD frozen at genesis) · the market decides, grow or die.</div>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.3.0</span></h1>
+      <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
       <div id="tiles" class="grid"></div>
@@ -170,7 +170,7 @@
        * Returns { pctVal, spanned } or null when there's no usable baseline.
        */
       function growthOver(journal, eqNowSol, windowMs) {
-        if (!journal.length) return null;
+        if (journal.length < 2) return null;
         const nowMs = Date.parse(journal[journal.length - 1].at) || Date.now();
         const cutoff = nowMs - windowMs;
         let baseline = null;
@@ -418,6 +418,16 @@
           encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
       }
       function ventureActionHtml(v, st) {
+        if (v.pumpToken && st === 'proposed') {
+          return '<div class="m-sec">Approve the devnet token</div>' +
+            '<div class="m-approve">Check the name, symbol, metadata JSON and its HTTPS URL. Then edit this venture in <code>state/ventures.json</code> and set <code>status</code> to <code>approved</code>. The signer can create one token on devnet after the next tick. This is not a sale.</div>';
+        }
+        if (v.pumpToken && st === 'active') {
+          const minted = !!v.pumpToken.mint;
+          return '<div class="m-sec">Pump.fun devnet</div>' +
+            `<div class="m-approve">${minted ? 'Token created on devnet. ' : 'Approved. The agent may create the token on the next cycle. '}` +
+            'A mint is an experiment, not a sale. Report actual revenue separately.</div>';
+        }
         if (st === 'active') {
           const m = v.monitor || {};
           const url = safeUrl(v.liveUrl);
@@ -451,10 +461,11 @@
         body.innerHTML =
           '<button class="m-close" id="m-close">✕ close</button>' +
           `<h3>${escapeHtml(v.title || '')}</h3>` +
-          `<div class="m-meta">${escapeHtml(v.id || '')} · ${escapeHtml(v.category || '')} · ${escapeHtml(ventureStatusLabel(st))} · ` +
+          `<div class="m-meta">${escapeHtml(v.id || '')} · ${escapeHtml(v.category || '')} · ${escapeHtml(v.pumpToken && st === 'active' ? (v.pumpToken.mint ? 'devnet minted' : 'approved for devnet') : ventureStatusLabel(st))} · ` +
             ((Number(v.revenueUsd) || 0) > 0 ? `earned ${usd(v.revenueUsd)}` : `est ${usd(v.estRevenueUsd)}`) + '</div>' +
           (v.thesis ? `<div class="m-sec">Why it can earn</div><div class="m-thesis">${escapeHtml(v.thesis)}</div>` : '') +
           (v.deliverable ? `<div class="m-sec">What the agent built</div><div class="m-deliverable">${escapeHtml(v.deliverable)}</div>` : '') +
+          (v.pumpToken ? `<div class="m-sec">Pump.fun devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.pumpToken.name)} · Symbol: ${escapeHtml(v.pumpToken.symbol)}<br>URI: ${escapeHtml(v.pumpToken.uri)}${v.pumpToken.mint ? '<br>Mint: ' + escapeHtml(v.pumpToken.mint) : ''}</div>` : '') +
           `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml +
           (v.killCriteria ? `<div class="m-kill">Kill if: ${escapeHtml(v.killCriteria)}</div>` : '') +
           ventureActionHtml(v, st);
@@ -504,12 +515,13 @@
           return;
         }
         const waiting = ventures.filter((v) => v.status === 'proposed').length;
-        const live = ventures.filter((v) => v.status === 'active').length;
+        const live = ventures.filter((v) => v.status === 'active' && !v.pumpToken).length;
+        const devnet = ventures.filter((v) => v.pumpToken && v.pumpToken.mint).length;
         const earned = ventures.reduce((sum, v) => sum + (Number(v.revenueUsd) || 0), 0);
         const auto = Object.entries((book && book.ledger) || {})
           .filter(([, e]) => e && e.autoEligible)
           .map(([c]) => c);
-        sub.textContent = `· ${waiting} awaiting you · ${live} live · ${usd(earned)} real revenue`
+        sub.textContent = `· ${waiting} awaiting you · ${live} live listings · ${devnet} devnet mints · ${usd(earned)} reported revenue`
           + (auto.length ? ` · autonomy-earned: ${auto.join(', ')}` : '');
 
         ventures.slice().reverse().forEach((v) => {
@@ -523,7 +535,7 @@
           div.innerHTML =
             '<div class="msg-head">' +
               `<span class="cyc">${escapeHtml(v.id || '')}</span>` +
-              `<span class="badge ${st === 'proposed' ? 'reflect' : ''}">${escapeHtml(ventureStatusLabel(st))}</span>` +
+              `<span class="badge ${st === 'proposed' ? 'reflect' : ''}">${escapeHtml(v.pumpToken && st === 'active' ? (v.pumpToken.mint ? 'devnet minted' : 'approved for devnet') : ventureStatusLabel(st))}</span>` +
               `<span>${escapeHtml(v.category || '')}</span>` +
               `<span>${escapeHtml(money)}</span>` +
             '</div>' +
@@ -547,19 +559,20 @@
           const s = state.score ?? {};
           const desk = state.desk ?? { cashUsd: 0, positions: {} };
           const prices = state.lastPrices ?? {};
-          // The SOL/USD rate is FROZEN at genesis — SOL equity moves only with trading.
-          const solPrice = Number(state.genesisSolPriceUsd) || Number(prices.SOL) || 0;
+          const solPrice = Number(prices.SOL) || Number(state.genesisSolPriceUsd) || 0;
 
           const eqUsd = Number(s.equityUsd) || 0;
           const last = journal.length ? journal[journal.length - 1] : null;
           const eqSol = solPrice > 0 ? eqUsd / solPrice : last ? Number(last.equitySol) || 0 : 0;
-          const startSol = journal.length ? Number(journal[0].equitySol) || 0 : eqSol;
-          const peakSol = journal.reduce((mx, e) => Math.max(mx, Number(e.equitySol) || 0), eqSol);
+          const startSol = Number(state.genesisSolPriceUsd) > 0
+            ? (Number(s.startEquityUsd) || 0) / Number(state.genesisSolPriceUsd) : eqSol;
+          const liveSeries = journal.filter((e) => Number(e.solPriceUsd) > 0);
+          const peakSol = liveSeries.reduce((mx, e) => Math.max(mx, Number(e.equitySol) || 0), eqSol);
           const netSol = eqSol - startSol;
           const openPositions = Object.keys(desk.positions ?? {}).length;
           const vrev = Number(desk.ventureRevenueUsd) || 0;           // real venture revenue (separate line)
           const tradingUsd = eqUsd - vrev;                            // pure paper trading equity
-          const equitySub = (solPrice ? `${usd(eqUsd)} · frozen @ ${usd(solPrice)}/SOL` : usd(eqUsd))
+          const equitySub = (solPrice ? `${usd(eqUsd)} · observed @ ${usd(solPrice)}/SOL` : usd(eqUsd))
             + (vrev > 0 ? ` · trading ${usd(tradingUsd)} + ventures ${usd(vrev)}` : '');
 
           const tiles = document.getElementById('tiles');
@@ -567,7 +580,7 @@
             tile('cycle', state.cycle ?? 0),
             tile('equity', sol(eqSol), equitySub),
             tile('net PnL', signed(netSol, sol), signed(Number(s.netPnlUsd) || 0, usd)),
-            tile('peak equity', sol(peakSol)),
+            tile('peak equity', sol(peakSol), 'since live SOL valuation'),
             tile('population', (state.children ?? []).length),
             tile('open positions', openPositions),
             tile('cycles traded', s.tradeCycles ?? 0),
@@ -580,7 +593,7 @@
             tile('paper vs hold SOL', s.paperAlphaVsSolUsd == null ? 'no fresh quote' : signed(s.paperAlphaVsSolUsd, usd)),
             tile(
               'ventures',
-              (ventures?.ventures ?? []).filter((v) => v.status === 'active').length + ' live',
+              (ventures?.ventures ?? []).filter((v) => v.status === 'active').length + ' active',
               (ventures?.ventures ?? []).filter((v) => v.status === 'proposed').length + ' awaiting you',
             ),
           );
@@ -590,12 +603,12 @@
           const sinceStartPct = startSol > 0 ? (eqSol - startSol) / startSol : 0;
           growth.append(
             tile('since start', `<span class="${sinceStartPct >= 0 ? 'pos' : 'neg'}">${pct(sinceStartPct)}</span>`, `from ${sol(startSol)}`),
-            growthTile('per day (24h)', journal, eqSol, DAY),
-            growthTile('per week (7d)', journal, eqSol, 7 * DAY),
-            growthTile('per month (30d)', journal, eqSol, 30 * DAY),
+            growthTile('per day (24h)', liveSeries, eqSol, DAY),
+            growthTile('per week (7d)', liveSeries, eqSol, 7 * DAY),
+            growthTile('per month (30d)', liveSeries, eqSol, 30 * DAY),
           );
 
-          drawChart(journal);
+          drawChart(liveSeries);
           renderReasoning(journal);
           renderLessons(lessons);
           renderBook(desk, prices);
@@ -615,7 +628,7 @@
             tbody.appendChild(tr);
           });
 
-          status.textContent = `Loaded ${journal.length} cycles. Last run: ${state.lastRunAt ?? 'never'}.`;
+          status.textContent = `Loaded ${journal.length} cycles. SOL chart starts at v0.3.0 because older entries used a fixed SOL price. Last run: ${state.lastRunAt ?? 'never'}.`;
         } catch (err) {
           const notYet = /404/.test(String(err.message));
           status.className = notYet ? 'muted' : 'err';

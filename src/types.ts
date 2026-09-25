@@ -40,7 +40,7 @@ export interface SignedTxResult {
 
 /** A recorded on-chain action for the persisted state / journal. */
 export interface TxRecord {
-  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'heartbeat';
+  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'pump-create' | 'heartbeat';
   signature: string;
   lamports: number;
   from: string;
@@ -103,10 +103,8 @@ export interface AutomatonState {
   desk: Desk;
   /** last observed prices (USD/unit), used as a fallback when a fetch fails. */
   lastPrices: Record<string, number>;
-  /** SOL/USD price frozen at genesis. All SOL-denominated equity/tiers/death use
-   * THIS, not the live price, so the SOL/USD exchange rate never distorts the
-   * survival game — only the agent's own trading moves its SOL equity. 0 until
-   * the book is funded. */
+  /** SOL/USD price at genesis, for starting capital and the SOL-hold benchmark.
+   * Tiers and death use the current observed SOL price. 0 before funding. */
   genesisSolPriceUsd: number;
   children: ChildRecord[];
   caps: DailyCaps;
@@ -118,6 +116,9 @@ export interface AutomatonState {
   /** Durable intent written before broadcasting a value transfer. An ambiguous
    * result blocks later transfers until the operator reconciles the signature. */
   pendingTransfer?: { signature: string; to: string; lamports: number; at: string };
+  /** Confirmed Pump.fun launches. Persisted with the pending signature before
+   * the venture book, so a failed book save cannot mint the same coin twice. */
+  pumpMints?: Record<string, { mint: string; signature: string; at: string }>;
   /** consecutive cycles at/above the replicate threshold (Phase 3 gating). */
   sustainedSovereignCycles: number;
   dead: boolean;
@@ -129,6 +130,8 @@ export interface JournalEntry {
   tier: Tier;
   /** book equity in SOL terms (for the survival tiers). */
   equitySol: number;
+  /** Observed SOL/USD used for this cycle's SOL valuation. Older entries omit. */
+  solPriceUsd?: number;
   /** book equity in USD. */
   equityUsd: number;
   model: string;

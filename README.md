@@ -1,4 +1,4 @@
-# Apex Automaton v0.2.0
+# Apex Automaton v0.3.0
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -8,6 +8,35 @@ that on-chain operations work.
 Every Solana operation is a **real on-chain transaction**, but the cluster is
 checked against the devnet genesis hash before every signed operation. Devnet
 SOL has no monetary value. Anthropic API calls still cost real money.
+
+## Solana ventures and Pump.fun devnet
+
+The venture prompt now considers DeFi lending tools, NFT utility, leverage risk
+tools, token launches, Web3 apps and services alongside digital products. A
+category can have at most three active or pending ventures, so the queue cannot
+fill indefinitely with variations on one template. Each proposal must state a
+deliverable and the human action needed to launch it. A devnet token or a draft
+does **not** count as revenue; only separately reported sales enter the score.
+
+The first on-chain protocol route is a **Pump.fun token creation on devnet**.
+Its program is deployed on devnet. The agent can propose a venture with
+`pumpToken` containing `name`, `symbol` and a public HTTPS URI for metadata JSON.
+An operator checks the metadata and sets the proposal status to `approved` in
+`state/ventures.json`. After the next tick makes it `active`, the agent can use
+`pump_create` to create one token for that venture. The signer builds the Pump
+instruction itself with the official SDK, checks the devnet genesis hash,
+simulates the transaction, caps the wallet debit at `PUMP_MAX_CREATE_SOL` and
+the existing per-transaction and daily limits, and records signed intent before
+broadcast. It permits one launch per UTC day and saves the mint and signature
+with the main state to stop duplicate launches after a partial save.
+
+Set `PUMP_DEVNET_ENABLED=1` to expose this route. The hosted heartbeat and
+watchdog set it to true, but no proposal is approved automatically. Review the
+metadata URI, name and symbol before setting `approved`. If confirmation is
+uncertain, reconcile `pendingTransfer` on-chain before another value action.
+No buy, sell, lending, leverage or NFT market instructions are exposed yet.
+See [Solana opportunity map](docs/solana-opportunities.md) for the next adapters
+and the distinction between a devnet test and real demand.
 
 > ### The honest reality
 > Most "autonomous money-making agents" earn nothing. That is exactly why this

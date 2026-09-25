@@ -12,6 +12,7 @@ import type { AutonomyEntry, LaunchStep, Venture, VentureBook, VentureStatus } f
  */
 
 const MAX_OPEN_PROPOSALS = 5; // cap the queue so it stays a decision list, not a firehose.
+const MAX_LIVE_PER_CATEGORY = 3; // stop a stream of near-identical products.
 const DELIVERABLE_MAX = 6000; // keep a single proposal's deliverable bounded.
 
 export function emptyVentureBook(): VentureBook {
@@ -49,6 +50,22 @@ export interface ProposalInput {
   estRevenueUsd: number;
   killCriteria: string;
   launchSteps?: unknown;
+  pumpToken?: unknown;
+}
+
+export function validPumpToken(raw: unknown): { name: string; symbol: string; uri: string } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const v = raw as Record<string, unknown>;
+  if (typeof v.name !== 'string' || typeof v.symbol !== 'string' || typeof v.uri !== 'string') return null;
+  const name = v.name.trim();
+  const symbol = v.symbol.trim();
+  const uri = v.uri.trim();
+  if (!name || Buffer.byteLength(name) > 32 || !/^[A-Z0-9]{2,10}$/.test(symbol) || uri.length > 200) return null;
+  try {
+    const u = new URL(uri);
+    if (u.protocol !== 'https:' || !u.hostname || u.username || u.password) return null;
+  } catch { return null; }
+  return { name, symbol, uri };
 }
 
 const MAX_LAUNCH_STEPS = 8;
@@ -97,12 +114,21 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
   if (!title || !deliverable || !humanAction) {
     return { ok: false, reason: 'proposal needs at least a title, a deliverable, and a humanAction' };
   }
+  const pumpToken = input.pumpToken === undefined ? undefined : validPumpToken(input.pumpToken);
+  if (input.pumpToken !== undefined && !pumpToken) {
+    return { ok: false, reason: 'invalid Pump.fun token metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9)' };
+  }
+  const category = slug(input.category || 'other');
+  if (book.ventures.filter((v) => v.category === category &&
+    (v.status === 'proposed' || v.status === 'approved' || v.status === 'active')).length >= MAX_LIVE_PER_CATEGORY) {
+    return { ok: false, reason: `category ${category} already has ${MAX_LIVE_PER_CATEGORY} active or pending ventures; explore another market` };
+  }
   book.seq += 1;
   const venture: Venture = {
     id: `v${String(book.seq).padStart(4, '0')}`,
     createdAtCycle: cycle,
     at,
-    category: slug(input.category || 'other'),
+    category,
     title: title.slice(0, 160),
     thesis: (input.thesis ?? '').trim().slice(0, 1200),
     deliverable: deliverable.slice(0, DELIVERABLE_MAX),
@@ -112,6 +138,7 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     estRevenueUsd: cleanNum(input.estRevenueUsd),
     killCriteria: (input.killCriteria ?? '').trim().slice(0, 600),
     status: 'proposed',
+    ...(pumpToken ? { pumpToken } : {}),
     revenueUsd: 0,
     accountedRevenueUsd: 0,
   };
@@ -242,6 +269,9 @@ export function markLive(
 ): MarkLiveResult {
   const v = findVenture(book, id);
   if (!v) return { ok: false, reason: `no venture with id ${id}` };
+  if (v.pumpToken && v.status === 'proposed') {
+    return { ok: false, reason: 'approve Pump.fun metadata in ventures.json before marking this venture live' };
+  }
   const url =
     typeof liveUrl === 'string' && /^https?:\/\//i.test(liveUrl.trim())
       ? liveUrl.trim().slice(0, 400)
@@ -312,7 +342,12 @@ export function ventureDigest(book: VentureBook, n = 8): string {
     .map(([c]) => c);
   if (auto.length > 0) lines.push(`autonomy-earned categories: ${auto.join(', ')}`);
   const waiting = openProposalCount(book);
-  if (waiting > 0) lines.push(`${waiting} proposal(s) awaiting your approval before they can earn.`);
+  lines.push(`${waiting}/${MAX_OPEN_PROPOSALS} proposals awaiting your approval; active ventures do not count against this queue.`);
+  const crowded = Object.entries(
+    book.ventures.filter((v) => ['proposed', 'approved', 'active'].includes(v.status))
+      .reduce<Record<string, number>>((a, v) => ({ ...a, [v.category]: (a[v.category] ?? 0) + 1 }), {}),
+  ).filter(([, count]) => count >= MAX_LIVE_PER_CATEGORY).map(([category]) => category);
+  if (crowded.length) lines.push(`category slots full: ${crowded.join(', ')}; research a different user need or protocol.`);
   return lines.join('\n');
 }
 

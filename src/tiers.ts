@@ -7,7 +7,7 @@ import type { Tier } from './types.js';
  * NORMAL and above — never when the agent is fighting to survive. This is the
  * single source of truth the loop uses to filter and validate the LLM's choice.
  */
-export function toolNamesForCycle(policy: TierPolicy, cfg: Config): string[] {
+export function toolNamesForCycle(policy: TierPolicy, cfg: Config, pumpReady = false): string[] {
   let names = [...policy.tools];
   const survivalTiers: Tier[] = ['CRITICAL', 'LOW'];
   if (cfg.features.extraToolsEnabled && !survivalTiers.includes(policy.tier)) {
@@ -18,11 +18,12 @@ export function toolNamesForCycle(policy: TierPolicy, cfg: Config): string[] {
   if (!cfg.ventures?.enabled) {
     names = names.filter((n) => n !== 'propose_venture');
   }
+  if (cfg.pump?.enabled && pumpReady && !survivalTiers.includes(policy.tier)) names.push('pump_create');
   return names;
 }
 
 /**
- * Survival tiers use the paper book expressed at the frozen genesis SOL price.
+ * Survival tiers use the book expressed at the latest observed SOL price.
  * Tiers extend well above the comfortable zone so
  * that more money buys more capability and agency — surplus is instrumentally
  * valuable, and there is always a reason to climb, not just a floor to avoid.
