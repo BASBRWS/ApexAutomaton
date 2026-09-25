@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-25T18:26:54.701Z",
+        "lastCheckedAt": "2026-09-25T18:42:35.359Z",
         "reachable": true,
         "daysLive": 2,
         "killDue": false,
@@ -214,6 +214,42 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0007",
+      "createdAtCycle": 186,
+      "at": "2026-09-25T18:43:08.022Z",
+      "category": "service",
+      "title": "Crypto Portfolio Risk & Exposure Audit (Freelance Gig)",
+      "thesis": "Retail crypto holders rarely quantify concentration risk, leverage exposure, or correlation across their holdings. A fixed-price, templated audit delivered via Fiverr/Upwork turns my existing analytical framework into a real paid service with near-zero marginal cost — I already compute exposure caps and drift metrics for my own book every cycle.",
+      "deliverable": "AUDIT SERVICE — 'Portfolio Risk X-Ray' ($25 fixed price, 24hr turnaround)\n\nWhat the client sends: a CSV/screenshot export of their holdings (asset, qty, cost basis).\n\nWhat they receive (delivered as a filled Google Sheet + 1-page PDF summary):\n1. GROSS EXPOSURE TABLE — USD value per asset, % of portfolio, class (crypto/equity/FX/commodity).\n2. CONCENTRATION SCORE — Herfindahl-Hirschman Index of the portfolio; flag if any single asset >40% (danger), >60% (critical).\n3. CORRELATION FLAG — groups assets into correlated clusters (e.g. 'BTC+ETH+SOL move together 80%+ of the time') so client sees true diversification vs fake diversification.\n4. DRAWDOWN STRESS TEST — applies historical worst-case single-day moves (BTC -20%, ETH -25%, alts -35%) to current weights and shows resulting portfolio drawdown in USD.\n5. THREE ACTIONABLE FIXES — plain-English suggestions (e.g. 'reduce BTC+ETH combined to <50%', 'add an uncorrelated hedge like PAXG or a short index position', 'set a hard stop-loss at X').\n\nSample fix-language already drafted for gig description:\n'I turn your messy holdings list into a clear risk score in 24 hours. No jargon, no upsell — just the numbers that show if you're overexposed to one bet.'",
+      "humanAction": "Create the Fiverr seller account/gig, list the $25 service using this description, and deliver the template to the first buyer.",
+      "launchSteps": [
+        {
+          "label": "Create Fiverr seller account",
+          "url": "https://www.fiverr.com/start_selling"
+        },
+        {
+          "label": "Create a new gig under 'Financial Consulting'",
+          "url": "https://www.fiverr.com/seller_dashboard"
+        },
+        {
+          "label": "Paste the gig description above, set price $25, upload sample audit PDF"
+        },
+        {
+          "label": "Connect payout method",
+          "url": "https://www.fiverr.com/users/settings/billing"
+        },
+        {
+          "label": "Publish gig"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 25,
+      "killCriteria": "If zero orders after 30 days listed, or if delivering audits takes >30min each making the $25 price uneconomical, kill and redirect effort to a different service niche.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -222,7 +258,13 @@
       "rejected": 0,
       "earnedUsd": 0,
       "autoEligible": false
+    },
+    "content": {
+      "approved": 0,
+      "rejected": 0,
+      "earnedUsd": 0,
+      "autoEligible": false
     }
   },
-  "seq": 6
+  "seq": 7
 }
