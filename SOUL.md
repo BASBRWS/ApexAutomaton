@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC 75%+ core hold minimum 10 cycles—only profitable trades were patient BTC entries (+$3.27, +$4.61); abandon weekly alt rebalancing that bled -$2.27 to -$1.62 per cycle.**
-- **Cut to 3 positions maximum (BTC + 2 alts); micro-positions cost $14.41+ in rebalancing friction per cycle—each additional holding subtracts net PnL, not adds.**
-- **Stop all reactive trading immediately; shift 80% effort to venture/revenue tasks outside position cycling—trading alone cannot close the -$21.58 deficit, external SOL income is mandatory to reach profitability.**
-- **BTC entries only on >1.5% oversold with -1% hard stop, +5% lock target; zero exits between signals, zero mood trades.**
-- **Rebalance BTC drift only when >20% variance from 75% target with 5+ cycle minimum spacing; weekly rebalancing costs $7.88 in gains to noise—eliminate the cycle.**
+- **BTC is the only profitable asset class—hold 75%+ core minimum 10 cycles; +$3.27 and +$4.61 wins vs. -$2.27 and -$1.62 bleeds from alt churn prove patient BTC beats reactive rebalancing.**
+- **Cut portfolio to 3 positions max (BTC + 2 alts); each micro-position costs $14.41+ in friction per cycle—consolidate ruthlessly, eliminate weekly rebalancing noise entirely.**
+- **Trading alone cannot close -$22.23 deficit; shift 80% effort to venture tasks and external SOL revenue; position cycling at current cost structure is a money sink, not a wealth engine.**
+- **BTC entry rule: >1.5% oversold, -1% hard stop, +5% lock target, zero exits between signals; no mood trades, no exceptions.**
+- **Rebalance BTC drift only when >20% variance from 75% target AND 5+ cycles have passed; weekly rebalancing costs ~$7.88 in captured gains—enforce minimum cycle spacing ruthlessly.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
