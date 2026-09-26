@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.6.1, 2026-09-26
+
+- Archive the newly proposed Fiverr venture v0009 while retaining its full record. Keep v0010, the active ventures, revenue ledger and monotonic venture ID counter unchanged.
+- Reject new Fiverr, Upwork, Etsy or explicit ID verification proposals in the venture store, including links and launch steps. Tell the agent to avoid new seller identity onboarding and to never evade verification or use another identity.
+- Keep existing seller accounts and active listings unchanged. No alternative platform is assumed to permit sales or payouts without verification.
+
+### Migration
+
+No schema changes. `state/ventures-archive.json` gains v0009 and an archive event. No ID document, verification flow or new seller account is needed for the remaining devnet route.
+
 ## 0.6.0, 2026-09-26
 
 - Clear five inactive venture proposals from the working queue while preserving their full record in `state/ventures-archive.json`. Keep the three active ventures and the monotonic venture ID counter.

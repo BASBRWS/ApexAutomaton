@@ -82,5 +82,7 @@ describe('venture autonomy prompt', () => {
     expect(enabled).toContain('launchMode "autonomous-devnet"');
     expect(enabled).toContain('No human approval');
     expect(enabled).toContain('produces no sales or real revenue');
+    expect(enabled).toContain('will not upload a government ID');
+    expect(enabled).toContain('Do not propose Fiverr, Upwork, Etsy');
   });
 });

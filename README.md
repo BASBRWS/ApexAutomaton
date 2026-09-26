@@ -1,4 +1,4 @@
-# Apex Automaton v0.6.0
+# Apex Automaton v0.6.1
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -54,6 +54,13 @@ signer checks that the public JSON matches the stored venture, then attempts
 one capped zero-supply mint. The route is limited to one new experiment per UTC
 day and ten total. It has no payment or sale mechanism and earns no revenue.
 Metadata and the experiment are public once the heartbeat commits state.
+
+The operator does not want to submit a government ID to open a new seller
+account. New Fiverr, Upwork and Etsy proposals, and proposals asking for ID
+verification, are rejected by the venture store. A seller platform may still
+require identity checks before payouts; the agent must not bypass them or
+assume an alternative platform avoids them. Existing active listings stay as
+they are. An earlier Fiverr proposal, v0009, is kept in the venture archive.
 
 Set `PUMP_DEVNET_ENABLED=1` to expose this route. The hosted heartbeat and
 watchdog also set `NFT_DEVNET_ENABLED=1`, `SPL_DEVNET_ENABLED=1` and the

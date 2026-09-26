@@ -17,6 +17,10 @@ const MAX_LIVE_PER_CATEGORY = 3; // stop a stream of near-identical products.
 const DELIVERABLE_MAX = 6000; // keep a single proposal's deliverable bounded.
 const MAX_AUTONOMOUS_PER_DAY = 1;
 const MAX_AUTONOMOUS_TOTAL = 10;
+// The operator does not want to submit identity documents for a new seller
+// account. Check stored proposal text as well as links: prompt instructions
+// alone cannot stop the model from putting an ID-gated route in the queue.
+const ID_GATED_ROUTES = /\b(?:fiverr|upwork|etsy|kyc|identity verification|identiteitsverificatie|id-verificatie|passport|paspoort|government-issued id|overheids-id)\b/i;
 
 export function emptyVentureBook(): VentureBook {
   return { ventures: [], ledger: {}, seq: 0 };
@@ -132,6 +136,12 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
   const autonomous = input.launchMode === 'autonomous-devnet';
   if (input.launchMode !== undefined && !autonomous) {
     return { ok: false, reason: 'unsupported autonomous launch mode' };
+  }
+  const proposalText = [input.title, input.thesis, input.deliverable, input.humanAction,
+    ...(sanitizeLaunchSteps(input.launchSteps)?.flatMap((step) => [step.label, step.url ?? '']) ?? [])]
+    .filter((part): part is string => typeof part === 'string').join(' ');
+  if (ID_GATED_ROUTES.test(proposalText)) {
+    return { ok: false, reason: 'operator declined identity verification; choose a route without new seller ID onboarding' };
   }
   if (!autonomous && openProposalCount(book) >= MAX_OPEN_PROPOSALS) {
     return {

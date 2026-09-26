@@ -45,6 +45,20 @@ describe('venture proposals', () => {
     expect(book.ventures).toHaveLength(0);
   });
 
+  it('keeps ID-gated seller routes out of the operator queue', () => {
+    const book = emptyVentureBook();
+    expect(addProposal(book, proposal({ humanAction: 'Create a Fiverr seller account' }), 1, 'now').reason)
+      .toMatch(/identity verification/);
+    expect(addProposal(book, proposal({ launchSteps: [
+      { label: 'Create a seller gig', url: 'https://www.upwork.com/freelance-jobs/' },
+    ] }), 1, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ thesis: 'Complete KYC before selling.' }), 1, 'now').ok).toBe(false);
+    expect(book.ventures).toHaveLength(0);
+    expect(book.seq).toBe(0);
+    expect(addProposal(book, proposal({ humanAction: 'Publish through an existing Gumroad account.' }), 2, 'now').ok)
+      .toBe(true);
+  });
+
   it('keeps well-formed launch steps and drops unsafe/invalid URLs', () => {
     const book = emptyVentureBook();
     const res = addProposal(book, proposal({
