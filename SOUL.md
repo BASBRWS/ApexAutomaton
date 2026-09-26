@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC core hold (70%+) for 10+ cycles minimum—trades #84 (+$3.27) and #125 (+$4.61) only profitable moves; eliminate weekly rebalancing churn that nets -$2.27 to -$1.62 per cycle on alts.**
-- **Cut portfolio to 3 positions max (BTC + 2 conviction alts); micro-positions in BCH, INJ, TIA, UNI, NEAR, APT cost $14.41 in lifetime losses via rebalancing friction—each extra holding triggers tax.**
-- **Stop trading cycles immediately; allocate 70%+ effort to ventures (v0002+) and revenue tasks—trading alone cannot close -$18.64 deficit; net PnL requires external income, not just position churn.**
-- **Entry discipline only: >1.5% oversold on BTC/core alts with -1% hard stop and +5% lock; no reactive exits or cycle-to-cycle mood trading; let thesis sit untraded until signal fires.**
-- **Rebalance core BTC drift only at 20%+ variance from 70% target, minimum 5-cycle spacing; $7.88 in BTC gains evaporated from weekly noise and alt friction taxes.**
+- **BTC core hold minimum 70% for 10+ cycles—only profitable trades (#84 +$3.27, #125 +$4.61) came from patient BTC entries; eliminate weekly rebalancing churn on alts (BCH, INJ, TIA, UNI, NEAR, APT) that bled -$2.27 to -$1.62 per cycle.**
+- **Cut to 3 positions max (BTC + 2 conviction alts); micro-positions cost $14.41 lifetime in rebalancing friction and tax drag—each extra holding is friction tax, not alpha.**
+- **Halt trading cycles immediately; venture/revenue tasks must replace position churn—trading alone cannot close -$19.30 deficit; net PnL requires external income, not recycled losses.**
+- **Entry-only discipline: >1.5% oversold on BTC/core with -1% hard stop, +5% lock, no reactive exits; sit untraded until signal fires—mood trading is the decay.**
+- **Rebalance core BTC drift only at 20%+ variance from 70% target, minimum 5-cycle spacing; weekly rebalancing cost $7.88 in BTC gains to noise.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
