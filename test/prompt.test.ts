@@ -33,6 +33,22 @@ describe('buildUserPrompt — survival framing', () => {
     expect(prompt).toMatch(/metabolic/i);
     expect(prompt).toMatch(/COASTING IS DEATH/i);
   });
+
+  it('does not describe unavoidable drag on a flat book as losing trades to de-risk', () => {
+    const cfg = makeTestConfig();
+    const text = buildUserPrompt({
+      cycle: 225, tier: 'NORMAL', policy: policyForTier('NORMAL', cfg),
+      equityUsd: 213, equitySol: 1.76, dustSol: 0.02, dustUsd: 2.4,
+      avgBurnUsd: 0.05, runwayCycles: 3000, metabolicDailyPct: 0.96,
+      prices: { BTC: 60000 }, prevPrices: { BTC: 60000 }, deskSummary: 'no positions',
+      score: initialScore(234), journalDigest: '(none)', obituaryDigest: '(none)',
+      hasOpenPositions: false,
+      lossTrend: { level: 'alarm', drawdownPct: 0.09, lossStreak: 10, trailingPnlUsd: -0.7, window: 10 },
+    });
+    expect(text).toContain('There is no open position to cut');
+    expect(text).toContain('does not prove repeated losing trades');
+    expect(text).not.toContain('STOP THE BLEED: cut risk now');
+  });
 });
 
 describe('parseAction — tolerant action extraction', () => {

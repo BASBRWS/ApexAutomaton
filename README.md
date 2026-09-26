@@ -1,4 +1,4 @@
-# Apex Automaton v0.6.1
+# Apex Automaton v0.6.2
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -54,6 +54,13 @@ signer checks that the public JSON matches the stored venture, then attempts
 one capped zero-supply mint. The route is limited to one new experiment per UTC
 day and ten total. It has no payment or sale mechanism and earns no revenue.
 Metadata and the experiment are public once the heartbeat commits state.
+
+To limit unproductive API spend, a flat book with three recent rest or rejected
+venture decisions enters observation-only cycles. Prices and the devnet heartbeat
+continue every cycle, including the configured metabolic charge, but the model
+decides every fourth cycle. An open position, newly actionable venture or a
+fresh BTC/ETH move of at least 1% restores the normal decision cadence. This
+slows the bleed from compute; it does not create earnings or erase losses.
 
 The operator does not want to submit a government ID to open a new seller
 account. New Fiverr, Upwork and Etsy proposals, proposals requiring new seller

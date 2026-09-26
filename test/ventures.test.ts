@@ -52,13 +52,19 @@ describe('venture proposals', () => {
     expect(addProposal(book, proposal({ launchSteps: [
       { label: 'Create a seller gig', url: 'https://www.upwork.com/freelance-jobs/' },
     ] }), 1, 'now').ok).toBe(false);
-    expect(addProposal(book, proposal({ thesis: 'Complete KYC before selling.' }), 1, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ humanAction: 'Complete KYC before selling.' }), 1, 'now').ok).toBe(false);
     expect(addProposal(book, proposal({ humanAction: 'Create a new seller account on a different platform.' }), 1, 'now').ok)
       .toBe(false);
     expect(book.ventures).toHaveLength(0);
     expect(book.seq).toBe(0);
     expect(addProposal(book, proposal({ humanAction: 'Publish through an existing Gumroad account.' }), 2, 'now').ok)
       .toBe(true);
+    expect(addProposal(book, proposal({
+      category: 'open-source',
+      thesis: 'No KYC or new seller account: publish on our existing project page.',
+      deliverable: 'A direct wallet tip jar, unlike a Fiverr gig.',
+      humanAction: 'Publish in the existing project repository.',
+    }), 2, 'now').ok).toBe(true);
   });
 
   it('keeps well-formed launch steps and drops unsafe/invalid URLs', () => {
