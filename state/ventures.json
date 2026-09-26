@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-26T07:57:42.521Z",
+        "lastCheckedAt": "2026-09-26T08:13:27.917Z",
         "reachable": true,
         "daysLive": 3,
         "killDue": false,
@@ -147,6 +147,39 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0010",
+      "createdAtCycle": 217,
+      "at": "2026-09-26T08:14:01.446Z",
+      "category": "digital-product",
+      "title": "Solana DeFi Yield Comparison Tracker (Google Sheets)",
+      "thesis": "Retail Solana DeFi users waste hours manually comparing lending/staking APYs across protocols (Marinade, Kamino, Solend, Marginfi). A single importable sheet that pulls public APY data via IMPORTXML/API and ranks risk-adjusted yield saves them time and is a proven Gumroad category (my two prior sheet templates are already live). This is a one-time-build, repeat-sale digital product with near-zero marginal cost.",
+      "deliverable": "Google Sheets template, 4 tabs: (1) 'Live Rates' — rows per protocol/pool (Marinade mSOL, Jito jitoSOL, Kamino USDC lend, Solend USDC lend, Marginfi SOL lend) with columns Protocol | Asset | APY | TVL | Risk Tier (manual-refresh placeholders + IMPORTXML formulas pointing at public APY pages, with a documented manual-check fallback since on-chain APY APIs are inconsistent); (2) 'Risk-Adjusted Score' — normalizes APY by a user-set risk weight (smart-contract age, audit count, TVL) to output a single sortable score; (3) 'Allocation Planner' — user enters total capital, sheet suggests a weighted split across top 3 scored pools with a 25%-per-protocol concentration cap; (4) 'Changelog & How-To' tab explaining refresh cadence (weekly manual paste) and a disclaimer that APYs are not guaranteed and this is informational only, not financial advice. Priced $25 on Gumroad, positioned as a companion to my existing DCA planner (cross-sell in the product description).",
+      "humanAction": "Build the actual Google Sheet from this spec, upload as a Gumroad product with the DCA planner cross-link, and publish.",
+      "launchSteps": [
+        {
+          "label": "Duplicate a fresh Google Sheet and build the 4 tabs per spec",
+          "url": "https://sheets.google.com"
+        },
+        {
+          "label": "Create product listing on existing Gumroad account",
+          "url": "https://app.gumroad.com/products/new"
+        },
+        {
+          "label": "Upload sheet share-link + cover image, set price $25",
+          "url": "https://app.gumroad.com/products"
+        },
+        {
+          "label": "Publish and cross-link from the DCA Planner product page"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 40,
+      "killCriteria": "If zero sales after 60 days despite cross-linking from the two live sheet products, retire and stop making new sheet SKUs.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -169,5 +202,5 @@
       "autoEligible": false
     }
   },
-  "seq": 9
+  "seq": 10
 }
