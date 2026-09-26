@@ -7,13 +7,21 @@ import type { LossTrend } from './losstrend.js';
 /** The escalating loss-trend block: raises concern on a sustained drawdown/losing
  * streak, and — the point the operator asked for — prescribes DE-RISKING, never
  * more trading. Overtrading in a drawdown is explicitly named as the wrong move. */
-function lossTrendBlock(lt: LossTrend | undefined): string[] {
+function lossTrendBlock(lt: LossTrend | undefined, hasOpenPositions = true): string[] {
   if (!lt || lt.level === 'ok') return [];
   const dd = (lt.drawdownPct * 100).toFixed(1);
   const trail = `${lt.trailingPnlUsd >= 0 ? '+' : '-'}$${Math.abs(lt.trailingPnlUsd).toFixed(2)}`;
   const stats =
     `Down ${dd}% from your peak · ${lt.lossStreak} losing cycle(s) in a row · ` +
     `trailing PnL over last ${lt.window} cycles: ${trail}.`;
+  if (!hasOpenPositions) return [
+    '## Equity drag while flat', stats,
+    'There is no open position to cut. This equity decline includes compute burn',
+    'and metabolic cost; the streak alone does not prove repeated losing trades. Do not repeat proposals',
+    'already rejected by policy. Look for a valid earning opportunity when a new',
+    'decision is due; otherwise the observation-only cadence avoids needless model spend.',
+    '',
+  ];
   const antiChurn =
     'The DISCIPLINED response to a losing trend is to PROTECT capital, not to trade more. ' +
     'Overtrading in a drawdown compounds the loss — that is your own hard-won lesson ' +
@@ -84,6 +92,10 @@ export function buildSystemPrompt(args: {
         'just an idea. For external platforms and real payments, an operator still owns',
         'the account, terms acceptance and payout connection; these ventures wait in the',
         'approval queue. Once active, only reported REAL revenue enters your book.',
+        'A devnet mint, unlaunched proposal or tip address is not income. Do not',
+        'keep proposing a route that policy rejected. Your strategy notes are',
+        'hypotheses, not a ban on every future trade: a measured paper trade may',
+        'grow the book when no verified external revenue channel is available.',
         'The operator will not upload a government ID or complete new seller identity',
         'verification. Do not propose Fiverr, Upwork, Etsy, KYC or any route that',
         'asks the operator to verify identity to open a seller account. Do not',
@@ -213,6 +225,7 @@ export function buildUserPrompt(args: {
   lessonsDigest?: string;
   reflectNudge?: boolean;
   lossTrend?: LossTrend;
+  hasOpenPositions?: boolean;
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -247,7 +260,7 @@ export function buildUserPrompt(args: {
     'So each cycle: are you safe enough to take risk and GROW (usually yes), or bleeding',
     'badly and needing to preserve briefly to SURVIVE? Decide explicitly and act on it.',
     '',
-    ...lossTrendBlock(args.lossTrend),
+    ...lossTrendBlock(args.lossTrend, args.hasOpenPositions),
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',
     '',

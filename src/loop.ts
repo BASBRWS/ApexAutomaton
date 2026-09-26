@@ -7,6 +7,7 @@ import { loadConstitution } from './constitution/index.js';
 import { soulForPrompt, ensureSoul, syncSoulHistory } from './soul.js';
 import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } from './journal.js';
 import { assessLossTrend } from './losstrend.js';
+import { shouldObserveOnly } from './decision-cadence.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
 import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
@@ -37,11 +38,11 @@ import {
   ventureDigest,
   updateVentureMonitor,
 } from './ventures/store.js';
-import { buildSystemPrompt, buildUserPrompt, parseAction } from './prompt.js';
+import { buildSystemPrompt, buildUserPrompt, parseAction, type AgentAction } from './prompt.js';
 import { appendLesson, lessonsDigest, realizedFromClose, recentLessons } from './memory/lessons.js';
 import { autoReflect } from './memory/reflect.js';
 import { AnthropicClient } from './llm/anthropic.js';
-import type { LLMClient } from './llm/client.js';
+import type { LLMClient, LLMResponse } from './llm/client.js';
 import type { AutomatonState, JournalEntry, Tier } from './types.js';
 
 /**
@@ -157,6 +158,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // ledger. The book is owned by the loop and saved once at the end. --------------
   const ventureBook = cfg.ventures.enabled ? loadVentureBook() : null;
   let ventureNote: string | undefined;
+  let ventureChanged = false;
   if (ventureBook) {
     state.creditedVentureRevenueUsd ??= Object.fromEntries(
       ventureBook.ventures.map((venture) => [venture.id, venture.accountedRevenueUsd ?? 0]),
@@ -173,6 +175,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       },
       state.creditedVentureRevenueUsd,
     );
+    ventureChanged = decisions.activated.length > 0 || decisions.revenueAddedUsd > 0;
     const parts: string[] = [];
     if (decisions.activated.length > 0) parts.push(`ventures live +${decisions.activated.length}`);
     if (decisions.revenueAddedUsd > 0) parts.push(`venture revenue +$${decisions.revenueAddedUsd.toFixed(2)}`);
@@ -321,23 +324,38 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       peakEquityUsd: state.score.peakEquityUsd,
       recentPnls: readRecent(10).map((e) => Number(e.cyclePnlUsd) || 0),
     }),
+    hasOpenPositions: Object.keys(state.desk.positions).length > 0,
   });
 
-  // --- Think: one LLM call, priced by the tier's model. ---------------------
+  // --- Think only when another decision can add information. On a flat book
+  // with repeated no-op decisions, a periodic decision and market-move wakeup
+  // preserve agency while observation-only cycles avoid unproductive API burn.
   const llm = deps.llm ?? new AnthropicClient();
-  const resp = await llm.generate({
-    model: policy.model,
-    system,
-    messages: [{ role: 'user', content: user }],
-    maxTokens: policy.maxTokens,
-    effort: policy.effort,
+  const observeOnly = shouldObserveOnly({
+    cycle,
+    openPositions: Object.keys(state.desk.positions).length,
+    prices: executablePrices,
+    previousPrices: prevPrices,
+    recent: readRecent(3),
+    ventureChanged,
+    onchainActionReady: pumpReady || nftReady || splReady,
   });
-  const costUsd = computeCostUsd(policy.model, resp.usage);
+  let resp: LLMResponse | undefined;
+  if (!observeOnly) {
+    resp = await llm.generate({
+      model: policy.model,
+      system,
+      messages: [{ role: 'user', content: user }],
+      maxTokens: policy.maxTokens,
+      effort: policy.effort,
+    });
+  }
+  const costUsd = resp ? computeCostUsd(policy.model, resp.usage) : 0;
 
   // --- Decide + act (fall back to rest on any ambiguity). -------------------
-  const action = parseAction(resp.text);
+  const action: AgentAction | null = resp ? parseAction(resp.text) : null;
   let chosenName = action?.tool ?? 'rest';
-  let coerceNote: string | undefined;
+  let coerceNote: string | undefined = observeOnly ? 'observation-only: no LLM call; decision resumes on next scheduled cycle or core-market move' : undefined;
   if (!registry.has(chosenName) || !allowedToolNames.includes(chosenName)) {
     coerceNote = `requested tool "${chosenName}" not available at tier ${tier}; rested`;
     chosenName = 'rest';
@@ -575,11 +593,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     equitySol: equityToSol(equityPost, solPrice),
     solPriceUsd: solPrice,
     equityUsd: equityPost,
-    model: policy.model,
+    model: resp ? policy.model : '(none)',
     action: chosenName,
     actionSummary: toolResult.summary,
     rationale: action?.rationale,
-    reasoning: resp.thinking,
+    reasoning: resp?.thinking,
     costUsd,
     cyclePnlUsd,
     signatures,

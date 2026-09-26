@@ -18,8 +18,8 @@ const DELIVERABLE_MAX = 6000; // keep a single proposal's deliverable bounded.
 const MAX_AUTONOMOUS_PER_DAY = 1;
 const MAX_AUTONOMOUS_TOTAL = 10;
 // The operator does not want to submit identity documents for a new seller
-// account. Check stored proposal text as well as links: prompt instructions
-// alone cannot stop the model from putting an ID-gated route in the queue.
+// account. Check the requested launch action and links, not narrative comparisons
+// such as "no KYC" in the thesis: rejecting those wastes an expensive cycle.
 const ID_GATED_ROUTES = /\b(?:fiverr|upwork|etsy|kyc|identity verification|identiteitsverificatie|id-verificatie|passport|paspoort|government-issued id|overheids-id)\b/i;
 const NEW_SELLER_ACCOUNT = /\b(?:create|open|register|sign\s?up|set\s?up|aanmaken|openen|registreren)\b.{0,100}\b(?:seller|freelancer|merchant|payout|payment|store|shop|gig|account|verkoper|winkel|uitbetaling|betaalrekening)\b/i;
 
@@ -138,10 +138,10 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
   if (input.launchMode !== undefined && !autonomous) {
     return { ok: false, reason: 'unsupported autonomous launch mode' };
   }
-  const proposalText = [input.title, input.thesis, input.deliverable, input.humanAction,
+  const launchText = [input.title, input.humanAction,
     ...(sanitizeLaunchSteps(input.launchSteps)?.flatMap((step) => [step.label, step.url ?? '']) ?? [])]
     .filter((part): part is string => typeof part === 'string').join(' ');
-  if (ID_GATED_ROUTES.test(proposalText) || NEW_SELLER_ACCOUNT.test(proposalText)) {
+  if (ID_GATED_ROUTES.test(launchText) || NEW_SELLER_ACCOUNT.test(launchText)) {
     return { ok: false, reason: 'operator declined new seller ID onboarding; use an existing channel without new verification' };
   }
   if (!autonomous && openProposalCount(book) >= MAX_OPEN_PROPOSALS) {

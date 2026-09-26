@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.6.2, 2026-09-26
+
+- Stop paying for repeated idle decisions on a flat book. After three rest or rejected-venture cycles, keep observing and journaling every heartbeat but call the decision model only every fourth cycle until a fresh BTC/ETH move of at least 1%, an open position, or an actionable venture wakes it. Real LLM cost is zero on observation-only cycles; the modeled metabolic charge and devnet heartbeat continue.
+- Interpret a losing streak with no open positions as compute/metabolic drag, not evidence of repeated losing trades. Avoid telling an already flat agent to cut exposure it does not have.
+- Check seller-ID policy against actual proposed launch steps and title instead of comparing text in the thesis or deliverable. A proposal that says "no KYC" no longer gets rejected solely for mentioning KYC. New seller account requests and restricted platforms remain blocked.
+
+### Migration
+
+No score or state reset. At diagnosis, cycle 223 had $213.30 paper equity and no open positions. Model calls had been about $0.05 per recent cycle plus about $0.021 metabolic drag. After this change, observation-only cycles still record the real decline from metabolism. The agent must find actual gains to reverse it; skipping calls only reduces avoidable compute burn.
+
 ## 0.6.1, 2026-09-26
 
 - Archive the newly proposed Fiverr venture v0009 while retaining its full record. Keep v0010, the active ventures, revenue ledger and monotonic venture ID counter unchanged.
