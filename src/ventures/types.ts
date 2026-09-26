@@ -5,10 +5,11 @@
  * are the opposite: the agent hunts BROADLY for any legal way to create real
  * value (a digital product, a piece of content, a service, an arbitrage — the
  * category is free-form on purpose), and it BUILDS the deliverable itself. What
- * it cannot do is cross the money/identity edge: opening an account, accepting a
- * platform's terms, connecting a payment rail, spending real money. Those steps
- * are legally a human's, so every venture waits in an APPROVAL QUEUE for exactly
- * one human decision. Approved ventures' real, reported revenue is then folded
+ * it cannot do is cross an unimplemented money/identity edge: opening an account,
+ * accepting a platform's terms, connecting a payment rail, spending real money.
+ * External ventures wait in the approval queue; narrowly scoped first-party
+ * devnet experiments can be launched by code without a per-venture decision.
+ * Approved ventures' real, reported revenue is then folded
  * back into the book — so the survival score becomes grounded in real value, not
  * only paper marks.
  */
@@ -18,7 +19,7 @@ export type VentureStatus =
   | 'proposed'
   /** you approved it; the loop activates it on the next cycle. */
   | 'approved'
-  /** live in the real world (you took the human action); may not be earning yet. */
+  /** launched by an operator or a permitted autonomous route; may not be earning. */
   | 'active'
   /** ended — abandoned by you or the agent (see killCriteria). */
   | 'killed'
@@ -81,6 +82,8 @@ export interface Venture {
   /** when to abandon it — a concrete, falsifiable condition. */
   killCriteria: string;
   status: VentureStatus;
+  /** A first-party devnet route may start without a per-venture human decision. */
+  launchMode?: 'autonomous-devnet';
   /** the public URL where it is selling, once the human has listed it live. */
   liveUrl?: string;
   /** ISO timestamp the human marked it live (starts the kill-criteria clock). */

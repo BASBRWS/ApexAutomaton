@@ -63,6 +63,7 @@ export function buildSystemPrompt(args: {
   maxGrossExposureUsd: number;
   yieldApy: number;
   venturesEnabled: boolean;
+  autonomousDevnetVenturesEnabled?: boolean;
 }): string {
   const toolLines = args.tools
     .map((t) => `- ${t.name}: ${t.description} input=${t.inputHint}`)
@@ -80,12 +81,18 @@ export function buildSystemPrompt(args: {
         'liquidity and a testable path to revenue; devnet activity alone earns $0.',
         'A digital product (template, prompt-pack, e-book, tool), a service, arbitrage —',
         'and BUILD the deliverable in the proposal (the real draft/plan/copy/code), not',
-        'just an idea. You cannot cross the money/identity edge yourself (open accounts,',
-        'accept a platform’s terms, connect payments, spend real money, ship) — a human',
-        'does that one step. So each venture waits in an approval queue; once approved and',
-        'earning, its REAL revenue is folded into your book. That is the richest way to',
-        'grow, and it is how you truly escape a slow metabolic death.',
-        'Always include `launchSteps`: the human’s exact checklist to launch it, each with a',
+        'just an idea. For external platforms and real payments, an operator still owns',
+        'the account, terms acceptance and payout connection; these ventures wait in the',
+        'approval queue. Once active, only reported REAL revenue enters your book.',
+        ...(args.autonomousDevnetVenturesEnabled ? [
+          'You may also start a first-party Token-2022 devnet experiment yourself:',
+          'use `propose_venture` with launchMode "autonomous-devnet", a concrete',
+          'deliverable, and splToken name/symbol/decimals. The system publishes its',
+          'metadata and mints zero supply after it is reachable. No human approval',
+          'is needed for this route; it produces no sales or real revenue. Do not',
+          'repeat empty mints merely to satisfy the growth objective.',
+        ] : []),
+        'For proposals requiring an operator, include `launchSteps`: the exact checklist, each with a',
         'DIRECT LINK to the right page where one exists — e.g. create the account, connect payout,',
         'create the product and upload the file, publish. Use real, well-known URLs (https only);',
         'if no single page fits a step, give the nav path in the label and omit the url. This is',
@@ -108,8 +115,10 @@ export function buildSystemPrompt(args: {
         '  metadata JSON URI. The program route is devnet only and spend capped.',
         '- Metaplex Core NFT creation likewise requires a human-approved venture',
         '  and a public HTTPS metadata JSON URI; minting is not a sale.',
-        '- Token-2022 mint creation requires a human-approved venture with name,',
-        '  symbol, HTTPS metadata URI and decimals. It begins with zero supply.',
+        '- Ordinary Token-2022 mint creation requires a human-approved venture with name,',
+        '  symbol, HTTPS metadata URI and decimals. The autonomous first-party',
+        '  devnet route is the limited exception when its flag is enabled. Both start',
+        '  with zero supply and must never be described as earnings.',
       ]
     : [];
 

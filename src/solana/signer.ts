@@ -12,6 +12,7 @@ import type { AutomatonState, SignedTxResult, TransferProposal } from '../types.
 import type { Venture } from '../ventures/types.js';
 import { validNftAsset, validPumpToken, validSplToken } from '../ventures/store.js';
 import { buildSplMintTx, splMintSpace } from './spl-mint.js';
+import { autonomousMetadata, autonomousMetadataUrl } from '../ventures/autonomy.js';
 import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
 
@@ -373,6 +374,26 @@ export class Signer {
     if (venture.status !== 'active' || !venture.splToken) throw new PolicyError('venture is not approved for Token-2022 creation');
     const metadata = validSplToken(venture.splToken);
     if (!metadata) throw new PolicyError('invalid approved Token-2022 metadata');
+    if (venture.launchMode === 'autonomous-devnet') {
+      if (!this.cfg.ventures.autonomousDevnetEnabled || metadata.uri !== autonomousMetadataUrl(venture.id)) {
+        throw new PolicyError('autonomous metadata route disabled or changed');
+      }
+      // Creation waits for the previous heartbeat commit and Pages deployment.
+      // The agent cannot replace the metadata URI with an arbitrary endpoint.
+      let document: unknown;
+      try {
+        const response = await fetch(metadata.uri, { signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        document = await response.json();
+      } catch {
+        throw new PolicyError('autonomous metadata is not published yet');
+      }
+      const expected = autonomousMetadata(venture);
+      const found = document && typeof document === 'object' ? document as Record<string, unknown> : {};
+      if (found.name !== expected.name || found.symbol !== expected.symbol || found.description !== expected.description) {
+        throw new PolicyError('published metadata does not match the stored venture');
+      }
+    }
     if (venture.splToken.mint || this.state.splMints?.[venture.id]) throw new PolicyError('venture already minted');
     if (this.state.pendingTransfer) throw new PolicyError('unreconciled signed transaction');
 

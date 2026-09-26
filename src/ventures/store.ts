@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { STATE_DIR, VENTURES_FILE } from '../paths.js';
 import type { AutonomyEntry, LaunchStep, Venture, VentureBook, VentureStatus } from './types.js';
+import { autonomousMetadataUrl } from './autonomy.js';
 
 /**
  * ventures/store.ts — the venture pipeline's persistence AND its pure logic.
@@ -14,6 +15,8 @@ import type { AutonomyEntry, LaunchStep, Venture, VentureBook, VentureStatus } f
 const MAX_OPEN_PROPOSALS = 5; // cap the queue so it stays a decision list, not a firehose.
 const MAX_LIVE_PER_CATEGORY = 3; // stop a stream of near-identical products.
 const DELIVERABLE_MAX = 6000; // keep a single proposal's deliverable bounded.
+const MAX_AUTONOMOUS_PER_DAY = 1;
+const MAX_AUTONOMOUS_TOTAL = 10;
 
 export function emptyVentureBook(): VentureBook {
   return { ventures: [], ledger: {}, seq: 0 };
@@ -53,6 +56,7 @@ export interface ProposalInput {
   pumpToken?: unknown;
   nftAsset?: unknown;
   splToken?: unknown;
+  launchMode?: unknown;
 }
 
 function validMetadataUri(raw: unknown): string | null {
@@ -125,28 +129,44 @@ function slug(s: string): string {
  * throwing) when the queue is full or the proposal is missing its essentials, so
  * the loop can record a clean journal note instead of crashing. */
 export function addProposal(book: VentureBook, input: ProposalInput, cycle: number, at: string): AddProposalResult {
-  if (openProposalCount(book) >= MAX_OPEN_PROPOSALS) {
+  const autonomous = input.launchMode === 'autonomous-devnet';
+  if (input.launchMode !== undefined && !autonomous) {
+    return { ok: false, reason: 'unsupported autonomous launch mode' };
+  }
+  if (!autonomous && openProposalCount(book) >= MAX_OPEN_PROPOSALS) {
     return {
       ok: false,
       reason: `queue full (${MAX_OPEN_PROPOSALS} proposals awaiting your decision) — no new proposal added`,
     };
   }
+  if (autonomous && (!input.splToken || input.pumpToken || input.nftAsset)) {
+    return { ok: false, reason: 'autonomous launch only supports first-party Token-2022 devnet mints' };
+  }
+  if (autonomous && book.ventures.filter((v) => v.launchMode === 'autonomous-devnet').length >= MAX_AUTONOMOUS_TOTAL) {
+    return { ok: false, reason: 'autonomous devnet venture limit reached' };
+  }
+  if (autonomous && book.ventures.some((v) => v.launchMode === 'autonomous-devnet' && v.at.slice(0, 10) === at.slice(0, 10))) {
+    return { ok: false, reason: `only ${MAX_AUTONOMOUS_PER_DAY} autonomous devnet venture per UTC day` };
+  }
   const title = input.title?.trim();
   const deliverable = input.deliverable?.trim();
-  const humanAction = input.humanAction?.trim();
+  const humanAction = autonomous ? 'No operator action for this devnet experiment.' : input.humanAction?.trim();
   if (!title || !deliverable || !humanAction) {
     return { ok: false, reason: 'proposal needs at least a title, a deliverable, and a humanAction' };
   }
   const pumpToken = input.pumpToken === undefined ? undefined : validPumpToken(input.pumpToken);
   const nftAsset = input.nftAsset === undefined ? undefined : validNftAsset(input.nftAsset);
-  const splToken = input.splToken === undefined ? undefined : validSplToken(input.splToken);
+  const rawSpl = autonomous && input.splToken && typeof input.splToken === 'object' && !Array.isArray(input.splToken)
+    ? { ...input.splToken, uri: autonomousMetadataUrl(`v${String(book.seq + 1).padStart(4, '0')}`) }
+    : input.splToken;
+  const splToken = rawSpl === undefined ? undefined : validSplToken(rawSpl);
   if (input.pumpToken !== undefined && !pumpToken) {
     return { ok: false, reason: 'invalid Pump.fun token metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9)' };
   }
   if (input.nftAsset !== undefined && !nftAsset) {
     return { ok: false, reason: 'invalid NFT metadata (HTTPS URI and name <=32 bytes)' };
   }
-  if (input.splToken !== undefined && !splToken) {
+  if (rawSpl !== undefined && !splToken) {
     return { ok: false, reason: 'invalid Token-2022 metadata (HTTPS URI, name <=32 bytes, symbol 2-10 A-Z/0-9, decimals 0-9)' };
   }
   if ([pumpToken, nftAsset, splToken].filter(Boolean).length > 1) {
@@ -172,6 +192,7 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
     estRevenueUsd: cleanNum(input.estRevenueUsd),
     killCriteria: (input.killCriteria ?? '').trim().slice(0, 600),
     status: 'proposed',
+    ...(autonomous ? { launchMode: 'autonomous-devnet' as const } : {}),
     ...(pumpToken ? { pumpToken } : {}),
     ...(nftAsset ? { nftAsset } : {}),
     ...(splToken ? { splToken } : {}),

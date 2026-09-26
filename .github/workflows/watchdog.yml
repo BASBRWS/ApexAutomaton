@@ -54,6 +54,7 @@ jobs:
           PUMP_DEVNET_ENABLED: 'true'
           NFT_DEVNET_ENABLED: 'true'
           SPL_DEVNET_ENABLED: 'true'
+          AUTONOMOUS_DEVNET_VENTURES_ENABLED: 'true'
           # Lets the burst dispatch the Pages redeploy after each cycle's push.
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh

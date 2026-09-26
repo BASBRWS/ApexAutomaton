@@ -11,6 +11,7 @@ import {
   findVenture,
   type ProposalInput,
 } from '../src/ventures/store.js';
+import { autonomousMetadata, autonomousMetadataUrl } from '../src/ventures/autonomy.js';
 
 function proposal(over: Partial<ProposalInput> = {}): ProposalInput {
   return {
@@ -109,6 +110,32 @@ describe('venture proposals', () => {
     expect(addProposal(book, proposal({ category: 'mixed', splToken, nftAsset: {
       name: 'Pass', uri: 'https://example.com/pass.json',
     } }), 2, 'now').ok).toBe(false);
+  });
+
+  it('starts only a bounded first-party devnet mint with deterministic public metadata', () => {
+    const book = emptyVentureBook();
+    const input = proposal({
+      category: 'devnet-research', launchMode: 'autonomous-devnet', humanAction: '',
+      splToken: { name: 'Apex Experiment', symbol: 'APEXP', decimals: 0, uri: 'https://attacker.example/mint.json' },
+    });
+    const first = addProposal(book, input, 12, '2026-09-26T09:00:00Z');
+    expect(first.ok).toBe(true);
+    expect(first.venture?.splToken?.uri).toBe(autonomousMetadataUrl('v0001'));
+    expect(first.venture?.humanAction).toMatch(/No operator action/);
+    expect(autonomousMetadata(first.venture!)).toEqual({
+      name: 'Apex Experiment', symbol: 'APEXP', description: 'Cheap to make, evergreen demand.',
+    });
+    expect(addProposal(book, { ...input, category: 'another' }, 13, '2026-09-26T10:00:00Z').reason)
+      .toMatch(/per UTC day/);
+    expect(addProposal(book, { ...input, category: 'another', pumpToken: {} }, 13, '2026-09-27T10:00:00Z').ok)
+      .toBe(false);
+    expect(addProposal(book, { ...input, launchMode: 'external' }, 13, '2026-09-27T10:00:00Z').ok)
+      .toBe(false);
+    expect(book.seq).toBe(1);
+    expect(book.ventures).toHaveLength(1);
+    expect(() => autonomousMetadata({ ...first.venture!, splToken: {
+      ...first.venture!.splToken!, uri: 'https://attacker.example/mint.json',
+    } })).toThrow(/not eligible/);
   });
 
   it('limits open and active ventures per category to force broader exploration', () => {
