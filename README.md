@@ -56,8 +56,8 @@ day and ten total. It has no payment or sale mechanism and earns no revenue.
 Metadata and the experiment are public once the heartbeat commits state.
 
 The operator does not want to submit a government ID to open a new seller
-account. New Fiverr, Upwork and Etsy proposals, and proposals asking for ID
-verification, are rejected by the venture store. A seller platform may still
+account. New Fiverr, Upwork and Etsy proposals, proposals requiring new seller
+accounts, and proposals asking for ID verification are rejected by the venture store. A seller platform may still
 require identity checks before payouts; the agent must not bypass them or
 assume an alternative platform avoids them. Existing active listings stay as
 they are. An earlier Fiverr proposal, v0009, is kept in the venture archive.

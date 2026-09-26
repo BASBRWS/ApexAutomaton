@@ -48,11 +48,13 @@ describe('venture proposals', () => {
   it('keeps ID-gated seller routes out of the operator queue', () => {
     const book = emptyVentureBook();
     expect(addProposal(book, proposal({ humanAction: 'Create a Fiverr seller account' }), 1, 'now').reason)
-      .toMatch(/identity verification/);
+      .toMatch(/seller ID onboarding/);
     expect(addProposal(book, proposal({ launchSteps: [
       { label: 'Create a seller gig', url: 'https://www.upwork.com/freelance-jobs/' },
     ] }), 1, 'now').ok).toBe(false);
     expect(addProposal(book, proposal({ thesis: 'Complete KYC before selling.' }), 1, 'now').ok).toBe(false);
+    expect(addProposal(book, proposal({ humanAction: 'Create a new seller account on a different platform.' }), 1, 'now').ok)
+      .toBe(false);
     expect(book.ventures).toHaveLength(0);
     expect(book.seq).toBe(0);
     expect(addProposal(book, proposal({ humanAction: 'Publish through an existing Gumroad account.' }), 2, 'now').ok)
@@ -63,7 +65,7 @@ describe('venture proposals', () => {
     const book = emptyVentureBook();
     const res = addProposal(book, proposal({
       launchSteps: [
-        { label: 'Create a Gumroad account', url: 'https://gumroad.com/signup' },
+        { label: 'Use existing Gumroad account', url: 'https://app.gumroad.com/products' },
         { label: 'Publish' }, // no url is fine
         { label: 'Evil', url: 'javascript:alert(1)' }, // unsafe → url stripped, label kept
         { label: '' }, // no label → dropped
@@ -72,7 +74,7 @@ describe('venture proposals', () => {
     }), 1, 'now');
     const steps = res.venture?.launchSteps ?? [];
     expect(steps).toHaveLength(3);
-    expect(steps[0]).toEqual({ label: 'Create a Gumroad account', url: 'https://gumroad.com/signup' });
+    expect(steps[0]).toEqual({ label: 'Use existing Gumroad account', url: 'https://app.gumroad.com/products' });
     expect(steps[1]).toEqual({ label: 'Publish' });
     expect(steps[2]).toEqual({ label: 'Evil' }); // javascript: URL removed, no url key
   });

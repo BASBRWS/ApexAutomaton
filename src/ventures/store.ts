@@ -21,6 +21,7 @@ const MAX_AUTONOMOUS_TOTAL = 10;
 // account. Check stored proposal text as well as links: prompt instructions
 // alone cannot stop the model from putting an ID-gated route in the queue.
 const ID_GATED_ROUTES = /\b(?:fiverr|upwork|etsy|kyc|identity verification|identiteitsverificatie|id-verificatie|passport|paspoort|government-issued id|overheids-id)\b/i;
+const NEW_SELLER_ACCOUNT = /\b(?:create|open|register|sign\s?up|set\s?up|aanmaken|openen|registreren)\b.{0,100}\b(?:seller|freelancer|merchant|payout|payment|store|shop|gig|account|verkoper|winkel|uitbetaling|betaalrekening)\b/i;
 
 export function emptyVentureBook(): VentureBook {
   return { ventures: [], ledger: {}, seq: 0 };
@@ -140,8 +141,8 @@ export function addProposal(book: VentureBook, input: ProposalInput, cycle: numb
   const proposalText = [input.title, input.thesis, input.deliverable, input.humanAction,
     ...(sanitizeLaunchSteps(input.launchSteps)?.flatMap((step) => [step.label, step.url ?? '']) ?? [])]
     .filter((part): part is string => typeof part === 'string').join(' ');
-  if (ID_GATED_ROUTES.test(proposalText)) {
-    return { ok: false, reason: 'operator declined identity verification; choose a route without new seller ID onboarding' };
+  if (ID_GATED_ROUTES.test(proposalText) || NEW_SELLER_ACCOUNT.test(proposalText)) {
+    return { ok: false, reason: 'operator declined new seller ID onboarding; use an existing channel without new verification' };
   }
   if (!autonomous && openProposalCount(book) >= MAX_OPEN_PROPOSALS) {
     return {

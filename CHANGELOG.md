@@ -3,7 +3,7 @@
 ## 0.6.1, 2026-09-26
 
 - Archive the newly proposed Fiverr venture v0009 while retaining its full record. Keep v0010, the active ventures, revenue ledger and monotonic venture ID counter unchanged.
-- Reject new Fiverr, Upwork, Etsy or explicit ID verification proposals in the venture store, including links and launch steps. Tell the agent to avoid new seller identity onboarding and to never evade verification or use another identity.
+- Reject new Fiverr, Upwork, Etsy, explicit ID verification or new seller-account proposals in the venture store, including links and launch steps. Tell the agent to avoid new seller identity onboarding and to never evade verification or use another identity.
 - Keep existing seller accounts and active listings unchanged. No alternative platform is assumed to permit sales or payouts without verification.
 
 ### Migration
