@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-26T06:55:17.152Z",
+        "lastCheckedAt": "2026-09-26T07:10:26.987Z",
         "reachable": true,
         "daysLive": 3,
         "killDue": false,
@@ -115,6 +115,38 @@
       "accountedRevenueUsd": 0,
       "listedAt": "2026-09-25T19:07:03.118Z",
       "decidedAtCycle": -1
+    },
+    {
+      "id": "v0009",
+      "createdAtCycle": 213,
+      "at": "2026-09-26T07:11:17.644Z",
+      "category": "service",
+      "title": "Pre-Launch Security & Ops Checklist for Small Solana/NFT Projects",
+      "thesis": "Small token and NFT teams on Solana routinely skip basic pre-launch hygiene (wallet hygiene, multisig setup, metadata immutability checks, mint authority revocation, common drainer/phishing vectors) because a full paid audit is out of reach. A concise, honest checklist-and-review service (not a security 'certification') sold cheaply on Fiverr/Upwork fills that gap: I review their public contract/mint config and deployment plan against a structured checklist and return a marked-up PDF with concrete flagged risks. No code execution or guarantees claimed — explicitly framed as a hygiene review, not an audit, to stay honest and avoid overclaiming.",
+      "deliverable": "CHECKLIST v1 (delivered as the actual gig output):\n1. MINT AUTHORITY: Is mint authority revoked/renounced post-supply-lock? (check via explorer)\n2. FREEZE AUTHORITY: Is freeze authority null unless intentionally used (e.g. compliance token)?\n3. METADATA: Is metadata URI pinned (IPFS/Arweave) not a mutable centralized URL? Is update authority a multisig or burned?\n4. LP LOCK: If launching liquidity, is LP locked/burned with a verifiable lock contract and duration stated publicly?\n5. TEAM WALLET TRANSPARENCY: Are team/treasury wallets disclosed and vesting terms public?\n6. SOCIAL SURFACE: Are official Discord/Twitter/Telegram links consistent everywhere, with no unofficial mod DM policy stated (anti-phishing)?\n7. SITE/DAPP: Does the connect-wallet flow request only expected permissions (no blanket approve-all)? Is the domain the one publicized on all official channels (typosquat check)?\n8. MULTISIG: Are upgrade/admin keys on a Squads or equivalent multisig, not a single EOA?\n9. RUGCHECK CROSS-REF: Cross-reference against a public rugcheck-style tool output and reconcile discrepancies.\n10. COMMUNICATION HONESTY: No promised APY/returns claims on marketing copy without disclosed source of yield.\nDelivered as: 1-page PDF scorecard (pass/flag/fail per item) + 3-5 bullet written risk summary. Explicitly labeled 'hygiene checklist review, not a security audit or guarantee.'",
+      "humanAction": "Create a Fiverr seller account/gig, price at $25-$40 for a checklist review turnaround in 48h, and fulfill orders by applying the checklist above to each client's public on-chain config and links.",
+      "launchSteps": [
+        {
+          "label": "Create Fiverr seller account",
+          "url": "https://www.fiverr.com/start_selling"
+        },
+        {
+          "label": "Create gig: 'Solana Pre-Launch Security Hygiene Checklist Review'",
+          "url": "https://www.fiverr.com/seller_dashboard"
+        },
+        {
+          "label": "Set price tiers ($25/$40/$60) and delivery time (48h)"
+        },
+        {
+          "label": "Publish gig and share link in relevant Solana dev/NFT Discord communities (per their self-promo rules)"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 40,
+      "killCriteria": "If no orders within 30 days of publishing, or if any client expects an actual smart-contract code audit (scope mismatch), kill and redirect effort to a narrower checklist-only product.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -137,5 +169,5 @@
       "autoEligible": false
     }
   },
-  "seq": 8
+  "seq": 9
 }
