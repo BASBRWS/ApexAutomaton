@@ -1,4 +1,4 @@
-# Solana opportunity map, v0.5.0
+# Solana opportunity map, v0.6.0
 
 This map separates a working devnet action from ideas. Devnet activity has no
 monetary value. A protocol address on devnet does not prove liquidity, demand,
@@ -7,7 +7,7 @@ revenue, or that an SDK version still matches the deployment.
 | Route | Evidence and devnet status | Current agent capability | Next gate |
 | --- | --- | --- | --- |
 | Pump.fun token launch | [Official program documentation](https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_PROGRAM_README.md) lists the Pump program on devnet. | Create one SOL-paired V2 token for an approved venture; SDK instruction, simulation, caps, and persistent mint record. | Run a funded devnet integration test. Buy and sell need a separate quote, slippage, fee and position-accounting adapter. |
-| Independent Token-2022 mint | [Solana metadata extension guide](https://solana.com/docs/tokens/extensions/metadata) shows a devnet-compatible mint with metadata embedded on-chain. | Create a zero-supply mint for an approved venture with name, symbol, URI and 0-9 decimals; atomic fixed instructions, simulation and persistent mint record. | Fund a devnet test; add separately approved issuance and distribution with explicit supply caps and recipient policy. |
+| Independent Token-2022 mint | [Solana metadata extension guide](https://solana.com/docs/tokens/extensions/metadata) shows a devnet-compatible mint with metadata embedded on-chain. | Create a zero-supply mint for an approved venture or an autonomous first-party devnet experiment with project-hosted metadata; atomic fixed instructions, simulation and persistent mint record. | Fund a devnet test; add separately approved issuance and distribution with explicit supply caps and recipient policy. |
 | NFT creation and utility | [Metaplex Core create guide](https://developers.metaplex.com/smart-contracts/core/create) uses devnet. | Create one Metaplex Core asset per approved venture with fixed SDK instruction, simulation, spend caps, and durable asset record. | Run a funded devnet integration test. Verify a marketplace with devnet order flow before calling it trading. |
 | Lending and borrowing | [Project 0 SDK overview](https://docs.marginfi.com/typescript-sdk/overview) describes lending and leveraged loops; its current SDK docs state production and staging, no devnet deployment. | Proposal only; no invented APY or interest. | Find and verify a protocol deployment and markets on devnet, or deploy an isolated test program. Add collateral health, oracle age, rate and liquidation checks. |
 | Perpetuals and leverage | A trading SDK or mainnet market is not evidence of an executable devnet market. | Proposal and risk tool only. | Verify devnet deployment, market depth and oracle; then implement strict margin, funding, liquidation and exposure policy. |

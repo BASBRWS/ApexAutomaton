@@ -1,5 +1,19 @@
 # Release notes
 
+## 0.6.0, 2026-09-26
+
+- Clear five inactive venture proposals from the working queue while preserving their full record in `state/ventures-archive.json`. Keep the three active ventures and the monotonic venture ID counter.
+- Allow one narrowly scoped autonomous venture route: a first-party Token-2022 devnet experiment with project-hosted metadata, zero initial supply, existing signer caps and no operator approval per venture. The signer verifies the published metadata before minting in a later cycle. Limit creation to one new experiment per UTC day and ten total.
+- Explain autonomous and operator-led routes in the agent prompt, dashboard, setup and opportunity map. No mint, sale or revenue is implied by activation.
+
+### Migration
+
+Hosted heartbeat and watchdog enable `AUTONOMOUS_DEVNET_VENTURES_ENABLED=1` alongside `SPL_DEVNET_ENABLED=1`. Local runs default to off. The Pages workflow already publishes committed `state/metadata/` and the heartbeat dispatches a redeploy after each state commit. If Pages is unavailable, the mint waits for the metadata to become public.
+
+### Known limits
+
+This autonomous route produces only a devnet zero-supply mint; it cannot itself earn SOL or real income. External marketplaces, payments, lending, leverage and Pump.fun still need separate verified integrations and policy limits. No funded end-to-end devnet mint was run from this environment.
+
 ## 0.5.1, 2026-09-25
 
 - Restore the full journal as the default USD equity chart. Keep a separate live-price SOL view, which starts at cycle 185 because older entries used a fixed conversion price.

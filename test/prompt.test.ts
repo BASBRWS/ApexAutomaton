@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAction, buildUserPrompt } from '../src/prompt.js';
+import { parseAction, buildSystemPrompt, buildUserPrompt } from '../src/prompt.js';
 import { initialScore } from '../src/score.js';
 import { policyForTier } from '../src/tiers.js';
 import { makeTestConfig } from './helpers.js';
@@ -68,5 +68,19 @@ describe('parseAction — tolerant action extraction', () => {
     const a = parseAction('{"tool":"rest"}');
     expect(a?.tool).toBe('rest');
     expect(a?.input).toEqual({});
+  });
+});
+
+describe('venture autonomy prompt', () => {
+  it('offers first-party devnet self-launch only when the route is enabled', () => {
+    const args = {
+      constitution: '', soul: '', tools: [], railsSummary: '', tradableAssets: ['BTC'],
+      maxGrossExposureUsd: 100, yieldApy: 0, venturesEnabled: true,
+    };
+    expect(buildSystemPrompt(args)).not.toContain('launchMode "autonomous-devnet"');
+    const enabled = buildSystemPrompt({ ...args, autonomousDevnetVenturesEnabled: true });
+    expect(enabled).toContain('launchMode "autonomous-devnet"');
+    expect(enabled).toContain('No human approval');
+    expect(enabled).toContain('produces no sales or real revenue');
   });
 });

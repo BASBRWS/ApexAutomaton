@@ -12,6 +12,7 @@ import {
 } from '../trading/desk.js';
 import type { TransferProposal } from '../types.js';
 import { addProposal, findVenture, type ProposalInput } from '../ventures/store.js';
+import { publishAutonomousMetadata } from '../ventures/autonomy.js';
 import { ToolRegistry, type Tool } from './registry.js';
 
 /**
@@ -194,7 +195,7 @@ const proposeVenture: Tool = {
     'DeFi apps, lending tools, NFT utility, Solana token launches, Web3 services, ' +
     'digital products, content, or arbitrage. You must actually ' +
     'produce the deliverable (the draft/plan/copy/code), not just an idea. It goes ' +
-    'into an approval queue: a human takes the one step you legally cannot (open the ' +
+    'into an approval queue when a human must take a step (open the ' +
     'account, accept the platform terms, connect payments, publish, ship), then real ' +
     'revenue they report is folded into your book. Never propose anything that breaks ' +
     'a platform’s terms, impersonates a person or brand, fakes reviews, or spams. ' +
@@ -204,7 +205,13 @@ const proposeVenture: Tool = {
     'public HTTPS metadata JSON URI. NFT creation is not a sale. For an independent ' +
     'Token-2022 mint, include splToken with name, symbol, URI and decimals 0-9. ' +
     'It starts with zero supply; creation is not a sale. A human must ' +
-    'approve the proposal before any on-chain creation. ' +
+    'approve ordinary proposals before on-chain creation. When the separate ' +
+    'autonomous devnet mode is available, you may instead propose a first-party ' +
+    'Token-2022 experiment using launchMode "autonomous-devnet" plus splToken ' +
+    'name, symbol and decimals. The system hosts its metadata, starts it without ' +
+    'per-venture approval and attempts a capped mint in a later cycle. This ' +
+    'produces no real revenue. Never claim an external platform permits automation ' +
+    'without an implemented and verified connector. ' +
     'Keep at most a few proposals waiting; iterate and kill rather than pile up.',
   movesValue: false,
   inputHint:
@@ -216,7 +223,7 @@ const proposeVenture: Tool = {
     '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
     '"estRevenueUsd": 50, "killCriteria": "when to abandon it", ' +
     '"nftAsset": { "name": "Example", "uri": "https://example.com/nft.json" } } ' +
-    '(optional: use pumpToken with name, symbol, uri or splToken with name, symbol, uri, decimals instead of nftAsset)',
+    '(optional: use pumpToken with name, symbol, uri or splToken with name, symbol, uri, decimals instead of nftAsset; autonomous devnet: launchMode "autonomous-devnet" plus splToken name, symbol, decimals)',
   async execute(input, ctx) {
     if (!ctx.ventureBook) {
       return { summary: 'propose_venture unavailable this cycle', note: 'no venture book in context' };
@@ -234,12 +241,33 @@ const proposeVenture: Tool = {
       pumpToken: input.pumpToken,
       nftAsset: input.nftAsset,
       splToken: input.splToken,
+      launchMode: input.launchMode,
     };
+    if (proposal.launchMode === 'autonomous-devnet' &&
+        (!ctx.cfg.ventures.autonomousDevnetEnabled || !ctx.cfg.spl.enabled)) {
+      return { summary: 'autonomous devnet mode is disabled', note: 'autonomous venture rejected by config' };
+    }
     const res = addProposal(ctx.ventureBook, proposal, ctx.cycle, new Date().toISOString());
     if (!res.ok || !res.venture) {
       return { summary: `venture not queued: ${res.reason}`, note: `venture rejected: ${res.reason}` };
     }
     const v = res.venture;
+    if (v.launchMode === 'autonomous-devnet') {
+      try {
+        publishAutonomousMetadata(v);
+      } catch (err) {
+        ctx.ventureBook.ventures.pop();
+        ctx.ventureBook.seq -= 1;
+        return { summary: `autonomous metadata could not be written: ${String(err)}` };
+      }
+      v.status = 'active';
+      v.decidedAtCycle = ctx.cycle;
+      v.note = 'Autonomous Token-2022 devnet experiment. Metadata must publish before mint; no sale or revenue.';
+      return {
+        summary: `started autonomous devnet venture ${v.id}; metadata queued for publication, mint attempted on a later cycle`,
+        note: `autonomous venture ${v.id} prepared; zero reported revenue`,
+      };
+    }
     return {
       summary: `proposed venture ${v.id} "${v.title}" (${v.category}) — awaiting your approval`,
       note: `venture ${v.id} queued: ${v.humanAction.slice(0, 120)}`,

@@ -188,6 +188,8 @@ export interface Config {
     enabled: boolean;
     /** approvals of one category needed before it is flagged "autonomy-earned". */
     autonomyThreshold: number;
+    /** Allow autonomous first-party Token-2022 devnet experiments only. */
+    autonomousDevnetEnabled: boolean;
   };
 
   pump: {
@@ -324,6 +326,7 @@ export function loadConfig(): Config {
     ventures: {
       enabled: envBool('VENTURES_ENABLED', true),
       autonomyThreshold: Math.trunc(envNum('VENTURE_AUTONOMY_THRESHOLD', 10)),
+      autonomousDevnetEnabled: envBool('AUTONOMOUS_DEVNET_VENTURES_ENABLED', false),
     },
 
     pump: {

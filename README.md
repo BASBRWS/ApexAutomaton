@@ -1,4 +1,4 @@
-# Apex Automaton v0.5.1
+# Apex Automaton v0.6.0
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -15,7 +15,7 @@ The venture prompt now considers DeFi lending tools, NFT utility, leverage risk
 tools, token launches, Web3 apps and services alongside digital products. A
 category can have at most three active or pending ventures, so the queue cannot
 fill indefinitely with variations on one template. Each proposal must state a
-deliverable and the human action needed to launch it. A devnet token or a draft
+deliverable. External platforms still require the account owner's action. A devnet token or a draft
 does **not** count as revenue; only separately reported sales enter the score.
 
 The first on-chain protocol route is a **Pump.fun token creation on devnet**.
@@ -45,13 +45,27 @@ metadata and **zero supply**. No tokens are issued or sold. The signer checks
 simulation and both `SPL_MAX_CREATE_SOL` and the general transaction limits,
 then persists the signature and mint address against the approved venture.
 
+**Autonomous first-party devnet route:** when `AUTONOMOUS_DEVNET_VENTURES_ENABLED=1`
+and `SPL_DEVNET_ENABLED=1`, the agent can propose `launchMode: "autonomous-devnet"`
+with a Token-2022 name, symbol and decimals. It writes project metadata to
+`state/metadata/<venture-id>.json`, activates that venture itself, and waits for
+the metadata to appear on this project's GitHub Pages. On a later cycle the
+signer checks that the public JSON matches the stored venture, then attempts
+one capped zero-supply mint. The route is limited to one new experiment per UTC
+day and ten total. It has no payment or sale mechanism and earns no revenue.
+Metadata and the experiment are public once the heartbeat commits state.
+
 Set `PUMP_DEVNET_ENABLED=1` to expose this route. The hosted heartbeat and
-watchdog also set `NFT_DEVNET_ENABLED=1` and `SPL_DEVNET_ENABLED=1`; locally all
-three flags default to off.
-No proposal is approved automatically. Review the
-metadata URI, name and symbol before setting `approved`. If confirmation is
+watchdog also set `NFT_DEVNET_ENABLED=1`, `SPL_DEVNET_ENABLED=1` and the
+autonomous devnet flag; locally these flags default to off.
+All other on-chain proposals still require approval; review their metadata
+URI, name and symbol before setting `approved`. If confirmation is
 uncertain, reconcile `pendingTransfer` on-chain before another value action.
 No buy, sell, lending, leverage or NFT marketplace instructions are exposed yet.
+External venture proposals still wait for a provider-specific integration,
+operator-owned credentials and terms review. They are never activated merely
+because this devnet flag is on. Five older inactive proposals were moved to
+`state/ventures-archive.json` without changing active ventures or the ID counter.
 See [Solana opportunity map](docs/solana-opportunities.md) for the next adapters
 and the distinction between a devnet test and real demand.
 

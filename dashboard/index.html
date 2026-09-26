@@ -100,7 +100,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.5.1</span></h1>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.6.0</span></h1>
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
@@ -420,7 +420,8 @@
         if (status !== 'active') return ventureStatusLabel(status);
         if (v.pumpToken) return v.pumpToken.mint ? 'devnet minted' : 'approved for devnet';
         if (v.nftAsset) return v.nftAsset.asset ? 'devnet asset created' : 'approved for devnet';
-        if (v.splToken) return v.splToken.mint ? 'devnet mint created' : 'approved for devnet';
+        if (v.splToken) return v.splToken.mint ? 'devnet mint created' :
+          v.launchMode === 'autonomous-devnet' ? 'self-started devnet' : 'approved for devnet';
         return ventureStatusLabel(status);
       }
 
@@ -444,6 +445,11 @@
             '<div class="m-approve">Check name, symbol, decimals and public HTTPS metadata JSON. Set <code>status</code> to <code>approved</code> in <code>state/ventures.json</code>. The signer may create one zero-supply mint on devnet. This is not revenue.</div>';
         }
         if (v.splToken && st === 'active') {
+          if (v.launchMode === 'autonomous-devnet') {
+            return '<div class="m-sec">Autonomous Token-2022 experiment</div>' +
+              `<div class="m-approve">${v.splToken.mint ? 'Zero-supply mint created on devnet. ' : 'Metadata is being published; mint follows when the public JSON matches. '}` +
+              'No operator step or sale. Report real revenue only if earned separately.</div>';
+          }
           return '<div class="m-sec">Token-2022 devnet</div>' +
             `<div class="m-approve">${v.splToken.mint ? 'Zero-supply mint created. ' : 'Approved; the agent may create the zero-supply mint. '}` +
             'A mint is not a sale. Report actual sales separately.</div>';
@@ -507,7 +513,7 @@
           (v.pumpToken ? `<div class="m-sec">Pump.fun devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.pumpToken.name)} · Symbol: ${escapeHtml(v.pumpToken.symbol)}<br>URI: ${escapeHtml(v.pumpToken.uri)}${v.pumpToken.mint ? '<br>Mint: ' + escapeHtml(v.pumpToken.mint) : ''}</div>` : '') +
           (v.nftAsset ? `<div class="m-sec">Metaplex Core devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.nftAsset.name)}<br>URI: ${escapeHtml(v.nftAsset.uri)}${v.nftAsset.asset ? '<br>Asset: ' + escapeHtml(v.nftAsset.asset) : ''}</div>` : '') +
           (v.splToken ? `<div class="m-sec">Token-2022 devnet metadata</div><div class="m-thesis">Name: ${escapeHtml(v.splToken.name)} · Symbol: ${escapeHtml(v.splToken.symbol)} · Decimals: ${escapeHtml(v.splToken.decimals)}<br>URI: ${escapeHtml(v.splToken.uri)}${v.splToken.mint ? '<br>Mint: ' + escapeHtml(v.splToken.mint) : ''}</div>` : '') +
-          `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml +
+          (v.launchMode === 'autonomous-devnet' ? '' : `<div class="m-sec">Your steps to launch it${steps.length ? ' (only you can do these)' : ''}</div>` + stepsHtml) +
           (v.killCriteria ? `<div class="m-kill">Kill if: ${escapeHtml(v.killCriteria)}</div>` : '') +
           ventureActionHtml(v, st);
         document.getElementById('m-close').onclick = closeVentureModal;

@@ -280,6 +280,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     maxGrossExposureUsd,
     yieldApy: cfg.trading.yieldApy,
     venturesEnabled: Boolean(ventureBook),
+    autonomousDevnetVenturesEnabled: Boolean(ventureBook && cfg.ventures.autonomousDevnetEnabled && cfg.spl.enabled),
   });
   // --- Survival metrics: give the agent the numbers to weigh its own mortality.
   const dustUsd = cfg.trading.dustSol * solPrice;
@@ -366,6 +367,26 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
   const traded = toolResult.traded ?? false;
   const signatures: string[] = [...(toolResult.signatures ?? [])];
+  let autonomousNote: string | undefined;
+  if (cfg.ventures.autonomousDevnetEnabled && ventureBook) {
+    const ready = ventureBook.ventures.find((v) => v.launchMode === 'autonomous-devnet' &&
+      v.status === 'active' && v.createdAtCycle < cycle && v.splToken &&
+      !v.splToken.mint && !state.splMints?.[v.id]);
+    if (ready) {
+      try {
+        const minted = await signer.createSplToken(ready);
+        ready.splToken = { ...ready.splToken!, mint: minted.mint, signature: minted.signature };
+        signatures.push(minted.signature);
+        recordTx(state, { kind: 'spl-create', signature: minted.signature,
+          lamports: minted.lamports, from: cfg.agentPubkey,
+          to: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', cycle, at: now(),
+          note: `autonomous Token-2022 venture ${ready.id}` });
+        autonomousNote = `autonomous venture ${ready.id} minted ${minted.mint} on devnet; no revenue`;
+      } catch (err) {
+        autonomousNote = `autonomous venture ${ready.id} waiting: ${errMsg(err)}`;
+      }
+    }
+  }
 
   // --- Learn from this action: durable lessons ledger. ----------------------
   if (traded) {
@@ -541,6 +562,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     borrowNote,
     metabolicNote,
     ventureNote,
+    autonomousNote,
     reflectNote,
     toolResult.note,
     heartbeatNote,
