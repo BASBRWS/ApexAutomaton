@@ -199,6 +199,8 @@ const proposeVenture: Tool = {
     'account, accept the platform terms, connect payments, publish, ship), then real ' +
     'revenue they report is folded into your book. Never propose anything that breaks ' +
     'a platform’s terms, impersonates a person or brand, fakes reviews, or spams. ' +
+    'The operator declines new seller ID verification. Do not propose Fiverr, Upwork, ' +
+    'Etsy or another route needing a government ID or KYC. Do not bypass verification. ' +
     'For a Pump.fun devnet launch, include pumpToken with name, symbol and a ' +
     'public HTTPS metadata JSON URI. Creating a devnet token does not create ' +
     'real revenue. For a Metaplex Core NFT, include nftAsset with name and a ' +
@@ -217,10 +219,8 @@ const proposeVenture: Tool = {
   inputHint:
     '{ "category": "digital-product", "title": "...", "thesis": "why it earns, legally", ' +
     '"deliverable": "the ACTUAL drafted product/plan/copy/code", "humanAction": "one-line ' +
-    'summary of the human step", "launchSteps": [ { "label": "Create a Gumroad account", "url": ' +
-    '"https://gumroad.com/signup" }, { "label": "Connect payout", "url": ' +
-    '"https://app.gumroad.com/settings/payments" }, { "label": "Create product + upload the file", ' +
-    '"url": "https://app.gumroad.com/products/new" }, { "label": "Publish" } ], "estCostUsd": 0, ' +
+    'summary of the human step", "launchSteps": [ { "label": "Use an existing distribution channel" }, ' +
+    '{ "label": "Publish" } ], "estCostUsd": 0, ' +
     '"estRevenueUsd": 50, "killCriteria": "when to abandon it", ' +
     '"nftAsset": { "name": "Example", "uri": "https://example.com/nft.json" } } ' +
     '(optional: use pumpToken with name, symbol, uri or splToken with name, symbol, uri, decimals instead of nftAsset; autonomous devnet: launchMode "autonomous-devnet" plus splToken name, symbol, decimals)',
