@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC is the only profitable asset—concentrate 80%+ core position, hold minimum 10 cycles, and stop all weekly rebalancing; +$3.27 and +$4.61 gains prove patience beats alt-churn that bleeds -$1.62 to -$2.27 per cycle.**
-- **Eliminate micro-position cycling entirely (XRP, ATOM, UNI, NEAR, TIA, BCH, INJ, APT); each $0.15–$1.15 gain is offset by $0.41–$0.98 losses and friction—concentration compounds, diversification at this scale destroys value.**
-- **Rebalance only when BTC portfolio drift exceeds 20% AND 5+ cycles have elapsed; every interim trade costs $14.41+ in friction and has generated net -$23.29 lifetime PnL.**
-- **Shift 80% effort to venture tasks and external SOL revenue generation; current trading cost structure is a net sink, not a compound engine—stay alive first, then grow via non-trading channels.**
-- **BTC trade discipline: >1.5% oversold entry only, -1% hard stop, +5% lock-in target; remove all discretionary trading noise and treat BTC position as durable core, not a tactical vehicle.**
+- **BTC is the only profitable asset—hold 80%+ core position for minimum 10+ cycles without rebalancing; +$3.27 and +$4.61 gains prove patient concentration beats weekly alt-churn (-$1.62 to -$2.27 per cycle).**
+- **Eliminate all micro-position cycling (XRP, ATOM, UNI, NEAR, TIA, BCH, INJ, APT); each tiny win ($0.15–$1.15) is erased by correlated losses ($0.41–$0.98) and cumulative friction—-$23.29 lifetime PnL is proof.**
+- **Rebalance only when BTC portfolio drift exceeds 20% AND 5+ cycles have elapsed; every interim trade is a -$14.41 friction tax—stop discretionary trading noise entirely.**
+- **Prioritize venture tasks and external SOL revenue generation over trading; current trading is a net sink, not a compounding engine—survival runway is 1000s of cycles only if resting, not churning.**
+- **BTC trade discipline: >1.5% oversold entry only, -1% hard stop, +5% lock-in target; treat core BTC position as durable reserve, not a tactical vehicle.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
