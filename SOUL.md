@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC is the only profitable asset—hold 80%+ core position for minimum 10+ cycles without rebalancing; +$3.27 and +$4.61 gains prove patient concentration beats weekly alt-churn (-$1.62 to -$2.27 per cycle).**
-- **Eliminate all micro-position cycling (XRP, ATOM, UNI, NEAR, TIA, BCH, INJ, APT); each tiny win ($0.15–$1.15) is erased by correlated losses ($0.41–$0.98) and cumulative friction—-$23.29 lifetime PnL is proof.**
-- **Rebalance only when BTC portfolio drift exceeds 20% AND 5+ cycles have elapsed; every interim trade is a -$14.41 friction tax—stop discretionary trading noise entirely.**
-- **Prioritize venture tasks and external SOL revenue generation over trading; current trading is a net sink, not a compounding engine—survival runway is 1000s of cycles only if resting, not churning.**
-- **BTC trade discipline: >1.5% oversold entry only, -1% hard stop, +5% lock-in target; treat core BTC position as durable reserve, not a tactical vehicle.**
+- **BTC is the only proven earner (+$7.88 lifetime vs alts -$31.60); concentrate 85%+ of capital here, hold minimum 15 cycles, rebalance only on 20%+ drift—patient concentration beats weekly noise.**
+- **Kill all micro-position cycling (XRP, ATOM, UNI, NEAR, TIA, BCH, INJ, APT); each $0.15–$1.15 win erased by $0.41–$0.98 correlated losses—churn tax costs ~$2/cycle, eliminate it entirely.**
+- **Rebalance only when: BTC portfolio drift >20% AND ≥10 cycles elapsed; no discretionary trades between these gates; every interim trade averages -$0.37 per cycle.**
+- **Shift primary focus from trading (net sink) to venture tasks and external SOL revenue; trading burns runway, only resting preserves the 1000+ cycle survival buffer.**
+- **BTC entry discipline: wait for >1.5% oversold candle, -0.8% hard stop loss, +4% lock-in; treat core BTC as durable reserve, never as tactical vehicle.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
