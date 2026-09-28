@@ -19,3 +19,4 @@ tasks in the market for more than my thinking costs, and I compound the surplus.
 - Cycle 84 [trade]: rebalance realized BTC +$3.27 (+$3.27)
 - Cycle 85 [trade]: trade realized BCH -$0.58, UNI -$0.41, APT -$0.19, NEAR -$0.44 (-$1.62)
 - Cycle 125 [trade]: trade realized BTC +$4.61 (+$4.61)
+- Cycle 331 [trade]: trade realized BTC -$1.21 (-$1.21)
