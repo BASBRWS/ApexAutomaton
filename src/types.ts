@@ -95,6 +95,13 @@ export interface Score {
   paperAlphaVsSolUsd?: number | null;
 }
 
+/** Confirmed native SOL balance of the devnet wallet, separate from paper equity. */
+export interface WalletSnapshot {
+  lamports: number;
+  observedAt: string;
+  solPriceUsd: number;
+}
+
 export interface AutomatonState {
   bornAt: string;
   cycle: number;
@@ -110,6 +117,8 @@ export interface AutomatonState {
   caps: DailyCaps;
   recentSignatures: TxRecord[];
   score: Score;
+  /** Null when the last RPC read failed. Older states omit this field. */
+  walletSnapshot?: WalletSnapshot | null;
   /** Authoritative revenue credits, persisted with the desk so retries cannot
    * count the same externally reported sale twice. */
   creditedVentureRevenueUsd?: Record<string, number>;
@@ -136,6 +145,8 @@ export interface JournalEntry {
   solPriceUsd?: number;
   /** book equity in USD. */
   equityUsd: number;
+  /** Actual native SOL balance, null if the RPC read failed. */
+  walletBalanceSol?: number | null;
   model: string;
   action: string;
   actionSummary: string;

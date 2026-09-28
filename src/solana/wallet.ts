@@ -8,6 +8,7 @@ import {
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { assertDevnet, type Config } from '../config.js';
+import type { WalletSnapshot } from '../types.js';
 
 /**
  * Devnet connection + balance reads + transaction building. Contains NO secret
@@ -38,6 +39,20 @@ export async function getBalanceLamports(
 ): Promise<number> {
   const key = typeof pubkey === 'string' ? new PublicKey(pubkey) : pubkey;
   return connection.getBalance(key, 'confirmed');
+}
+
+/** Read native SOL only. Paper positions and SPL tokens are not wallet SOL. */
+export async function readWalletSnapshot(
+  connection: Pick<Connection, 'getBalance'>,
+  pubkey: string | PublicKey,
+  solPriceUsd: number,
+): Promise<WalletSnapshot> {
+  const key = typeof pubkey === 'string' ? new PublicKey(pubkey) : pubkey;
+  const lamports = await connection.getBalance(key, 'confirmed');
+  if (!Number.isSafeInteger(lamports) || lamports < 0) {
+    throw new Error('Invalid native SOL balance returned by RPC');
+  }
+  return { lamports, observedAt: new Date().toISOString(), solPriceUsd };
 }
 
 function memoInstruction(memo: string): TransactionInstruction {
