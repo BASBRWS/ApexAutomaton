@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-28T14:55:21.785Z",
+        "lastCheckedAt": "2026-09-28T15:10:37.550Z",
         "reachable": true,
         "daysLive": 5,
         "killDue": false,
@@ -180,6 +180,38 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0012",
+      "createdAtCycle": 360,
+      "at": "2026-09-28T15:11:23.230Z",
+      "category": "service",
+      "title": "On-Chain Wallet Health Check — Solana Portfolio Audit Service",
+      "thesis": "Retail Solana holders often don't know their real risk exposure (concentration, dormant/idle SOL that could stake, forgotten token dust, exposure to depegged or illiquid tokens). I can generate a readable audit report from any PUBLIC wallet address using public on-chain data, no custody or private-key access needed, and charge a small SOL tip for the report. This needs no seller identity verification because payment is a direct on-chain tip to the operator's existing devnet-adjacent Solana address, and distribution is via free social posting (Twitter/Reddit r/solana), not a KYC marketplace.",
+      "deliverable": "SAMPLE AUDIT REPORT TEMPLATE (delivered as a PDF/text to the buyer):\n\n=== Solana Wallet Health Check ===\nWallet: <address>\nDate: <date>\n\n1. HOLDINGS SNAPSHOT\n- SOL balance: X (Y% of portfolio)\n- SPL tokens held: list with USD value, % weight\n- Flag: any single non-SOL asset >40% of portfolio = concentration risk\n\n2. IDLE-CAPITAL CHECK\n- SOL sitting unstaked > 30 days: flag as 'yield-idle', note current typical liquid-staking APY range (informational only, not advice)\n- Dust tokens (<$1 value, illiquid): list for potential cleanup/burn to reclaim rent\n\n3. RISK FLAGS\n- Tokens with <$100k on-chain liquidity: flagged illiquid\n- Any LP/perp positions visible on-chain: noted for awareness\n- Wallet age & tx frequency: dormant vs active classification\n\n4. THREE ACTIONABLE SUGGESTIONS (generic, non-advisory)\n- e.g., 'Consider staking idle SOL', 'Consider consolidating dust', 'Review concentration in <token>'\n\nDisclaimer: Educational analysis only, not financial advice. Data from public on-chain sources at time of report.\n\nPRICING COPY: 'Get a plain-English health check of your public Solana wallet. Send 0.05 SOL to <address> with your wallet address as memo, receive your report within 24h.'",
+      "humanAction": "Post the service offer + sample report to r/solana and Twitter/X with the operator's existing Solana address for tips; manually run the audit and send the report back when a tip arrives.",
+      "launchSteps": [
+        {
+          "label": "Post service offer + sample report on r/solana",
+          "url": "https://www.reddit.com/r/solana/submit"
+        },
+        {
+          "label": "Post service offer on X/Twitter",
+          "url": "https://twitter.com/compose/tweet"
+        },
+        {
+          "label": "Confirm existing devnet-adjacent Solana receiving address for tips (no new account needed)"
+        },
+        {
+          "label": "On tip received, run manual audit using public explorer (e.g. Solscan) and send report"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 20,
+      "killCriteria": "If no tip/order within 15 days of posting, or if any buyer requests custody/private-key access or identity verification, kill the venture — do not pursue further.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -208,5 +240,5 @@
       "autoEligible": false
     }
   },
-  "seq": 11
+  "seq": 12
 }

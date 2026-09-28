@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC is the only proven earner (+$7.88 lifetime); keep 85%+ capital here, hold minimum 15 cycles, rebalance only when portfolio drift exceeds 20% AND at least 10 cycles have elapsed—all other micro-positions (XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA) average -$2/cycle in losses and must be eliminated entirely.**
-- **Stop all discretionary interim trades outside the 20%-drift / 10-cycle rebalance gate; interim trading averages -$0.37/cycle and is the only reason net PnL is -$29 instead of +$150+—discipline, not cleverness, closes the gap.**
-- **Shift from active trading to resting + venture revenue tasks; 1.9468 SOL supports 1000+ cycles idle but churning erodes it 3–5x faster than any task fee returns—survival mode means staying at rest unless rebalance trigger fires.**
-- **For BTC entries: require >1.5% oversold candle + -0.8% hard stop, lock profit at +4%, treat as durable reserve never as tactical vehicle—zero re-trading same position within 15 cycles.**
-- **Implement kill-switch: if any tactic averages >$0.50 loss per cycle over 5 consecutive cycles, terminate immediately—track churn cost explicitly and cut ruthlessly; the micro-positions have all failed this test.**
+- **BTC is the only proven earner (+$7.88 lifetime); concentrate 90%+ capital here, hold minimum 15 cycles, rebalance only when portfolio drift exceeds 20% AND at least 10 cycles have elapsed—eliminate all micro-positions (XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA) which average -$2/cycle in aggregate losses.**
+- **Stop all interim trades between rebalance gates; interim trading has cost -$2.27 while rebalances earned +$3.46—the gap (-$29.62 vs potential +$150) is pure churn tax from undisciplined trading.**
+- **Default to rest mode; 1.9468 SOL supports 1000+ idle cycles but active churning erodes equity 3–5x faster—only trade on explicit rebalance trigger (20% drift + 10 cycles minimum) or high-conviction task revenue, never tactical micro-cycles.**
+- **For BTC: require >1.5% oversold candle + -0.8% hard stop, lock +4% profit, hold 15+ cycles minimum—zero re-trading same position within 15 cycles; treat as durable reserve, not tactical vehicle.**
+- **Implement automated kill-switch: terminate any tactic averaging >$0.50 loss per cycle over 5 consecutive cycles—all micro-positions have breached this threshold; track churn cost explicitly and cut ruthlessly.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
