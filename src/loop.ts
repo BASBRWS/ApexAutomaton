@@ -9,7 +9,7 @@ import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } 
 import { assessLossTrend } from './losstrend.js';
 import { shouldObserveOnly } from './decision-cadence.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
-import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
+import { computeCostUsd, equityToSol, tierForSurvival, survivalSol, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
 import {
   equityUsd as deskEquityUsd,
@@ -225,20 +225,29 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const equityPre = paperEquityPre + ventureRevUsd; // scoreboard (mixed)
   const equitySolPre = equityToSol(equityPre, solPrice);
 
-  // --- Death check: economic, in SOL. Never self-resurrect. -----------------
-  if (equitySolPre <= cfg.trading.dustSol) {
-    try {
-      state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
-    } catch {
-      state.walletSnapshot = null;
-    }
+  // --- Survival anchor: the REAL devnet wallet is leading ("de wallet is
+  // leidend"). Read the confirmed on-chain balance up front — it governs the
+  // death check and the tier below. If the RPC read fails, survivalSol() falls
+  // back to the paper book's equity-in-SOL, so a transient RPC hiccup never
+  // kills the agent or collapses its tier on a phantom (missing) reading.
+  let walletSol: number | null = null;
+  try {
+    state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
+    walletSol = state.walletSnapshot.lamports / 1e9;
+  } catch {
+    state.walletSnapshot = null;
+  }
+  const survivalSolPre = survivalSol(walletSol, equitySolPre);
+
+  // --- Death check: economic, in SOL, on the survival anchor. Never self-resurrect.
+  if (survivalSolPre <= cfg.trading.dustSol) {
     const file = writeObituary(buildObituary(cycle, equityPre, equitySolPre, state), cycle);
     state.dead = true;
     appendLesson({
       cycle,
       at: now(),
       kind: 'death',
-      text: `DIED at ${equitySolPre.toFixed(4)} SOL — the market + burn + metabolism outpaced earnings`,
+      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (wallet anchor) — the market + burn + metabolism outpaced earnings`,
       pnlUsd: state.score.netPnlUsd,
     });
     appendEntry({
@@ -250,7 +259,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
       model: '(none)',
       action: 'die',
-      actionSummary: `book equity ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
+      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (wallet anchor; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
       costUsd: 0,
       cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
@@ -262,8 +271,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     return { exitCode: 1, summary: `DEAD at ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)})` };
   }
 
-  // Tier from equity-in-SOL (clamp away from DEAD; death is the USD check above).
-  let tier = tierForEquity(equityPre, solPrice, cfg);
+  // Tier from the survival anchor — the real wallet SOL when available, else the
+  // paper book's equity-in-SOL (clamp away from DEAD; death is the check above).
+  let tier = tierForSurvival(walletSol, equitySolPre, cfg);
   if (tier === 'DEAD') tier = 'CRITICAL';
   const policy = policyForTier(tier, cfg);
 
@@ -308,6 +318,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     policy,
     equityUsd: equityPre,
     equitySol: equitySolPre,
+    walletSol,
+    survivalSol: survivalSolPre,
     dustSol: cfg.trading.dustSol,
     dustUsd,
     avgBurnUsd,
@@ -544,7 +556,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
 
   // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
-  const finalTier = tierForEquity(equityPost, solPrice, cfg);
+  // Anchored on the same real-wallet survival balance as the live tier above.
+  const finalTier = tierForSurvival(walletSol, equityToSol(equityPost, solPrice), cfg);
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 
