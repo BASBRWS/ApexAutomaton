@@ -452,20 +452,21 @@ export class Signer {
   }
 
   /**
-   * Burn real SOL to the incinerator as the metabolic cost of living (the
-   * real-economy survival anchor). The destination is FIXED in code — the agent
-   * can never redirect it — so this bypasses the transfer allowlist, but it still
-   * refuses when the kill switch is engaged. Like the heartbeat, it is a fixed
-   * system transaction and is NOT counted against the agent's per-day transfer
-   * caps, so it can run every cycle without starving the agent's trading budget.
+   * Burn real SOL to the incinerator — the down leg of the wallet reconciliation
+   * (a trading loss, fees or the metabolic cost). The destination is FIXED in
+   * code — the agent can never redirect it — so this bypasses the transfer
+   * allowlist, but it still refuses when the kill switch is engaged. Like the
+   * heartbeat, it is a fixed system transaction and is NOT counted against the
+   * agent's per-day transfer caps, so it can run every cycle without starving
+   * the agent's trading budget.
    */
-  async metabolicBurn(lamports: number, memo: string): Promise<SignedTxResult> {
+  async burnLamports(lamports: number, memo: string): Promise<SignedTxResult> {
     await assertDevnetConnection(this.connection);
     if (isKillSwitchEngaged(this.cfg)) {
-      throw new PolicyError('kill switch engaged — no metabolic burn');
+      throw new PolicyError('kill switch engaged — no burn');
     }
     if (!Number.isInteger(lamports) || lamports <= 0) {
-      throw new Error('metabolic burn requires a positive integer lamports');
+      throw new Error('burn requires a positive integer lamports');
     }
     const tx = buildTransfer({
       from: this.keypair.publicKey,

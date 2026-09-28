@@ -154,14 +154,13 @@ export async function operatorAirdrop(
 }
 
 /**
- * Settle reported venture revenue by airdropping its SOL-equivalent into the
- * wallet on devnet — the ONLY inflow that refills the wallet under the
- * real-economy anchor. Unlike the operator seed airdrop, the loop calls this,
- * but strictly gated on human-approved venture revenue, so it can never be free
- * money the agent summons. Best-effort at the call site (rate limits / faucet
+ * The up leg of the wallet reconciliation: airdrop lamports into the wallet on
+ * devnet to settle a trading gain (or booked venture revenue) so the wallet
+ * mirrors the book. This is a devnet SIMULATION — the SOL comes from the faucet,
+ * not a real counterparty. Best-effort at the call site (rate limits / faucet
  * outages are non-fatal). Devnet only (asserted).
  */
-export async function revenueSettlementAirdrop(
+export async function settlementAirdrop(
   connection: Connection,
   to: string | PublicKey,
   lamports: number,

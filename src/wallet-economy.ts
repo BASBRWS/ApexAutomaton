@@ -1,13 +1,14 @@
 /**
- * wallet-economy.ts — the REAL devnet wallet as the survival anchor.
+ * wallet-economy.ts — the REAL devnet wallet as the trading account.
  *
- * Under the real-economy anchor ("de wallet is leidend") the wallet is a genuine
- * two-way ledger: the metabolic cost of living is burned OUT of it as real SOL
- * each cycle, and reported (human-approved) venture revenue settles back IN as a
- * devnet airdrop of its SOL-equivalent. Paper trading stays the scoreboard; it
- * can never become real SOL (there is no real devnet market — that is why it is
- * paper). These are the pure sizing helpers; the loop wires them to the signer
- * (burn) and the devnet faucet (settlement).
+ * "De wallet is leidend": the wallet is trued up to the book's equity every
+ * cycle, so it moves WITH the trades (and with the metabolic cost and venture
+ * revenue) instead of sitting apart from them — a trading gain airdrops SOL in,
+ * a loss burns SOL out. It is the survival anchor (tier + life/death) and the
+ * single number, no paper/wallet mismatch. This is a devnet on-chain SIMULATION:
+ * the inflow is faucet SOL, not real profit — real profit needs a real market /
+ * mainnet, which is out of scope. This is the pure sizing helper; the loop wires
+ * it to the signer (burn, down leg) and the devnet faucet (airdrop, up leg).
  */
 
 /** Solana's canonical incinerator address — SOL sent here is provably burned. */
@@ -16,38 +17,38 @@ export const INCINERATOR_ADDRESS = '1nc1nerator11111111111111111111111111111111'
 export const LAMPORTS_PER_SOL = 1_000_000_000;
 
 /**
- * Lamports to burn this cycle for the real cost of living. The metabolic rate is
- * applied to the REAL wallet balance, but the burn never spends below the floor
- * and never exceeds the per-cycle cap. Returns 0 when the wallet is missing,
- * invalid, or at/below the floor — so an absent balance never triggers a burn.
+ * The signed lamports move that reconciles the wallet to the book's equity —
+ * the wallet IS the trading account, so each cycle it is trued up to the book:
+ *   positive  → airdrop that many lamports IN  (the book grew: a trading gain,
+ *               or booked venture revenue),
+ *   negative  → burn -that many lamports OUT   (the book shrank: a trading loss,
+ *               fees/spread/slippage, or the metabolic cost),
+ *   zero      → already aligned, or the reading/price is unusable.
+ *
+ * The move is capped per cycle in each direction (so a one-off bad reading can
+ * only ever nudge the wallet), and the burn (down) leg never spends the wallet
+ * below the floor, keeping enough SOL for transaction fees.
  */
-export function walletBurnLamports(params: {
-  walletSol: number | null | undefined;
-  metabolicRatePerCycle: number;
+export function reconcileLamports(params: {
+  bookEquityUsd: number;
+  solPriceUsd: number;
+  walletLamports: number | null | undefined;
+  maxMovePerCycleSol: number;
   floorSol: number;
-  maxBurnPerCycleSol: number;
 }): number {
-  const { walletSol, metabolicRatePerCycle, floorSol, maxBurnPerCycleSol } = params;
-  if (typeof walletSol !== 'number' || !Number.isFinite(walletSol)) return 0;
-  if (!(metabolicRatePerCycle > 0)) return 0;
-  const floor = Math.max(0, floorSol);
-  if (walletSol <= floor) return 0;
-  const desired = walletSol * metabolicRatePerCycle; // cost of living, on the real balance
-  const spendable = walletSol - floor; // never touch the floor (keeps fee headroom)
-  const cap = Math.max(0, maxBurnPerCycleSol);
-  const burnSol = Math.min(desired, spendable, cap);
-  const lamports = Math.floor(burnSol * LAMPORTS_PER_SOL);
-  return lamports > 0 ? lamports : 0;
-}
-
-/**
- * Lamports to airdrop into the wallet to settle reported venture revenue. Only
- * positive USD at a positive SOL price produces an inflow; the loop gates this on
- * human-approved revenue, so it is never free money the agent can summon.
- */
-export function revenueAirdropLamports(params: { usd: number; solPriceUsd: number }): number {
-  const { usd, solPriceUsd } = params;
-  if (!(usd > 0) || !(solPriceUsd > 0)) return 0;
-  const lamports = Math.floor((usd / solPriceUsd) * LAMPORTS_PER_SOL);
-  return lamports > 0 ? lamports : 0;
+  const { bookEquityUsd, solPriceUsd, walletLamports, maxMovePerCycleSol, floorSol } = params;
+  if (!(solPriceUsd > 0)) return 0;
+  if (typeof walletLamports !== 'number' || !Number.isFinite(walletLamports) || walletLamports < 0) return 0;
+  const targetLamports = Math.max(0, Math.round((bookEquityUsd / solPriceUsd) * LAMPORTS_PER_SOL));
+  const cap = Math.max(0, Math.round(maxMovePerCycleSol * LAMPORTS_PER_SOL));
+  let move = targetLamports - walletLamports;
+  if (move > cap) move = cap;
+  if (move < -cap) move = -cap;
+  if (move < 0) {
+    // Never burn the wallet below the floor (keeps fee headroom).
+    const floorLamports = Math.max(0, Math.round(Math.max(0, floorSol) * LAMPORTS_PER_SOL));
+    const spendable = Math.max(0, walletLamports - floorLamports);
+    if (-move > spendable) move = -spendable;
+  }
+  return move === 0 ? 0 : Math.trunc(move); // normalise -0 to 0
 }

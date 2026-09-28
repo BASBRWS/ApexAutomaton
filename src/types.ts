@@ -40,7 +40,7 @@ export interface SignedTxResult {
 
 /** A recorded on-chain action for the persisted state / journal. */
 export interface TxRecord {
-  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'pump-create' | 'nft-create' | 'spl-create' | 'heartbeat' | 'metabolic-burn' | 'venture-settlement';
+  kind: 'burn' | 'revenue' | 'replication' | 'transfer' | 'pump-create' | 'nft-create' | 'spl-create' | 'heartbeat' | 'wallet-settle';
   signature: string;
   lamports: number;
   from: string;

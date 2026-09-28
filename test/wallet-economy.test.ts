@@ -1,52 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import {
-  walletBurnLamports,
-  revenueAirdropLamports,
-  INCINERATOR_ADDRESS,
-  LAMPORTS_PER_SOL,
-} from '../src/wallet-economy.js';
+import { reconcileLamports, INCINERATOR_ADDRESS, LAMPORTS_PER_SOL } from '../src/wallet-economy.js';
 
-describe('walletBurnLamports — real cost of living out of the wallet', () => {
-  const base = { metabolicRatePerCycle: 0.0001, floorSol: 0.05, maxBurnPerCycleSol: 0.02 };
+describe('reconcileLamports — the wallet mirrors the book', () => {
+  const base = { solPriceUsd: 100, maxMovePerCycleSol: 0.5, floorSol: 0.05 };
 
-  it('burns the metabolic fraction of the real balance', () => {
-    // 1.75 SOL * 0.0001 = 0.000175 SOL
-    expect(walletBurnLamports({ walletSol: 1.75, ...base })).toBe(Math.floor(0.000175 * LAMPORTS_PER_SOL));
+  it('airdrops IN when the book grew above the wallet (a trading gain)', () => {
+    // book $210 @ $100/SOL -> 2.1 SOL target; wallet holds 2.0 SOL -> +0.1 SOL
+    const move = reconcileLamports({ ...base, bookEquityUsd: 210, walletLamports: 2 * LAMPORTS_PER_SOL });
+    expect(move).toBe(Math.round(0.1 * LAMPORTS_PER_SOL));
   });
 
-  it('never spends below the floor and never burns a wallet already at/under it', () => {
-    expect(walletBurnLamports({ walletSol: 0.05, ...base })).toBe(0);
-    expect(walletBurnLamports({ walletSol: 0.04, ...base })).toBe(0);
-    // Just above the floor: the burn is clamped to what is spendable above it.
-    const justAbove = walletBurnLamports({ walletSol: 0.0500001, ...base });
-    expect(justAbove).toBeLessThanOrEqual(Math.floor(0.0000001 * LAMPORTS_PER_SOL) + 1);
+  it('burns OUT when the book shrank below the wallet (a loss / cost)', () => {
+    // book $190 -> 1.9 SOL target; wallet 2.0 SOL -> -0.1 SOL
+    const move = reconcileLamports({ ...base, bookEquityUsd: 190, walletLamports: 2 * LAMPORTS_PER_SOL });
+    expect(move).toBe(-Math.round(0.1 * LAMPORTS_PER_SOL));
   });
 
-  it('caps a single cycle burn at maxBurnPerCycleSol', () => {
-    // A huge balance would want to burn a lot; the cap holds it to 0.02 SOL.
-    expect(walletBurnLamports({ walletSol: 10_000, ...base })).toBe(Math.floor(0.02 * LAMPORTS_PER_SOL));
+  it('is zero when already aligned', () => {
+    expect(reconcileLamports({ ...base, bookEquityUsd: 200, walletLamports: 2 * LAMPORTS_PER_SOL })).toBe(0);
   });
 
-  it('returns 0 for a missing/invalid balance or a disabled rate', () => {
-    expect(walletBurnLamports({ walletSol: null, ...base })).toBe(0);
-    expect(walletBurnLamports({ walletSol: undefined, ...base })).toBe(0);
-    expect(walletBurnLamports({ walletSol: NaN, ...base })).toBe(0);
-    expect(walletBurnLamports({ walletSol: 1.75, ...base, metabolicRatePerCycle: 0 })).toBe(0);
-  });
-});
-
-describe('revenueAirdropLamports — real income into the wallet', () => {
-  it('converts reported USD revenue to lamports at the SOL price', () => {
-    // $117 at SOL=$117 -> exactly 1 SOL
-    expect(revenueAirdropLamports({ usd: 117, solPriceUsd: 117 })).toBe(LAMPORTS_PER_SOL);
-    // $58.50 at SOL=$117 -> 0.5 SOL
-    expect(revenueAirdropLamports({ usd: 58.5, solPriceUsd: 117 })).toBe(Math.floor((58.5 / 117) * LAMPORTS_PER_SOL));
+  it('caps the move per cycle in each direction', () => {
+    const cap = Math.round(0.5 * LAMPORTS_PER_SOL);
+    // book far above wallet -> capped airdrop
+    expect(reconcileLamports({ ...base, bookEquityUsd: 1000, walletLamports: 2 * LAMPORTS_PER_SOL })).toBe(cap);
+    // book far below wallet -> capped burn
+    expect(reconcileLamports({ ...base, bookEquityUsd: 10, walletLamports: 5 * LAMPORTS_PER_SOL })).toBe(-cap);
   });
 
-  it('is zero for non-positive revenue or price', () => {
-    expect(revenueAirdropLamports({ usd: 0, solPriceUsd: 117 })).toBe(0);
-    expect(revenueAirdropLamports({ usd: -5, solPriceUsd: 117 })).toBe(0);
-    expect(revenueAirdropLamports({ usd: 5, solPriceUsd: 0 })).toBe(0);
+  it('never burns the wallet below the floor', () => {
+    // wallet 0.1 SOL, book wants 0 -> can only burn down to the 0.05 floor
+    const move = reconcileLamports({ ...base, bookEquityUsd: 0, walletLamports: Math.round(0.1 * LAMPORTS_PER_SOL) });
+    expect(move).toBe(-Math.round(0.05 * LAMPORTS_PER_SOL));
+    // wallet already at the floor -> no burn
+    expect(reconcileLamports({ ...base, bookEquityUsd: 0, walletLamports: Math.round(0.05 * LAMPORTS_PER_SOL) })).toBe(0);
+  });
+
+  it('returns 0 for a missing/invalid wallet reading or an unusable SOL price', () => {
+    expect(reconcileLamports({ ...base, bookEquityUsd: 210, walletLamports: null })).toBe(0);
+    expect(reconcileLamports({ ...base, bookEquityUsd: 210, walletLamports: undefined })).toBe(0);
+    expect(reconcileLamports({ ...base, bookEquityUsd: 210, walletLamports: -1 })).toBe(0);
+    expect(reconcileLamports({ ...base, solPriceUsd: 0, bookEquityUsd: 210, walletLamports: 2 * LAMPORTS_PER_SOL })).toBe(0);
   });
 });
 

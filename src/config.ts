@@ -171,21 +171,21 @@ export interface Config {
     priceApiBase: string;
   };
 
-  /** The REAL devnet wallet as the survival anchor ("de wallet is leidend").
-   * When realEconomyEnabled, the metabolic cost of living is paid in REAL SOL out
-   * of the wallet each cycle (a burn to the incinerator), and reported venture
-   * revenue settles back IN as a devnet airdrop of its SOL-equivalent — so the
-   * wallet genuinely rises and falls with the real economy instead of the paper
-   * book. OFF by default: nothing leaves the wallet until you switch it on. */
+  /** The REAL devnet wallet as the trading account ("de wallet is leidend").
+   * When realEconomyEnabled, the wallet is trued up to the book's equity every
+   * cycle: a trading gain airdrops SOL IN, a loss (or the metabolic cost) burns
+   * SOL OUT — so the wallet moves WITH the trades and is the single number, no
+   * paper/wallet mismatch. Devnet SIMULATION (inflow is faucet SOL, not real
+   * profit). OFF by default: nothing moves on-chain until you switch it on. */
   wallet: {
-    /** master switch: real metabolic burn OUT + venture-revenue settlement IN. */
+    /** master switch: reconcile the wallet to the book each cycle (settle IN/OUT). */
     realEconomyEnabled: boolean;
-    /** floor (SOL) the burn never spends below, so the wallet always keeps enough
-     * for tx fees. It also means a wallet at the floor simply stops burning. */
+    /** floor (SOL) the settle-OUT (burn) leg never spends below, so the wallet
+     * always keeps enough SOL for transaction fees. */
     floorSol: number;
-    /** hard cap (SOL) on a single cycle's burn — belt-and-braces against a bad
-     * balance reading translating into an oversized burn. */
-    maxBurnPerCycleSol: number;
+    /** hard cap (SOL) on a single cycle's reconciliation move, each direction —
+     * so any one cycle (or a bad reading) can only ever nudge the wallet. */
+    maxSettlePerCycleSol: number;
   };
 
   /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
@@ -338,7 +338,7 @@ export function loadConfig(): Config {
     wallet: {
       realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
       floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
-      maxBurnPerCycleSol: envNum('WALLET_MAX_BURN_PER_CYCLE_SOL', 0.02),
+      maxSettlePerCycleSol: envNum('WALLET_MAX_SETTLE_PER_CYCLE_SOL', 0.5),
     },
 
     memory: {

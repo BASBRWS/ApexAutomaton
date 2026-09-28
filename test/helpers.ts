@@ -59,7 +59,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
     wallet: {
       realEconomyEnabled: false,
       floorSol: 0.05,
-      maxBurnPerCycleSol: 0.02,
+      maxSettlePerCycleSol: 0.5,
     },
     features: {
       replicationEnabled: false,

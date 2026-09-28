@@ -1,6 +1,6 @@
 import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
-import { assertDevnetConnection, makeConnection, readWalletSnapshot, revenueSettlementAirdrop } from './solana/wallet.js';
-import { walletBurnLamports, revenueAirdropLamports, INCINERATOR_ADDRESS } from './wallet-economy.js';
+import { assertDevnetConnection, makeConnection, readWalletSnapshot, settlementAirdrop } from './solana/wallet.js';
+import { reconcileLamports, INCINERATOR_ADDRESS } from './wallet-economy.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
@@ -161,9 +161,6 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const ventureBook = cfg.ventures.enabled ? loadVentureBook() : null;
   let ventureNote: string | undefined;
   let ventureChanged = false;
-  // The real-economy anchor settles reported revenue INTO the wallet (below); its
-  // airdrop signature is captured here and folded into this cycle's signatures.
-  let ventureSettlementSig: string | undefined;
   if (ventureBook) {
     state.creditedVentureRevenueUsd ??= Object.fromEntries(
       ventureBook.ventures.map((venture) => [venture.id, venture.accountedRevenueUsd ?? 0]),
@@ -193,29 +190,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (decisions.revenueAddedUsd > 0) {
       appendLesson({ cycle, at: now(), kind: 'venture', text: `real venture revenue booked`, pnlUsd: decisions.revenueAddedUsd });
     }
-
-    // --- Real-economy anchor: settle reported (human-approved) venture revenue
-    // INTO the wallet as a devnet airdrop of its SOL-equivalent. This is the ONLY
-    // inflow that refills the wallet — trading (paper) never can. Gated on real
-    // revenue, so it is not free money. Best-effort: a faucet hiccup is noted,
-    // not fatal, and the balance simply catches up on a later cycle. This runs
-    // BEFORE the wallet is read below, so the tier reflects the settled balance.
-    if (cfg.wallet.realEconomyEnabled && decisions.revenueAddedUsd > 0) {
-      const lamports = revenueAirdropLamports({ usd: decisions.revenueAddedUsd, solPriceUsd: solPrice });
-      if (lamports > 0) {
-        try {
-          ventureSettlementSig = await revenueSettlementAirdrop(connection, cfg.agentPubkey, lamports);
-          recordTx(state, {
-            kind: 'venture-settlement', signature: ventureSettlementSig, lamports,
-            from: '(devnet faucet)', to: cfg.agentPubkey, cycle, at: now(),
-            note: `settle venture revenue $${decisions.revenueAddedUsd.toFixed(2)}`,
-          });
-          parts.push(`wallet settled +${(lamports / 1e9).toFixed(4)} SOL`);
-        } catch (err) {
-          parts.push(`wallet settlement airdrop failed (${errMsg(err)})`);
-        }
-      }
-    }
+    // (Venture revenue lands on the book's scoreboard equity; the end-of-cycle
+    // wallet reconciliation below settles the whole book — trades, costs and
+    // venture revenue alike — onto the real wallet in one move.)
 
     // --- Autonomous monitoring: for each LIVE venture, ping its listing (best-
     // effort) and refresh its monitor (uptime, days-live, kill-clock). This is
@@ -431,7 +408,6 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
   const traded = toolResult.traded ?? false;
   const signatures: string[] = [...(toolResult.signatures ?? [])];
-  if (ventureSettlementSig) signatures.push(ventureSettlementSig);
   let autonomousNote: string | undefined;
   if (cfg.ventures.autonomousDevnetEnabled && ventureBook) {
     const ready = ventureBook.ventures.find((v) => v.launchMode === 'autonomous-devnet' &&
@@ -496,39 +472,13 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Settle the compute burn against the book (economic). -----------------
   state.desk.cashUsd -= costUsd;
 
-  // --- Metabolic cost: the "cost of living", the forcing function against
-  // coasting. Under the real-economy anchor it is paid in REAL SOL burned out of
-  // the wallet (so the wallet genuinely depletes and only real revenue refills
-  // it); otherwise it bites the paper book as before. Exactly one of the two is
-  // charged, never both. --------------------------------------------------------
-  let metabolicNote: string | undefined;
-  if (cfg.wallet.realEconomyEnabled) {
-    const burnLamports = walletBurnLamports({
-      walletSol,
-      metabolicRatePerCycle: cfg.trading.metabolicRatePerCycle,
-      floorSol: cfg.wallet.floorSol,
-      maxBurnPerCycleSol: cfg.wallet.maxBurnPerCycleSol,
-    });
-    if (burnLamports > 0) {
-      try {
-        const burn = await signer.metabolicBurn(burnLamports, `metabolism:cycle:${cycle}`);
-        signatures.push(burn.signature);
-        recordTx(state, {
-          kind: 'metabolic-burn', signature: burn.signature, lamports: burnLamports,
-          from: cfg.agentPubkey, to: INCINERATOR_ADDRESS, cycle, at: now(), note: 'metabolic burn',
-        });
-        metabolicNote = `metabolism -${(burnLamports / 1e9).toFixed(6)} SOL (real burn)`;
-      } catch (err) {
-        metabolicNote = `metabolic burn skipped (${errMsg(err)})`;
-      }
-    } else {
-      metabolicNote = 'metabolism 0 (wallet at floor — needs real revenue)';
-    }
-  } else {
-    const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
-    state.desk.cashUsd -= metabolicUsd;
-    metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
-  }
+  // --- Metabolic cost: the "cost of living" as a fraction of equity, so it bites
+  // at every book size — the forcing function against coasting. It is charged on
+  // the book; when the wallet mirrors the book (below), it flows through to the
+  // real wallet as part of the one end-of-cycle reconciliation. -----------------
+  const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
+  state.desk.cashUsd -= metabolicUsd;
+  const metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
 
   // --- On-chain heartbeat: prove we ran, on Solana. Best-effort. ------------
   let heartbeatNote: string;
@@ -599,6 +549,51 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   });
   state.lastPrices = prices;
 
+  // --- Wallet reconciliation: the wallet IS the trading account. Settle the
+  // whole book (trades — with fees/spread/slippage/borrow already applied —, the
+  // metabolic cost and venture revenue) onto the real devnet wallet so it moves
+  // with performance: a gain airdrops SOL IN, a loss burns SOL OUT. Capped per
+  // cycle and floored for fees. This is a devnet on-chain SIMULATION — the inflow
+  // is faucet SOL, not real profit (real profit needs a real market / mainnet,
+  // out of scope). OFF by default (WALLET_REAL_ECONOMY). Best-effort: a faucet
+  // rate-limit or RPC hiccup just leaves the wallet to catch up next cycle. ------
+  let settleNote: string | undefined;
+  if (cfg.wallet.realEconomyEnabled) {
+    const move = reconcileLamports({
+      bookEquityUsd: equityPost,
+      solPriceUsd: solPrice,
+      walletLamports: state.walletSnapshot ? state.walletSnapshot.lamports : null,
+      maxMovePerCycleSol: cfg.wallet.maxSettlePerCycleSol,
+      floorSol: cfg.wallet.floorSol,
+    });
+    if (move > 0) {
+      try {
+        const sig = await settlementAirdrop(connection, cfg.agentPubkey, move);
+        signatures.push(sig);
+        recordTx(state, {
+          kind: 'wallet-settle', signature: sig, lamports: move,
+          from: '(devnet faucet)', to: cfg.agentPubkey, cycle, at: now(), note: 'settle trading gain',
+        });
+        settleNote = `wallet +${(move / 1e9).toFixed(6)} SOL (settle gain)`;
+      } catch (err) {
+        settleNote = `wallet settle airdrop skipped (${errMsg(err)})`;
+      }
+    } else if (move < 0) {
+      const burn = -move;
+      try {
+        const res = await signer.burnLamports(burn, `settle:cycle:${cycle}`);
+        signatures.push(res.signature);
+        recordTx(state, {
+          kind: 'wallet-settle', signature: res.signature, lamports: burn,
+          from: cfg.agentPubkey, to: INCINERATOR_ADDRESS, cycle, at: now(), note: 'settle trading loss',
+        });
+        settleNote = `wallet -${(burn / 1e9).toFixed(6)} SOL (settle loss)`;
+      } catch (err) {
+        settleNote = `wallet settle burn skipped (${errMsg(err)})`;
+      }
+    }
+  }
+
   // Milestone lesson: the first time net PnL turns positive.
   if (!hadFirstProfit && state.score.firstProfitAtCycle === cycle) {
     appendLesson({
@@ -664,6 +659,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     yieldNote,
     borrowNote,
     metabolicNote,
+    settleNote,
     ventureNote,
     autonomousNote,
     reflectNote,
