@@ -105,10 +105,18 @@
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
-      <div id="tiles" class="grid"></div>
-
-      <h2>Real devnet wallet <span class="muted" style="font-size:12px;font-weight:400">· native SOL on chain, separate from the paper book</span></h2>
+      <h2>Real wallet — survival balance <span class="muted" style="font-size:12px;font-weight:400">· LEADING · native SOL on chain — this decides the tier and life/death</span></h2>
       <div id="wallet" class="grid"></div>
+      <div class="muted" style="font-size:12px;margin:2px 0 4px">
+        Two meters, on purpose. The <strong>wallet SOL</strong> above is the real bank balance that keeps the agent alive:
+        the cost of living burns it down, and only real (approved) venture revenue tops it back up. The
+        <strong>paper book</strong> below is the trading track-record, marked to real prices — it proves skill but can
+        never become real SOL on devnet (no real market), so the two numbers diverge by design. When the wallet
+        reading is unavailable, the tier temporarily falls back to the paper book.
+      </div>
+
+      <h2>Paper trading — skill track-record <span class="muted" style="font-size:12px;font-weight:400">· not real money · marked to real market prices</span></h2>
+      <div id="tiles" class="grid"></div>
 
       <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
@@ -669,12 +677,12 @@
             const quote = Number(snapshot.solPriceUsd);
             const observed = Date.parse(snapshot.observedAt);
             wallet.append(
-              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance, including transaction fees'),
+              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance (leading — sets the tier)'),
               tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable',
                 Number.isFinite(observed) ? `observed ${new Date(observed).toLocaleString()}` : 'observation time unavailable'),
             );
           } else {
-            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance for this cycle'));
+            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance — tier falls back to the paper book this cycle'));
           }
 
           const growth = document.getElementById('growth');
