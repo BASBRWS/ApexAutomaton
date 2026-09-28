@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.6.3, 2026-09-28
+
+- Read the agent wallet's confirmed native SOL balance from devnet RPC after each cycle's on-chain actions and record it separately from paper equity. Add the observed wallet balance to the cycle journal.
+- Display native wallet SOL and its indicative USD value in a distinct dashboard section, with the observation time. Mark the wallet unavailable after an RPC failure instead of displaying a stale balance.
+
+### Migration
+
+Existing state needs no migration. The wallet section shows "unavailable" until the first cycle on this version saves a confirmed balance. Wallet SOL does not include SPL token values, paper positions or modeled staking, and it does not change the existing tier and death rules.
+
 ## 0.6.2, 2026-09-26
 
 - Stop paying for repeated idle decisions on a flat book. After three rest or rejected-venture cycles, keep observing and journaling every heartbeat but call the decision model only every fourth cycle until a fresh BTC/ETH move of at least 1%, an open position, or an actionable venture wakes it. Real LLM cost is zero on observation-only cycles; the modeled metabolic charge and devnet heartbeat continue.

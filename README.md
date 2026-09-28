@@ -1,4 +1,4 @@
-# Apex Automaton v0.6.2
+# Apex Automaton v0.6.3
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -325,6 +325,14 @@ npm run dashboard   # balance/score/population -> http://localhost:4173/dashboar
 
 Both open your browser automatically. The **setup wizard is local only** — it
 handles secrets and is never published.
+
+The dashboard shows the confirmed native SOL balance of the devnet wallet in a
+separate section, including its indicative USD value at the observed SOL quote.
+The heartbeat reads the wallet after on-chain actions and commits the snapshot
+with its observation time. GitHub Pages shows the last committed snapshot, not
+a continuous live RPC feed. An RPC failure displays "unavailable" instead of
+reusing an older balance. Paper book equity and simulated staking remain
+separate; the wallet value does not determine the agent's tiers or death.
 
 ## Publish the dashboard to GitHub Pages (no VPS needed)
 

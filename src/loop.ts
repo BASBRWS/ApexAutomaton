@@ -1,5 +1,5 @@
 import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
-import { assertDevnetConnection, makeConnection } from './solana/wallet.js';
+import { assertDevnetConnection, makeConnection, readWalletSnapshot } from './solana/wallet.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
@@ -226,6 +226,11 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // --- Death check: economic, in SOL. Never self-resurrect. -----------------
   if (equitySolPre <= cfg.trading.dustSol) {
+    try {
+      state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, solPrice);
+    } catch {
+      state.walletSnapshot = null;
+    }
     const file = writeObituary(buildObituary(cycle, equityPre, equitySolPre, state), cycle);
     state.dead = true;
     appendLesson({
@@ -241,6 +246,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       tier: 'DEAD',
       equitySol: equitySolPre,
       equityUsd: equityPre,
+      walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
       model: '(none)',
       action: 'die',
       actionSummary: `book equity ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
@@ -572,6 +578,16 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     }
   }
 
+  // Read after all on-chain actions, including a possible child funding.
+  // An RPC failure clears the previous snapshot rather than displaying stale SOL.
+  let walletNote: string | undefined;
+  try {
+    state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, solPrice);
+  } catch (err) {
+    state.walletSnapshot = null;
+    walletNote = `wallet balance unavailable (${errMsg(err)})`;
+  }
+
   // --- Persist. -------------------------------------------------------------
   const noteParts = [
     coerceNote,
@@ -585,6 +601,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     toolResult.note,
     heartbeatNote,
     replicationNote,
+    walletNote,
   ].filter(Boolean);
   const entry: JournalEntry = {
     cycle,
@@ -593,6 +610,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     equitySol: equityToSol(equityPost, solPrice),
     solPriceUsd: solPrice,
     equityUsd: equityPost,
+    walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
     model: resp ? policy.model : '(none)',
     action: chosenName,
     actionSummary: toolResult.summary,

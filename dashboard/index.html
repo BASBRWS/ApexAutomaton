@@ -100,11 +100,14 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.6.2</span></h1>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.6.3</span></h1>
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
       <div id="tiles" class="grid"></div>
+
+      <h2>Real devnet wallet <span class="muted" style="font-size:12px;font-weight:400">· native SOL on chain, separate from the paper book</span></h2>
+      <div id="wallet" class="grid"></div>
 
       <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
@@ -644,6 +647,22 @@
               (ventures?.ventures ?? []).filter((v) => v.status === 'proposed').length + ' awaiting you',
             ),
           );
+
+          const wallet = document.getElementById('wallet');
+          const snapshot = state.walletSnapshot;
+          const hasBalance = snapshot && Number.isSafeInteger(snapshot.lamports) && snapshot.lamports >= 0;
+          if (hasBalance) {
+            const nativeSol = snapshot.lamports / 1e9;
+            const quote = Number(snapshot.solPriceUsd);
+            const observed = Date.parse(snapshot.observedAt);
+            wallet.append(
+              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance, including transaction fees'),
+              tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable',
+                Number.isFinite(observed) ? `observed ${new Date(observed).toLocaleString()}` : 'observation time unavailable'),
+            );
+          } else {
+            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance for this cycle'));
+          }
 
           const growth = document.getElementById('growth');
           const DAY = 86400000;
