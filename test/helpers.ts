@@ -56,6 +56,11 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       metabolicRatePerCycle: 0.0001,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
+    wallet: {
+      realEconomyEnabled: false,
+      floorSol: 0.05,
+      maxBurnPerCycleSol: 0.02,
+    },
     features: {
       replicationEnabled: false,
       offchainRevenueEnabled: false,

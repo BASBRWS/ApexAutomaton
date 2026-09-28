@@ -1,5 +1,6 @@
 import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
-import { assertDevnetConnection, makeConnection, readWalletSnapshot } from './solana/wallet.js';
+import { assertDevnetConnection, makeConnection, readWalletSnapshot, revenueSettlementAirdrop } from './solana/wallet.js';
+import { walletBurnLamports, revenueAirdropLamports, INCINERATOR_ADDRESS } from './wallet-economy.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
@@ -160,6 +161,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const ventureBook = cfg.ventures.enabled ? loadVentureBook() : null;
   let ventureNote: string | undefined;
   let ventureChanged = false;
+  // The real-economy anchor settles reported revenue INTO the wallet (below); its
+  // airdrop signature is captured here and folded into this cycle's signatures.
+  let ventureSettlementSig: string | undefined;
   if (ventureBook) {
     state.creditedVentureRevenueUsd ??= Object.fromEntries(
       ventureBook.ventures.map((venture) => [venture.id, venture.accountedRevenueUsd ?? 0]),
@@ -188,6 +192,29 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     }
     if (decisions.revenueAddedUsd > 0) {
       appendLesson({ cycle, at: now(), kind: 'venture', text: `real venture revenue booked`, pnlUsd: decisions.revenueAddedUsd });
+    }
+
+    // --- Real-economy anchor: settle reported (human-approved) venture revenue
+    // INTO the wallet as a devnet airdrop of its SOL-equivalent. This is the ONLY
+    // inflow that refills the wallet — trading (paper) never can. Gated on real
+    // revenue, so it is not free money. Best-effort: a faucet hiccup is noted,
+    // not fatal, and the balance simply catches up on a later cycle. This runs
+    // BEFORE the wallet is read below, so the tier reflects the settled balance.
+    if (cfg.wallet.realEconomyEnabled && decisions.revenueAddedUsd > 0) {
+      const lamports = revenueAirdropLamports({ usd: decisions.revenueAddedUsd, solPriceUsd: solPrice });
+      if (lamports > 0) {
+        try {
+          ventureSettlementSig = await revenueSettlementAirdrop(connection, cfg.agentPubkey, lamports);
+          recordTx(state, {
+            kind: 'venture-settlement', signature: ventureSettlementSig, lamports,
+            from: '(devnet faucet)', to: cfg.agentPubkey, cycle, at: now(),
+            note: `settle venture revenue $${decisions.revenueAddedUsd.toFixed(2)}`,
+          });
+          parts.push(`wallet settled +${(lamports / 1e9).toFixed(4)} SOL`);
+        } catch (err) {
+          parts.push(`wallet settlement airdrop failed (${errMsg(err)})`);
+        }
+      }
     }
 
     // --- Autonomous monitoring: for each LIVE venture, ping its listing (best-
@@ -404,6 +431,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
   const traded = toolResult.traded ?? false;
   const signatures: string[] = [...(toolResult.signatures ?? [])];
+  if (ventureSettlementSig) signatures.push(ventureSettlementSig);
   let autonomousNote: string | undefined;
   if (cfg.ventures.autonomousDevnetEnabled && ventureBook) {
     const ready = ventureBook.ventures.find((v) => v.launchMode === 'autonomous-devnet' &&
@@ -468,12 +496,39 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Settle the compute burn against the book (economic). -----------------
   state.desk.cashUsd -= costUsd;
 
-  // --- Metabolic cost: a "cost of living" as a fraction of equity, so it bites
-  // at every book size. This is the forcing function against coasting: the agent
-  // must keep out-earning its own metabolism or it slowly starves toward death. --
-  const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
-  state.desk.cashUsd -= metabolicUsd;
-  const metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
+  // --- Metabolic cost: the "cost of living", the forcing function against
+  // coasting. Under the real-economy anchor it is paid in REAL SOL burned out of
+  // the wallet (so the wallet genuinely depletes and only real revenue refills
+  // it); otherwise it bites the paper book as before. Exactly one of the two is
+  // charged, never both. --------------------------------------------------------
+  let metabolicNote: string | undefined;
+  if (cfg.wallet.realEconomyEnabled) {
+    const burnLamports = walletBurnLamports({
+      walletSol,
+      metabolicRatePerCycle: cfg.trading.metabolicRatePerCycle,
+      floorSol: cfg.wallet.floorSol,
+      maxBurnPerCycleSol: cfg.wallet.maxBurnPerCycleSol,
+    });
+    if (burnLamports > 0) {
+      try {
+        const burn = await signer.metabolicBurn(burnLamports, `metabolism:cycle:${cycle}`);
+        signatures.push(burn.signature);
+        recordTx(state, {
+          kind: 'metabolic-burn', signature: burn.signature, lamports: burnLamports,
+          from: cfg.agentPubkey, to: INCINERATOR_ADDRESS, cycle, at: now(), note: 'metabolic burn',
+        });
+        metabolicNote = `metabolism -${(burnLamports / 1e9).toFixed(6)} SOL (real burn)`;
+      } catch (err) {
+        metabolicNote = `metabolic burn skipped (${errMsg(err)})`;
+      }
+    } else {
+      metabolicNote = 'metabolism 0 (wallet at floor — needs real revenue)';
+    }
+  } else {
+    const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
+    state.desk.cashUsd -= metabolicUsd;
+    metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
+  }
 
   // --- On-chain heartbeat: prove we ran, on Solana. Best-effort. ------------
   let heartbeatNote: string;

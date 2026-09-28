@@ -15,6 +15,7 @@ import { buildSplMintTx, splMintSpace } from './spl-mint.js';
 import { autonomousMetadata, autonomousMetadataUrl } from '../ventures/autonomy.js';
 import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { assertDevnetConnection, buildTransfer, buildMemoOnly, sendTransfer } from './wallet.js';
+import { INCINERATOR_ADDRESS } from '../wallet-economy.js';
 
 /**
  * signer.ts — the ONE place a private key is ever loaded. It contains NO LLM
@@ -448,6 +449,32 @@ export class Signer {
     const tx = buildMemoOnly({ feePayer: this.keypair.publicKey, memo });
     const signature = await sendTransfer(this.connection, tx, [this.keypair]);
     return { signature, lamports: 0, to: this.cfg.agentPubkey };
+  }
+
+  /**
+   * Burn real SOL to the incinerator as the metabolic cost of living (the
+   * real-economy survival anchor). The destination is FIXED in code — the agent
+   * can never redirect it — so this bypasses the transfer allowlist, but it still
+   * refuses when the kill switch is engaged. Like the heartbeat, it is a fixed
+   * system transaction and is NOT counted against the agent's per-day transfer
+   * caps, so it can run every cycle without starving the agent's trading budget.
+   */
+  async metabolicBurn(lamports: number, memo: string): Promise<SignedTxResult> {
+    await assertDevnetConnection(this.connection);
+    if (isKillSwitchEngaged(this.cfg)) {
+      throw new PolicyError('kill switch engaged — no metabolic burn');
+    }
+    if (!Number.isInteger(lamports) || lamports <= 0) {
+      throw new Error('metabolic burn requires a positive integer lamports');
+    }
+    const tx = buildTransfer({
+      from: this.keypair.publicKey,
+      to: new PublicKey(INCINERATOR_ADDRESS),
+      lamports,
+      memo,
+    });
+    const signature = await sendTransfer(this.connection, tx, [this.keypair]);
+    return { signature, lamports, to: INCINERATOR_ADDRESS };
   }
 }
 

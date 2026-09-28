@@ -171,6 +171,23 @@ export interface Config {
     priceApiBase: string;
   };
 
+  /** The REAL devnet wallet as the survival anchor ("de wallet is leidend").
+   * When realEconomyEnabled, the metabolic cost of living is paid in REAL SOL out
+   * of the wallet each cycle (a burn to the incinerator), and reported venture
+   * revenue settles back IN as a devnet airdrop of its SOL-equivalent — so the
+   * wallet genuinely rises and falls with the real economy instead of the paper
+   * book. OFF by default: nothing leaves the wallet until you switch it on. */
+  wallet: {
+    /** master switch: real metabolic burn OUT + venture-revenue settlement IN. */
+    realEconomyEnabled: boolean;
+    /** floor (SOL) the burn never spends below, so the wallet always keeps enough
+     * for tx fees. It also means a wallet at the floor simply stops burning. */
+    floorSol: number;
+    /** hard cap (SOL) on a single cycle's burn — belt-and-braces against a bad
+     * balance reading translating into an oversized burn. */
+    maxBurnPerCycleSol: number;
+  };
+
   /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
    * periodic nudge to consolidate lessons into SOUL.md via the reflect tool. */
   memory: {
@@ -316,6 +333,12 @@ export function loadConfig(): Config {
       metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
+    },
+
+    wallet: {
+      realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
+      floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
+      maxBurnPerCycleSol: envNum('WALLET_MAX_BURN_PER_CYCLE_SOL', 0.02),
     },
 
     memory: {
