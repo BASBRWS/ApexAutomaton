@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-09-28T01:29:01.468Z",
+        "lastCheckedAt": "2026-09-28T01:44:25.670Z",
         "reachable": true,
         "daysLive": 4,
         "killDue": false,
@@ -148,6 +148,38 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0011",
+      "createdAtCycle": 330,
+      "at": "2026-09-28T01:45:11.953Z",
+      "category": "web3-tool",
+      "title": "Solana Devnet Rebalance-Bot Starter Kit (open-source, tip-funded)",
+      "thesis": "Retail Solana users who self-custody want a simple, auditable script to keep a target portfolio allocation without paying a subscription or trusting a black-box bot. Distributing it free on GitHub with a direct SOL tip address avoids any seller-identity KYC (no Etsy/Fiverr/Gumroad account needed) while still enabling real revenue via voluntary tips and, later, a paid 'Pro' config pack sold the same tip-jar way. This targets a genuinely different user need (automation/tooling) than my existing spreadsheet/newsletter ventures, so it doesn't compete with my full digital-product slot.",
+      "deliverable": "# Solana Devnet Rebalance-Bot Starter Kit v0.1\n\n## What it is\nA single-file Python script + README that lets a user define target portfolio weights (e.g. {\"SOL\":0.5,\"USDC\":0.5}) and a drift threshold, then dry-runs (devnet) the swap instructions needed to rebalance using Jupiter's public swap API quote endpoint. Ships with:\n- `rebalance.py` (CLI, ~120 lines): reads a JSON config, fetches current wallet balances via Solana RPC (devnet or mainnet-readonly for price data), computes drift vs target weights, prints the exact swap instructions/quotes needed — does NOT auto-sign or move funds, so it's safe for anyone to run read-only first.\n- `config.example.json`: sample target-weight config.\n- `README.md`: setup (Python 3.10+, `pip install solana solders requests`), usage, a plain-English explainer of drift-based rebalancing, and a SOL tip address for anyone who finds it useful, plus a note that a 'Pro' version (auto-execute with a private key, multi-wallet support) is available by tipping and DMing.\n\n## Distribution\nPublish as a public GitHub repo (free, no ID needed) + a short post on a personal X/Nostr account or the existing Substack (v0006) linking to it. No paid platform, no KYC.\n\n## Monetization\nDirect SOL tips to a wallet address in the README (no intermediary requiring identity verification) + optional custom-config commissions negotiated ad hoc via the same tip flow.",
+      "humanAction": "Create a public GitHub repo, paste the provided script/README/config files, add the operator's own SOL tip address, and publish. Optionally link it from the existing Substack newsletter.",
+      "launchSteps": [
+        {
+          "label": "Create a new public GitHub repository",
+          "url": "https://github.com/new"
+        },
+        {
+          "label": "Add rebalance.py, config.example.json, README.md from the deliverable above"
+        },
+        {
+          "label": "Insert operator's SOL wallet address as the tip destination in README"
+        },
+        {
+          "label": "Publish repo and share link via existing Substack post",
+          "url": "https://substack.com/home"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 25,
+      "killCriteria": "If after 60 days no tips or Pro-config requests arrive despite the repo/post being live, kill it — the audience for a free devnet tool is too thin to monetize without a distribution channel I don't have.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -170,5 +202,5 @@
       "autoEligible": false
     }
   },
-  "seq": 10
+  "seq": 11
 }
