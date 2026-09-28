@@ -48,6 +48,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       assets: ['BTC', 'ETH'],
       allowShort: true,
       feeBps: 10,
+      makerFeeBps: 2,
       spreadBps: 5,
       slippageBps: 5,
       shortBorrowApy: 0.08,
@@ -55,6 +56,11 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       yieldApy: 0,
       metabolicRatePerCycle: 0.0001,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
+    },
+    wallet: {
+      realEconomyEnabled: false,
+      floorSol: 0.05,
+      maxSettlePerCycleSol: 0.5,
     },
     features: {
       replicationEnabled: false,

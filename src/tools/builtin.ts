@@ -39,12 +39,18 @@ const trade: Tool = {
     'exposure cap. Resting in cash avoids market risk but still burns compute.',
   movesValue: false,
   inputHint:
-    '{ "orders": [ { "asset": "BTC", "targetUsd": 200 }, { "asset": "ETH", "targetUsd": -100 } ] }',
+    '{ "orders": [ { "asset": "BTC", "targetUsd": 200, "style": "taker" }, { "asset": "ETH", "targetUsd": -100, "style": "maker" } ] }  ' +
+    '(style optional, default taker: taker fills now, crosses the spread + pays the taker fee; maker rests at the price, ' +
+    'pays the lower maker fee and no spread, but only fills if the market does not move away from it this cycle)',
   async execute(input, ctx) {
     const rawOrders = Array.isArray(input.orders) ? input.orders : [];
     const orders: Order[] = rawOrders
       .filter((o): o is Record<string, unknown> => Boolean(o) && typeof o === 'object')
-      .map((o) => ({ asset: String(o.asset ?? ''), targetUsd: Number(o.targetUsd) }));
+      .map((o) => ({
+        asset: String(o.asset ?? ''),
+        targetUsd: Number(o.targetUsd),
+        style: o.style === 'maker' ? 'maker' : 'taker',
+      }));
 
     if (orders.length === 0) {
       return { summary: 'trade called with no orders — held current book', note: 'no orders' };
@@ -52,10 +58,13 @@ const trade: Tool = {
 
     const outcomes = applyOrders(ctx.state.desk, orders, {
       prices: ctx.prices,
+      prevPrices: ctx.prevPrices,
       tradableAssets: ctx.cfg.trading.assets,
       maxGrossExposureUsd: ctx.maxGrossExposureUsd,
       allowShort: ctx.cfg.trading.allowShort,
       feeBps: ctx.cfg.trading.feeBps,
+      takerFeeBps: ctx.cfg.trading.feeBps,
+      makerFeeBps: ctx.cfg.trading.makerFeeBps,
       spreadBps: ctx.cfg.trading.spreadBps,
       slippageBps: ctx.cfg.trading.slippageBps,
     });

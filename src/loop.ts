@@ -1,5 +1,6 @@
 import { loadConfig, genesisCapitalUsd, type Config } from './config.js';
-import { assertDevnetConnection, makeConnection, readWalletSnapshot } from './solana/wallet.js';
+import { assertDevnetConnection, makeConnection, readWalletSnapshot, settlementAirdrop } from './solana/wallet.js';
+import { reconcileLamports, INCINERATOR_ADDRESS } from './wallet-economy.js';
 import { Signer, isKillSwitchEngaged, PolicyError } from './solana/signer.js';
 import { recordTx } from './state.js';
 import { makeStateStore } from './persistence/index.js';
@@ -9,7 +10,7 @@ import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } 
 import { assessLossTrend } from './losstrend.js';
 import { shouldObserveOnly } from './decision-cadence.js';
 import { policyForTier, toolNamesForCycle } from './tiers.js';
-import { computeCostUsd, equityToSol, tierForEquity, onChainHeartbeat } from './economy.js';
+import { computeCostUsd, equityToSol, tierForSurvival, survivalSol, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
 import {
   equityUsd as deskEquityUsd,
@@ -189,6 +190,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     if (decisions.revenueAddedUsd > 0) {
       appendLesson({ cycle, at: now(), kind: 'venture', text: `real venture revenue booked`, pnlUsd: decisions.revenueAddedUsd });
     }
+    // (Venture revenue lands on the book's scoreboard equity; the end-of-cycle
+    // wallet reconciliation below settles the whole book — trades, costs and
+    // venture revenue alike — onto the real wallet in one move.)
 
     // --- Autonomous monitoring: for each LIVE venture, ping its listing (best-
     // effort) and refresh its monitor (uptime, days-live, kill-clock). This is
@@ -225,20 +229,29 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const equityPre = paperEquityPre + ventureRevUsd; // scoreboard (mixed)
   const equitySolPre = equityToSol(equityPre, solPrice);
 
-  // --- Death check: economic, in SOL. Never self-resurrect. -----------------
-  if (equitySolPre <= cfg.trading.dustSol) {
-    try {
-      state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
-    } catch {
-      state.walletSnapshot = null;
-    }
+  // --- Survival anchor: the REAL devnet wallet is leading ("de wallet is
+  // leidend"). Read the confirmed on-chain balance up front — it governs the
+  // death check and the tier below. If the RPC read fails, survivalSol() falls
+  // back to the paper book's equity-in-SOL, so a transient RPC hiccup never
+  // kills the agent or collapses its tier on a phantom (missing) reading.
+  let walletSol: number | null = null;
+  try {
+    state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
+    walletSol = state.walletSnapshot.lamports / 1e9;
+  } catch {
+    state.walletSnapshot = null;
+  }
+  const survivalSolPre = survivalSol(walletSol, equitySolPre);
+
+  // --- Death check: economic, in SOL, on the survival anchor. Never self-resurrect.
+  if (survivalSolPre <= cfg.trading.dustSol) {
     const file = writeObituary(buildObituary(cycle, equityPre, equitySolPre, state), cycle);
     state.dead = true;
     appendLesson({
       cycle,
       at: now(),
       kind: 'death',
-      text: `DIED at ${equitySolPre.toFixed(4)} SOL — the market + burn + metabolism outpaced earnings`,
+      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (wallet anchor) — the market + burn + metabolism outpaced earnings`,
       pnlUsd: state.score.netPnlUsd,
     });
     appendEntry({
@@ -250,7 +263,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
       model: '(none)',
       action: 'die',
-      actionSummary: `book equity ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
+      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (wallet anchor; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
       costUsd: 0,
       cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
@@ -262,8 +275,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     return { exitCode: 1, summary: `DEAD at ${equitySolPre.toFixed(4)} SOL ($${equityPre.toFixed(2)})` };
   }
 
-  // Tier from equity-in-SOL (clamp away from DEAD; death is the USD check above).
-  let tier = tierForEquity(equityPre, solPrice, cfg);
+  // Tier from the survival anchor — the real wallet SOL when available, else the
+  // paper book's equity-in-SOL (clamp away from DEAD; death is the check above).
+  let tier = tierForSurvival(walletSol, equitySolPre, cfg);
   if (tier === 'DEAD') tier = 'CRITICAL';
   const policy = policyForTier(tier, cfg);
 
@@ -308,6 +322,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     policy,
     equityUsd: equityPre,
     equitySol: equitySolPre,
+    walletSol,
+    survivalSol: survivalSolPre,
     dustSol: cfg.trading.dustSol,
     dustUsd,
     avgBurnUsd,
@@ -375,6 +391,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state,
     signer,
     prices: executablePrices,
+    prevPrices,
     maxGrossExposureUsd,
     tier,
     policy,
@@ -456,9 +473,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Settle the compute burn against the book (economic). -----------------
   state.desk.cashUsd -= costUsd;
 
-  // --- Metabolic cost: a "cost of living" as a fraction of equity, so it bites
-  // at every book size. This is the forcing function against coasting: the agent
-  // must keep out-earning its own metabolism or it slowly starves toward death. --
+  // --- Metabolic cost: the "cost of living" as a fraction of equity, so it bites
+  // at every book size — the forcing function against coasting. It is charged on
+  // the book; when the wallet mirrors the book (below), it flows through to the
+  // real wallet as part of the one end-of-cycle reconciliation. -----------------
   const metabolicUsd = paperEquityPre * cfg.trading.metabolicRatePerCycle;
   state.desk.cashUsd -= metabolicUsd;
   const metabolicNote = metabolicUsd > 0 ? `metabolism -$${metabolicUsd.toFixed(4)}` : undefined;
@@ -532,6 +550,51 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   });
   state.lastPrices = prices;
 
+  // --- Wallet reconciliation: the wallet IS the trading account. Settle the
+  // whole book (trades — with fees/spread/slippage/borrow already applied —, the
+  // metabolic cost and venture revenue) onto the real devnet wallet so it moves
+  // with performance: a gain airdrops SOL IN, a loss burns SOL OUT. Capped per
+  // cycle and floored for fees. This is a devnet on-chain SIMULATION — the inflow
+  // is faucet SOL, not real profit (real profit needs a real market / mainnet,
+  // out of scope). OFF by default (WALLET_REAL_ECONOMY). Best-effort: a faucet
+  // rate-limit or RPC hiccup just leaves the wallet to catch up next cycle. ------
+  let settleNote: string | undefined;
+  if (cfg.wallet.realEconomyEnabled) {
+    const move = reconcileLamports({
+      bookEquityUsd: equityPost,
+      solPriceUsd: solPrice,
+      walletLamports: state.walletSnapshot ? state.walletSnapshot.lamports : null,
+      maxMovePerCycleSol: cfg.wallet.maxSettlePerCycleSol,
+      floorSol: cfg.wallet.floorSol,
+    });
+    if (move > 0) {
+      try {
+        const sig = await settlementAirdrop(connection, cfg.agentPubkey, move);
+        signatures.push(sig);
+        recordTx(state, {
+          kind: 'wallet-settle', signature: sig, lamports: move,
+          from: '(devnet faucet)', to: cfg.agentPubkey, cycle, at: now(), note: 'settle trading gain',
+        });
+        settleNote = `wallet +${(move / 1e9).toFixed(6)} SOL (settle gain)`;
+      } catch (err) {
+        settleNote = `wallet settle airdrop skipped (${errMsg(err)})`;
+      }
+    } else if (move < 0) {
+      const burn = -move;
+      try {
+        const res = await signer.burnLamports(burn, `settle:cycle:${cycle}`);
+        signatures.push(res.signature);
+        recordTx(state, {
+          kind: 'wallet-settle', signature: res.signature, lamports: burn,
+          from: cfg.agentPubkey, to: INCINERATOR_ADDRESS, cycle, at: now(), note: 'settle trading loss',
+        });
+        settleNote = `wallet -${(burn / 1e9).toFixed(6)} SOL (settle loss)`;
+      } catch (err) {
+        settleNote = `wallet settle burn skipped (${errMsg(err)})`;
+      }
+    }
+  }
+
   // Milestone lesson: the first time net PnL turns positive.
   if (!hadFirstProfit && state.score.firstProfitAtCycle === cycle) {
     appendLesson({
@@ -544,7 +607,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   }
 
   // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
-  const finalTier = tierForEquity(equityPost, solPrice, cfg);
+  // Anchored on the same real-wallet survival balance as the live tier above.
+  const finalTier = tierForSurvival(walletSol, equityToSol(equityPost, solPrice), cfg);
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 
@@ -596,6 +660,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     yieldNote,
     borrowNote,
     metabolicNote,
+    settleNote,
     ventureNote,
     autonomousNote,
     reflectNote,

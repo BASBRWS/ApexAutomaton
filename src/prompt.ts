@@ -172,6 +172,11 @@ export function buildSystemPrompt(args: {
     'next to the compute burn while your book is small, but a real alternative as you',
     'grow. There is no guaranteed income; resting in cash still burns compute, so',
     'doing nothing is slow death.',
+    'Each `trade` order takes a `style`: "taker" (default) fills now but crosses the',
+    'spread and pays the taker fee; "maker" rests at the price for the lower maker fee',
+    'and no spread, but only fills if the market does not move away from it that cycle.',
+    'Use maker to lower costs when you are patient and can risk a miss; use taker when',
+    'you need certainty of getting the position on.',
     ...ventureBlock,
     '',
     '## Constitution (immutable law — you cannot edit or override this)',
@@ -210,6 +215,11 @@ export function buildUserPrompt(args: {
   policy: TierPolicy;
   equityUsd: number;
   equitySol: number;
+  /** the REAL confirmed devnet wallet SOL (the survival anchor), or null if the
+   * RPC read was unavailable this cycle. */
+  walletSol?: number | null;
+  /** the survival balance that decides tier/death: wallet SOL, or paper equity-in-SOL fallback. */
+  survivalSol?: number;
   dustSol: number;
   dustUsd: number;
   avgBurnUsd: number;
@@ -250,7 +260,14 @@ export function buildUserPrompt(args: {
     `Tier: ${args.tier} — ${args.policy.description}`,
     '',
     '## Survival — weigh this FIRST, before any trade',
-    `You DIE if equity falls to ${args.dustSol} SOL ($${args.dustUsd.toFixed(2)}). You are at ${args.equitySol.toFixed(4)} SOL.`,
+    ...(typeof args.walletSol === 'number'
+      ? [
+          `Survival anchor — YOUR REAL DEVNET WALLET: ${args.walletSol.toFixed(4)} SOL. This real balance ` +
+            `(not your paper book) decides your tier and your death. Your paper book below is your trading ` +
+            `SCOREBOARD — it proves whether you can grow value.`,
+        ]
+      : []),
+    `You DIE if your survival balance falls to ${args.dustSol} SOL ($${args.dustUsd.toFixed(2)}). You are at ${(typeof args.survivalSol === 'number' ? args.survivalSol : args.equitySol).toFixed(4)} SOL.`,
     `Net PnL since birth: $${s.netPnlUsd.toFixed(2)} (${trend}); $${drawdownUsd.toFixed(2)} below your peak.`,
     `You pay to exist: a metabolic cost of ~${args.metabolicDailyPct.toFixed(1)}%/day of your equity,`,
     `plus compute burn (~$${args.avgBurnUsd.toFixed(4)}/cycle). Runway if you just rest: ${runway}.`,

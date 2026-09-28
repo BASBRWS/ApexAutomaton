@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeCostUsd, equityToSol, tierForEquity } from '../src/economy.js';
+import { computeCostUsd, equityToSol, tierForEquity, survivalSol, tierForSurvival } from '../src/economy.js';
 import { usdCostOf } from '../src/llm/pricing.js';
 import { makeTestConfig } from './helpers.js';
 
@@ -38,5 +38,28 @@ describe('equity → SOL → tier', () => {
     const equityUsd = 216.38;
     expect(equityToSol(equityUsd, 120.97)).toBeCloseTo(1.7887, 3);
     expect(equityToSol(equityUsd, 116.96)).toBeGreaterThan(1.85);
+  });
+});
+
+describe('survival anchor — the real wallet is leading', () => {
+  it('uses the real wallet SOL when a confirmed balance is available', () => {
+    expect(survivalSol(1.75, 2.5)).toBe(1.75); // wallet wins over paper equity
+    expect(survivalSol(0, 2.5)).toBe(0); // a confirmed empty wallet IS dead, not a fallback
+  });
+
+  it('falls back to the paper equity-in-SOL only when the reading is missing/invalid', () => {
+    expect(survivalSol(null, 2.5)).toBe(2.5);
+    expect(survivalSol(undefined, 2.5)).toBe(2.5);
+    expect(survivalSol(-1, 2.5)).toBe(2.5); // bogus negative RPC reading
+    expect(survivalSol(NaN, 2.5)).toBe(2.5);
+  });
+
+  it('classifies the tier off the wallet balance, with the paper book as fallback', () => {
+    // Wallet at 1.75 SOL -> NORMAL, regardless of a paper book that would score higher.
+    expect(tierForSurvival(1.75, 10, cfg)).toBe('NORMAL');
+    // Wallet unavailable -> tier follows the paper equity-in-SOL fallback.
+    expect(tierForSurvival(null, 3.0, cfg)).toBe('ABUNDANT');
+    // Confirmed near-empty wallet -> DEAD even if the paper book looks healthy.
+    expect(tierForSurvival(0, 5, cfg)).toBe('DEAD');
   });
 });

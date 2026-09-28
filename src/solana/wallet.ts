@@ -152,3 +152,18 @@ export async function operatorAirdrop(
   }
   return signature;
 }
+
+/**
+ * The up leg of the wallet reconciliation: airdrop lamports into the wallet on
+ * devnet to settle a trading gain (or booked venture revenue) so the wallet
+ * mirrors the book. This is a devnet SIMULATION — the SOL comes from the faucet,
+ * not a real counterparty. Best-effort at the call site (rate limits / faucet
+ * outages are non-fatal). Devnet only (asserted).
+ */
+export async function settlementAirdrop(
+  connection: Connection,
+  to: string | PublicKey,
+  lamports: number,
+): Promise<string> {
+  return operatorAirdrop(connection, to, lamports);
+}

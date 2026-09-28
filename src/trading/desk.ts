@@ -36,10 +36,18 @@ export interface Desk {
   openedAtCycle: number;
 }
 
+/** How an order executes. `taker` crosses the spread and pays the taker fee (it
+ * fills now). `maker` posts passively: it does NOT cross the spread and pays the
+ * (lower / rebate) maker fee, but it only fills if the market does not run away
+ * from the posted side this cycle — otherwise it misses, like a real limit order. */
+export type OrderStyle = 'maker' | 'taker';
+
 export interface Order {
   asset: string;
   /** desired net exposure in USD (signed). 0 closes the position. */
   targetUsd: number;
+  /** execution style; defaults to taker (fill-now). */
+  style?: OrderStyle;
 }
 
 export interface OrderOutcome {
@@ -50,10 +58,16 @@ export interface OrderOutcome {
 
 export interface ApplyContext {
   prices: PriceMap;
+  /** last cycle's prices — used to decide whether a passive maker order fills. */
+  prevPrices?: PriceMap;
   tradableAssets: string[];
   maxGrossExposureUsd: number;
   allowShort: boolean;
+  /** taker fee (bps). `feeBps` is the legacy name; both are read, `takerFeeBps` wins. */
   feeBps?: number;
+  takerFeeBps?: number;
+  /** maker fee (bps); may be 0 or negative (a rebate). */
+  makerFeeBps?: number;
   spreadBps?: number;
   slippageBps?: number;
 }
@@ -199,18 +213,44 @@ export function netPnlUsd(desk: Desk, prices: PriceMap): number {
 }
 
 /** Move one asset's exposure to `targetUsd` at the current price (mutates). */
-function setTarget(desk: Desk, asset: string, targetUsd: number, price: number, ctx: ApplyContext): void {
+interface FillResult { filled: boolean; reason: string }
+
+function setTarget(
+  desk: Desk,
+  asset: string,
+  targetUsd: number,
+  price: number,
+  ctx: ApplyContext,
+  style: OrderStyle = 'taker',
+): FillResult {
   const prev = desk.positions[asset];
   const prevUnits = prev?.units ?? 0;
   const newUnits = targetUsd / price;
   const deltaUnits = newUnits - prevUnits;
-  const impactBps = (ctx.spreadBps ?? 0) + (ctx.slippageBps ?? 0);
+
+  // A passive maker order only fills if the market did not run away from the
+  // posted side this cycle: a bid (buying, deltaUnits>0) fills when the price did
+  // not rise; an ask (selling, deltaUnits<0) fills when it did not fall. This is
+  // the maker's real trade-off — a better price and a lower fee, at the cost of
+  // missing when the market moves against a resting order.
+  if (style === 'maker' && Math.abs(deltaUnits) >= 1e-12) {
+    const prevPrice = ctx.prevPrices?.[asset];
+    if (typeof prevPrice === 'number' && prevPrice > 0) {
+      if (deltaUnits > 0 && price > prevPrice) return { filled: false, reason: 'maker bid not filled (price rose away)' };
+      if (deltaUnits < 0 && price < prevPrice) return { filled: false, reason: 'maker ask not filled (price fell away)' };
+    }
+  }
+
+  const takerFeeBps = ctx.takerFeeBps ?? ctx.feeBps ?? 0;
+  const feeBps = style === 'maker' ? (ctx.makerFeeBps ?? 0) : takerFeeBps;
+  // Taker crosses the spread + slippage; maker rests at the reference price.
+  const impactBps = style === 'maker' ? 0 : (ctx.spreadBps ?? 0) + (ctx.slippageBps ?? 0);
   const fillPrice = price * (1 + Math.sign(deltaUnits) * impactBps / 10_000);
-  const fee = Math.abs(deltaUnits * fillPrice) * (ctx.feeBps ?? 0) / 10_000;
+  const fee = Math.abs(deltaUnits * fillPrice) * feeBps / 10_000;
   desk.cashUsd -= deltaUnits * fillPrice + fee;
   if (Math.abs(newUnits) < 1e-12) {
     delete desk.positions[asset];
-    return;
+    return { filled: true, reason: style === 'maker' ? 'applied (maker)' : 'applied' };
   }
   const signFlipOrOpen = prevUnits === 0 || Math.sign(prevUnits) !== Math.sign(newUnits);
   const increased = prevUnits !== 0 && Math.sign(prevUnits) === Math.sign(newUnits) && Math.abs(newUnits) > Math.abs(prevUnits);
@@ -220,6 +260,7 @@ function setTarget(desk: Desk, asset: string, targetUsd: number, price: number, 
       ? (Math.abs(prevUnits) * (prev?.entryPriceUsd ?? price) + Math.abs(deltaUnits) * fillPrice) / Math.abs(newUnits)
       : (prev?.entryPriceUsd ?? fillPrice),
   };
+  return { filled: true, reason: style === 'maker' ? 'applied (maker)' : 'applied' };
 }
 
 /**
@@ -234,7 +275,8 @@ export function applyOrders(desk: Desk, orders: Order[], ctx: ApplyContext): Ord
   for (const raw of orders) {
     const asset = (raw.asset ?? '').toUpperCase();
     const targetUsd = Number(raw.targetUsd);
-    const order: Order = { asset, targetUsd };
+    const style: OrderStyle = raw.style === 'maker' ? 'maker' : 'taker';
+    const order: Order = { asset, targetUsd, style };
 
     if (!tradable.has(asset)) {
       outcomes.push({ order, ok: false, reason: `not a tradable asset: ${asset}` });
@@ -271,8 +313,8 @@ export function applyOrders(desk: Desk, orders: Order[], ctx: ApplyContext): Ord
       continue;
     }
 
-    setTarget(desk, asset, targetUsd, price, ctx);
-    outcomes.push({ order, ok: true, reason: 'applied' });
+    const fill = setTarget(desk, asset, targetUsd, price, ctx, style);
+    outcomes.push({ order, ok: fill.filled, reason: fill.reason });
   }
   return outcomes;
 }

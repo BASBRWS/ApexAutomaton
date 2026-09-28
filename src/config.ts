@@ -148,8 +148,13 @@ export interface Config {
     assets: string[];
     /** whether the agent may hold short (negative) positions. */
     allowShort: boolean;
-    /** Simulated execution costs in basis points, each charged on traded notional. */
+    /** Simulated execution costs in basis points, each charged on traded notional.
+     * `feeBps` is the TAKER fee (an aggressive, fill-now order crosses the spread
+     * and pays this). `makerFeeBps` is the passive maker fee — usually lower and
+     * may be negative (a rebate); a maker order rests at the reference price and
+     * pays no spread, but only fills when the market does not move away from it. */
     feeBps: number;
+    makerFeeBps: number;
     spreadBps: number;
     slippageBps: number;
     /** Simulated annual borrow cost on open shorts. */
@@ -169,6 +174,23 @@ export interface Config {
     metabolicRatePerCycle: number;
     /** base URL of the price API (default: CoinGecko simple price). */
     priceApiBase: string;
+  };
+
+  /** The REAL devnet wallet as the trading account ("de wallet is leidend").
+   * When realEconomyEnabled, the wallet is trued up to the book's equity every
+   * cycle: a trading gain airdrops SOL IN, a loss (or the metabolic cost) burns
+   * SOL OUT — so the wallet moves WITH the trades and is the single number, no
+   * paper/wallet mismatch. Devnet SIMULATION (inflow is faucet SOL, not real
+   * profit). OFF by default: nothing moves on-chain until you switch it on. */
+  wallet: {
+    /** master switch: reconcile the wallet to the book each cycle (settle IN/OUT). */
+    realEconomyEnabled: boolean;
+    /** floor (SOL) the settle-OUT (burn) leg never spends below, so the wallet
+     * always keeps enough SOL for transaction fees. */
+    floorSol: number;
+    /** hard cap (SOL) on a single cycle's reconciliation move, each direction —
+     * so any one cycle (or a bad reading) can only ever nudge the wallet. */
+    maxSettlePerCycleSol: number;
   };
 
   /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
@@ -308,6 +330,7 @@ export function loadConfig(): Config {
         .filter((s) => s.length > 0),
       allowShort: envBool('ALLOW_SHORT', true),
       feeBps: envNum('TRADING_FEE_BPS', 10),
+      makerFeeBps: envNum('TRADING_MAKER_FEE_BPS', 2),
       spreadBps: envNum('TRADING_SPREAD_BPS', 5),
       slippageBps: envNum('TRADING_SLIPPAGE_BPS', 5),
       shortBorrowApy: envNum('SHORT_BORROW_APY', 0.08),
@@ -316,6 +339,12 @@ export function loadConfig(): Config {
       metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
+    },
+
+    wallet: {
+      realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
+      floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
+      maxSettlePerCycleSol: envNum('WALLET_MAX_SETTLE_PER_CYCLE_SOL', 0.5),
     },
 
     memory: {

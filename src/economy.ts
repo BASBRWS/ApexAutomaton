@@ -29,6 +29,31 @@ export function tierForEquity(
   return tierForBalanceSol(equityToSol(equityUsd, solPriceUsd), cfg);
 }
 
+/**
+ * The survival balance in SOL. The REAL devnet wallet is the anchor: when we
+ * have a confirmed on-chain balance it governs life/death and the tier ("de
+ * wallet is leidend"). When the RPC read is unavailable (`null`, or a bogus
+ * negative/NaN reading) we fall back to the paper book's equity-in-SOL, so a
+ * transient RPC failure never mis-declares death or collapses the tier.
+ *
+ * A confirmed zero balance IS treated as real (a genuinely drained wallet is
+ * dead); only an absent/invalid reading falls back.
+ */
+export function survivalSol(walletSol: number | null | undefined, paperEquitySol: number): number {
+  return typeof walletSol === 'number' && Number.isFinite(walletSol) && walletSol >= 0
+    ? walletSol
+    : paperEquitySol;
+}
+
+/** The survival tier, anchored on the real wallet SOL when available. */
+export function tierForSurvival(
+  walletSol: number | null | undefined,
+  paperEquitySol: number,
+  cfg: Config,
+): Tier {
+  return tierForBalanceSol(survivalSol(walletSol, paperEquitySol), cfg);
+}
+
 export interface HeartbeatResult {
   signature: string | null;
   lamports: number;

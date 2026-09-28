@@ -105,10 +105,12 @@
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
-      <div id="tiles" class="grid"></div>
-
-      <h2>Real devnet wallet <span class="muted" style="font-size:12px;font-weight:400">· native SOL on chain, separate from the paper book</span></h2>
+      <h2>Real wallet — survival balance <span class="muted" style="font-size:12px;font-weight:400">· LEADING · native SOL on chain — this decides the tier and life/death</span></h2>
       <div id="wallet" class="grid"></div>
+      <div id="meter-note" class="muted" style="font-size:12px;margin:2px 0 4px"></div>
+
+      <h2>Trading book <span class="muted" style="font-size:12px;font-weight:400">· marked to real market prices (fees, spread &amp; slippage included)</span></h2>
+      <div id="tiles" class="grid"></div>
 
       <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
@@ -662,6 +664,7 @@
           );
 
           const wallet = document.getElementById('wallet');
+          const meterNote = document.getElementById('meter-note');
           const snapshot = state.walletSnapshot;
           const hasBalance = snapshot && Number.isSafeInteger(snapshot.lamports) && snapshot.lamports >= 0;
           if (hasBalance) {
@@ -669,12 +672,24 @@
             const quote = Number(snapshot.solPriceUsd);
             const observed = Date.parse(snapshot.observedAt);
             wallet.append(
-              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance, including transaction fees'),
+              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance (leading — sets the tier)'),
               tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable',
                 Number.isFinite(observed) ? `observed ${new Date(observed).toLocaleString()}` : 'observation time unavailable'),
             );
+            // Adaptive: when the wallet tracks the book equity (within ~2%), the
+            // real-economy reconciliation is on — the wallet mirrors the book, one
+            // number. Otherwise they are two separate meters.
+            const mirrored = eqSol > 0 && Math.abs(nativeSol - eqSol) / eqSol < 0.02;
+            meterNote.innerHTML = mirrored
+              ? 'The <strong>wallet mirrors the trading book</strong>: a gain airdrops SOL in, a loss (or the cost of living) '
+                + 'burns SOL out, so the wallet moves with the trades — one number, on-chain. Devnet simulation: the inflow '
+                + 'is faucet SOL, not real profit (real profit needs a real market / mainnet, out of scope).'
+              : 'Two meters. The <strong>wallet SOL</strong> above is the real balance that decides the tier and life/death. '
+                + 'The <strong>trading book</strong> below is marked to real prices but is not (yet) settled onto the wallet, '
+                + 'so the two can diverge. When the wallet reading is unavailable, the tier falls back to the book.';
           } else {
-            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance for this cycle'));
+            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance — tier falls back to the trading book this cycle'));
+            meterNote.textContent = 'Wallet balance unavailable this cycle — the tier temporarily follows the trading book below.';
           }
 
           const growth = document.getElementById('growth');
