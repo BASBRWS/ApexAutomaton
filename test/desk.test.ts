@@ -47,6 +47,60 @@ describe('venture revenue is separate from the paper book', () => {
   });
 });
 
+describe('maker vs taker execution', () => {
+  const fees = (prices: Record<string, number>, prevPrices: Record<string, number>): ApplyContext => ({
+    prices,
+    prevPrices,
+    tradableAssets: ['BTC'],
+    maxGrossExposureUsd: 5000,
+    allowShort: true,
+    feeBps: 10,
+    takerFeeBps: 10,
+    makerFeeBps: 2,
+    spreadBps: 5,
+    slippageBps: 5,
+  });
+
+  it('a taker crosses the spread and pays more than a maker for the same fill', () => {
+    const taker = initDesk(1000, 0);
+    applyOrders(taker, [{ asset: 'BTC', targetUsd: 200, style: 'taker' }], fees({ BTC: 100 }, { BTC: 100 }));
+    const maker = initDesk(1000, 0);
+    const out = applyOrders(maker, [{ asset: 'BTC', targetUsd: 200, style: 'maker' }], fees({ BTC: 100 }, { BTC: 100 }));
+    expect(out[0]!.ok).toBe(true);
+    // Both got the 2-unit position, but the maker spent less cash (no spread, lower fee).
+    expect(maker.positions.BTC!.units).toBeCloseTo(2, 9);
+    expect(maker.cashUsd).toBeGreaterThan(taker.cashUsd);
+    // Maker fills at the reference price exactly (no spread cross).
+    expect(maker.positions.BTC!.entryPriceUsd).toBeCloseTo(100, 9);
+  });
+
+  it('a maker BID does not fill when the price rose away this cycle', () => {
+    const d = initDesk(1000, 0);
+    const out = applyOrders(d, [{ asset: 'BTC', targetUsd: 200, style: 'maker' }], fees({ BTC: 100 }, { BTC: 99 }));
+    expect(out[0]!.ok).toBe(false);
+    expect(out[0]!.reason).toMatch(/not filled/);
+    expect(d.cashUsd).toBe(1000);        // untouched
+    expect(d.positions.BTC).toBeUndefined();
+  });
+
+  it('a maker ASK does not fill when the price fell away this cycle', () => {
+    const d = initDesk(1000, 0);
+    const out = applyOrders(d, [{ asset: 'BTC', targetUsd: -200, style: 'maker' }], fees({ BTC: 100 }, { BTC: 101 }));
+    expect(out[0]!.ok).toBe(false);
+    expect(d.cashUsd).toBe(1000);
+    expect(d.positions.BTC).toBeUndefined();
+  });
+
+  it('a maker fills when the market does not move away, and defaults to taker', () => {
+    const d = initDesk(1000, 0);
+    expect(applyOrders(d, [{ asset: 'BTC', targetUsd: 200, style: 'maker' }], fees({ BTC: 100 }, { BTC: 100 }))[0]!.ok).toBe(true);
+    // No style given -> taker (crosses spread): a filled order with a worse entry.
+    const t = initDesk(1000, 0);
+    applyOrders(t, [{ asset: 'BTC', targetUsd: 200 }], fees({ BTC: 100 }, { BTC: 100 }));
+    expect(t.positions.BTC!.entryPriceUsd).toBeGreaterThan(100);
+  });
+});
+
 describe('trading desk', () => {
   it('starts all in cash with equity = capital', () => {
     const d = initDesk(500, 0);

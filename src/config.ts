@@ -148,8 +148,13 @@ export interface Config {
     assets: string[];
     /** whether the agent may hold short (negative) positions. */
     allowShort: boolean;
-    /** Simulated execution costs in basis points, each charged on traded notional. */
+    /** Simulated execution costs in basis points, each charged on traded notional.
+     * `feeBps` is the TAKER fee (an aggressive, fill-now order crosses the spread
+     * and pays this). `makerFeeBps` is the passive maker fee — usually lower and
+     * may be negative (a rebate); a maker order rests at the reference price and
+     * pays no spread, but only fills when the market does not move away from it. */
     feeBps: number;
+    makerFeeBps: number;
     spreadBps: number;
     slippageBps: number;
     /** Simulated annual borrow cost on open shorts. */
@@ -325,6 +330,7 @@ export function loadConfig(): Config {
         .filter((s) => s.length > 0),
       allowShort: envBool('ALLOW_SHORT', true),
       feeBps: envNum('TRADING_FEE_BPS', 10),
+      makerFeeBps: envNum('TRADING_MAKER_FEE_BPS', 2),
       spreadBps: envNum('TRADING_SPREAD_BPS', 5),
       slippageBps: envNum('TRADING_SLIPPAGE_BPS', 5),
       shortBorrowApy: envNum('SHORT_BORROW_APY', 0.08),

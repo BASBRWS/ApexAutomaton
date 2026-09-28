@@ -48,6 +48,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       assets: ['BTC', 'ETH'],
       allowShort: true,
       feeBps: 10,
+      makerFeeBps: 2,
       spreadBps: 5,
       slippageBps: 5,
       shortBorrowApy: 0.08,

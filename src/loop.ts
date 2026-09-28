@@ -391,6 +391,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state,
     signer,
     prices: executablePrices,
+    prevPrices,
     maxGrossExposureUsd,
     tier,
     policy,
