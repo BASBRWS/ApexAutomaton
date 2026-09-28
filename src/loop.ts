@@ -91,6 +91,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // --- Kill switch: stand down before any spend. ----------------------------
   if (isKillSwitchEngaged(cfg)) {
+    state.walletSnapshot = null;
     const eq = deskEquityUsd(state.desk, state.lastPrices);
     appendEntry(standDownEntry(state, eq, solPriceOf({}, state)));
     state.lastRunAt = now();
@@ -227,7 +228,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // --- Death check: economic, in SOL. Never self-resurrect. -----------------
   if (equitySolPre <= cfg.trading.dustSol) {
     try {
-      state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, solPrice);
+      state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
     } catch {
       state.walletSnapshot = null;
     }
@@ -582,7 +583,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // An RPC failure clears the previous snapshot rather than displaying stale SOL.
   let walletNote: string | undefined;
   try {
-    state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, solPrice);
+    state.walletSnapshot = await readWalletSnapshot(connection, cfg.agentPubkey, executablePrices.SOL ?? 0);
   } catch (err) {
     state.walletSnapshot = null;
     walletNote = `wallet balance unavailable (${errMsg(err)})`;
@@ -645,6 +646,7 @@ function standDownEntry(state: AutomatonState, equityUsd: number, solPrice: numb
     tier,
     equitySol: equityToSol(equityUsd, solPrice),
     equityUsd,
+    walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
     model: '(none)',
     action: 'stand_down',
     actionSummary: 'kill switch engaged — no action taken',

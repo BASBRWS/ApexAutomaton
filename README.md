@@ -331,7 +331,8 @@ separate section, including its indicative USD value at the observed SOL quote.
 The heartbeat reads the wallet after on-chain actions and commits the snapshot
 with its observation time. GitHub Pages shows the last committed snapshot, not
 a continuous live RPC feed. An RPC failure displays "unavailable" instead of
-reusing an older balance. Paper book equity and simulated staking remain
+reusing an older balance. If the fresh SOL quote is unavailable, the wallet's
+SOL balance still shows but its USD estimate is unavailable. Paper book equity and simulated staking remain
 separate; the wallet value does not determine the agent's tiers or death.
 
 ## Publish the dashboard to GitHub Pages (no VPS needed)
