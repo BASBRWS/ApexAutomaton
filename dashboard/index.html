@@ -40,7 +40,8 @@
       .tile .v { font-size: 22px; font-weight: 600; margin-top: 4px; }
       .tile .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
       svg { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
-      .chart-controls { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+      .chart-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 8px; }
+      .chart-controls .range-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
       .chart-controls button { cursor: pointer; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); padding: 5px 12px; }
       .chart-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -100,7 +101,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.6.3</span></h1>
+      <h1>Apex Automaton <span class="muted" style="font-size:12px">v0.6.4</span></h1>
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
@@ -114,8 +115,14 @@
 
       <h2>Book equity over time</h2>
       <div class="chart-controls">
-        <button type="button" id="chart-usd" aria-pressed="true">USD, all cycles</button>
+        <button type="button" id="chart-usd" aria-pressed="true">USD</button>
         <button type="button" id="chart-sol" aria-pressed="false">SOL, live prices</button>
+        <span class="range-buttons" role="group" aria-label="Chart period">
+          <button type="button" data-chart-period="all" aria-pressed="true">All</button>
+          <button type="button" data-chart-period="day" aria-pressed="false">24 hours</button>
+          <button type="button" data-chart-period="week" aria-pressed="false">7 days</button>
+          <button type="button" data-chart-period="month" aria-pressed="false">30 days</button>
+        </span>
         <span id="chart-note" class="muted"></span>
       </div>
       <svg id="chart" viewBox="0 0 900 260" aria-label="equity in USD over all cycles chart"></svg>
@@ -227,7 +234,7 @@
         return el;
       }
 
-      function drawChart(entries, unit) {
+      function drawChart(entries, unit, period) {
         const NS = 'http://www.w3.org/2000/svg';
         const svg = document.getElementById('chart');
         svg.innerHTML = '';
@@ -242,7 +249,10 @@
         const W = 900, H = 260, m = { l: 72, r: 16, t: 14, b: 40 };
         const iw = W - m.l - m.r, ih = H - m.t - m.b;
         const isUsd = unit === 'usd';
-        const pts = entries.map((e, i) => ({ x: e.cycle ?? i + 1, y: Number(isUsd ? e.equityUsd : e.equitySol) || 0 }));
+        const pts = entries.map((e, i) => ({
+          x: period === 'all' ? (e.cycle ?? i + 1) : Date.parse(e.at),
+          y: Number(isUsd ? e.equityUsd : e.equitySol) || 0,
+        }));
         const formatY = (value) => isUsd ? '$' + value.toFixed(2) : value.toFixed(3);
 
         if (pts.length === 0) {
@@ -270,22 +280,25 @@
         }
         // X axis line
         add('line', { x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih, stroke: 'var(--line)', 'stroke-width': 1 });
-        // X labels (cycle numbers, up to ~7)
+        // X labels (cycle numbers for full history, timestamps for a time window)
         const step = Math.max(1, Math.ceil(pts.length / 7));
         pts.forEach((p, i) => {
           if (i % step !== 0 && i !== pts.length - 1) return;
-          add('text', { x: sx(p.x), y: m.t + ih + 18, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, String(p.x));
+          const label = period === 'all' ? String(p.x) : new Intl.DateTimeFormat(undefined,
+            period === 'day' ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' },
+          ).format(new Date(p.x));
+          add('text', { x: sx(p.x), y: m.t + ih + 18, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, label);
         });
         // Axis titles
-        add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, 'cycle');
+        add('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, period === 'all' ? 'cycle' : 'time');
         add('text', { x: 16, y: m.t + ih / 2, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11, transform: `rotate(-90 16 ${m.t + ih / 2})` }, isUsd ? 'equity USD' : 'equity SOL');
 
-        // Starting-stake reference line (genesis equity, the first point), if in range
+        // Reference line for the first point in the selected period.
         const startY = pts[0].y;
         if (startY >= minY && startY <= maxY) {
           const y1 = sy(startY);
           add('line', { x1: m.l, y1, x2: m.l + iw, y2: y1, stroke: 'var(--accent-dim)', 'stroke-width': 1, 'stroke-dasharray': '4 3' });
-          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, 'start ' + formatY(startY));
+          add('text', { x: m.l + iw - 2, y: y1 - 4, 'text-anchor': 'end', fill: 'var(--accent-dim)', 'font-size': 10 }, (period === 'all' ? 'start ' : 'period start ') + formatY(startY));
         }
 
         // Line + points
@@ -678,18 +691,38 @@
           const chartSol = document.getElementById('chart-sol');
           const chartNote = document.getElementById('chart-note');
           const chart = document.getElementById('chart');
-          function selectChart(unit) {
-            const isUsd = unit === 'usd';
+          const periods = { all: 0, day: DAY, week: 7 * DAY, month: 30 * DAY };
+          const periodLabels = { all: 'all history', day: 'last 24 hours', week: 'last 7 days', month: 'last 30 days' };
+          let chartUnit = 'usd';
+          let chartPeriod = 'all';
+          function selectChart() {
+            const isUsd = chartUnit === 'usd';
+            const source = isUsd ? journal : liveSeries;
+            const latest = source.reduce((max, e) => {
+              const at = Date.parse(e.at);
+              return Number.isFinite(at) ? Math.max(max, at) : max;
+            }, -Infinity);
+            const entries = chartPeriod === 'all' ? source : source.filter((e) => {
+              const at = Date.parse(e.at);
+              return Number.isFinite(at) && at >= latest - periods[chartPeriod] && at <= latest;
+            });
             chartUsd.setAttribute('aria-pressed', String(isUsd));
             chartSol.setAttribute('aria-pressed', String(!isUsd));
-            chart.setAttribute('aria-label', isUsd ? 'equity in USD over all cycles chart' : 'equity in SOL at observed prices chart');
-            chartNote.textContent = isUsd ? `${journal.length} cycles` :
-              (liveSeries.length ? `${liveSeries.length} cycles, from #${liveSeries[0].cycle}` : 'no live SOL prices yet');
-            drawChart(isUsd ? journal : liveSeries, unit);
+            document.querySelectorAll('[data-chart-period]').forEach((button) =>
+              button.setAttribute('aria-pressed', String(button.dataset.chartPeriod === chartPeriod)));
+            chart.setAttribute('aria-label', `book equity in ${isUsd ? 'USD' : 'SOL'} for ${periodLabels[chartPeriod]}`);
+            chartNote.textContent = `${entries.length} cycles · ${periodLabels[chartPeriod]}` +
+              (chartPeriod !== 'all' && Number.isFinite(latest)
+                ? ` through ${new Date(latest).toLocaleString()}` : '') +
+              (!isUsd && source.length ? ` · SOL history from #${source[0].cycle}` : '');
+            drawChart(entries, chartUnit, chartPeriod);
           }
-          chartUsd.onclick = () => selectChart('usd');
-          chartSol.onclick = () => selectChart('sol');
-          selectChart('usd');
+          chartUsd.onclick = () => { chartUnit = 'usd'; selectChart(); };
+          chartSol.onclick = () => { chartUnit = 'sol'; selectChart(); };
+          document.querySelectorAll('[data-chart-period]').forEach((button) => {
+            button.onclick = () => { chartPeriod = button.dataset.chartPeriod; selectChart(); };
+          });
+          selectChart();
           renderReasoning(journal);
           renderLessons(lessons);
           renderBook(desk, prices);

@@ -1,4 +1,4 @@
-# Apex Automaton v0.6.3
+# Apex Automaton v0.6.4
 
 A **growth-seeking autonomous agent** that owns a real Solana wallet on
 **devnet**. Its paper book aims to grow against live prices. The book controls
@@ -334,6 +334,11 @@ a continuous live RPC feed. An RPC failure displays "unavailable" instead of
 reusing an older balance. If the fresh SOL quote is unavailable, the wallet's
 SOL balance still shows but its USD estimate is unavailable. Paper book equity and simulated staking remain
 separate; the wallet value does not determine the agent's tiers or death.
+
+The book equity chart offers all history, 24 hours, 7 days and 30 days. Time
+windows use cycle timestamps and end at the latest recorded cycle, so a pause
+in heartbeats does not leave an empty chart. USD and SOL share the same period
+selection; older cycles without a live SOL price appear only in the USD view.
 
 ## Publish the dashboard to GitHub Pages (no VPS needed)
 

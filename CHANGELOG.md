@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.6.4, 2026-09-28
+
+- Add chart period controls for all history, the last 24 hours, 7 days and 30 days. Keep the USD and SOL views independent of the selected period.
+- Use cycle timestamps for the time windows, ending at the latest recorded point in the selected unit. Label the first visible value as the period start instead of implying it is the agent's birth value.
+
+### Migration
+
+No state change. Older cycles without live SOL quotes remain excluded from the SOL view.
+
 ## 0.6.3, 2026-09-28
 
 - Read the agent wallet's confirmed native SOL balance from devnet RPC after each cycle's on-chain actions and record it separately from paper equity. Add the observed wallet balance to the cycle journal.
