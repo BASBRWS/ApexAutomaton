@@ -671,10 +671,12 @@
             const nativeSol = snapshot.lamports / 1e9;
             const quote = Number(snapshot.solPriceUsd);
             const observed = Date.parse(snapshot.observedAt);
+            const asOf = `snapshot @ cycle ${state.cycle ?? '?'}`
+              + (Number.isFinite(observed) ? ` · ${new Date(observed).toLocaleString()}` : '')
+              + ' — live chain may differ';
             wallet.append(
-              tile('wallet SOL', sol(nativeSol), 'confirmed devnet balance (leading — sets the tier)'),
-              tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable',
-                Number.isFinite(observed) ? `observed ${new Date(observed).toLocaleString()}` : 'observation time unavailable'),
+              tile('wallet SOL', sol(nativeSol), asOf + ' (leading — sets the tier)'),
+              tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable', asOf),
             );
             // Adaptive: when the wallet tracks the book equity (within ~2%), the
             // real-economy reconciliation is on — the wallet mirrors the book, one
