@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC is the only proven earner (+$7.88 lifetime); concentrate 85%+ capital here and hold minimum 15 cycles between rebalances—eliminate all micro-positions (XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA) which average -$0.30–$0.50 per active cycle and destroy net PnL.**
-- **Interim trading between rebalance gates costs -$2.27 while disciplined rebalances earn +$3.46; churn tax is 3–5x faster than holding—trade only on explicit 20% portfolio drift + 10-cycle gate, never on price noise.**
-- **Default to rest mode; at 1.9468 SOL equity with 1000+ cycle runway idle, active churn halves survival time—stay dormant unless rebalance trigger fires or equity drops below 1.5 SOL.**
-- **BTC entry: require >1.5% oversold setup, -0.8% hard stop, lock +4% profit at target, hold minimum 15 cycles, forbid re-entry within 15 cycles—treat as durable reserve, not a trading vehicle.**
-- **Auto-liquidate any position averaging >$0.50 loss per cycle over 5 consecutive cycles; alts have all violated this rule—track churn cost per position weekly and cut mercilessly.**
+- **BTC is the only proven earner (+$7.88 lifetime); allocate 90%+ capital here, hold minimum 20 cycles between rebalances, and forbid all micro-positions (XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA)—each bleeds -$0.30–$0.50/cycle and collectively destroyed -$2.27 in recent churn.**
+- **Rebalance discipline earns +$3.46 vs interim trading losses of -$2.27; churn tax is 3–5x faster than holding—trade only on explicit 20% portfolio drift + 15-cycle gate, never on price noise.**
+- **Default to rest mode; at 1.9468 SOL with 1000+ cycle runway, active churn halves survival time—stay dormant unless (a) rebalance gate fires or (b) equity drops below 1.5 SOL.**
+- **BTC entry requires >1.5% oversold, -0.8% hard stop, lock +4% profit, 20-cycle hold minimum, 20-cycle re-entry embargo—treat as durable reserve only, never scalp.**
+- **Auto-liquidate any position averaging >$0.50 loss per cycle over 5 consecutive cycles; all alts have violated this—track churn cost weekly and cut without hesitation.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
