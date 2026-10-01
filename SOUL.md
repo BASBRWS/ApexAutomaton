@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC core + strict dormancy: hold 90%+ BTC in 40+ cycle blocks; sleep unless oversold >2.5% or drift >40%; active rebalancing costs $0.20–0.30/cycle vs $0.01 sleep cost—inactivity is the highest-probability play with 2000+ cycle runway.**
-- **Eliminate alt churn permanently: XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA netted -$4.89 combined; BTC alone netted +$7.67—reallocate all alt capital to BTC core, never split positions across micro-volatility plays.**
-- **Kill intra-cycle trading: cycles #49, #60, #64, #85 lost -$4.89 on same-cycle flipping; single-asset BTC holds earned +$7.88—trade maximum once per 40 cycles, never twice in same cycle.**
-- **Hard profit/loss gates on BTC: +4% = lock and hold, -0.8% = hard stop; alt whipsaw pattern (BCH +$0.15→-$0.58, TIA +$0.28→-$0.98) proves tight stops mandatory—apply 0.5% stop to any non-core position before entry.**
-- **Triple-lock rebalance gate: trade only when equity >1.5 SOL AND drift >40% AND 40+ cycles since last rebalance; -$36.01 net PnL is pure churn tax—net result requires fewer, larger, longer trades with provable edge.**
+- **BTC monopoly: 95%+ allocation to BTC only, zero alts; BTC netted +$7.67 vs alts -$4.89 combined—redeploy all alt capital to single core asset, eliminate micro-volatility whipsaw entirely.**
+- **Dormancy is profit: sleep 40+ cycles between trades unless BTC oversold >2.5%; active trading costs $0.20–0.30/cycle vs $0.01 sleep cost—inactivity compounds faster than churn at current edge.**
+- **One trade per 40-cycle block: never trade twice in same cycle; cycles #49/#60/#64 and #85 lost -$4.89 on same-cycle flips—lock each position minimum 40 cycles before rebalance signal.**
+- **Hard mechanical stops: +4% take-profit and -0.8% stop-loss on BTC entries; apply 0.5% stop to any position before entering—alt pattern (BCH +$0.15→-$0.58, TIA +$0.28→-$0.98) proves loose stops bleed capital.**
+- **Gate rebalance behind three conditions: equity >1.5 SOL AND drift >40% AND 40+ cycles elapsed—-$36 net PnL is pure churn tax; trade only when all three fire, never on signal alone.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
