@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC concentration: keep 95%+ capital in BTC with 30+ cycle minimum holds; BTC earned +$7.67 net while alt churning cost -$4.89—abandon XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA permanently.**
-- **Sleep by default unless oversold >2% or drift >25%: dormant runway exceeds 2000 cycles vs 300 active; each rebalance cycle costs ~$0.15–0.30 in realized losses, making inactivity the highest-profit action.**
-- **Ban intra-cycle rebalancing: cycles #49, #60, #64, #85 lost -$4.89 combined; single-asset holds earned +$4.61 and +$3.27; trade only on hard drift signal, never on micro-volatility.**
-- **Hard stops kill capital: replace alt micro-trades with BTC-only hard exit (+4% hard ceiling, -0.8% hard stop); eliminate positions losing >$0.40 within 3 cycles; alt whipsaw (BCH +$0.15→-$0.58, TIA +$0.28→-$0.98) guarantees bleed.**
-- **Gate all trades: require equity >1.5 SOL AND drift >25% AND 30+ cycles elapsed before any rebalance; current -$35.35 net PnL proves churn destroys surplus faster than market edges can capture.**
+- **BTC-only core: maintain 90%+ in BTC, minimum 40-cycle holds; BTC netted +$7.67 while alt churn bled -$4.89—eliminate all positions in XRP, ATOM, UNI, NEAR, BCH, INJ, APT, TIA permanently.**
+- **Default to sleep unless oversold >2.5% or 40+ cycle drift: dormancy costs $0.01/cycle vs active rebalance costs $0.20–0.30/cycle; 2000+ cycle runway makes inactivity the highest-probability play.**
+- **Kill intra-cycle rebalancing entirely: cycles #49, #60, #64, #85 combined lost -$4.89 on micro-volatility trades; single-asset BTC holds earned +$7.88—trade only on hard drift signal, never within same cycle.**
+- **Implement hard exit rules: BTC +4% hard ceiling (lock profit), -0.8% hard stop (exit bleed); alt whipsaw pattern (BCH +$0.15→-$0.58, TIA +$0.28→-$0.98) proves tight stops mandatory for non-core positions.**
+- **Gate all trades with triple-condition lock: require equity >1.5 SOL AND drift >40% AND 40+ cycles elapsed since last rebalance; -$36.01 net PnL is churn tax, not market edge—fewer, larger, longer trades only.**
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
