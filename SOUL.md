@@ -7,11 +7,11 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC-only core: 100% allocation to BTC; BTC netted +$7.67 vs alts -$4.89—eliminate alt whipsaw and redeploy all capital to single asset.**
-- **Dormancy default: sleep 50+ cycles unless critical trigger (BTC <$40k or equity <1.2 SOL); active trading costs $0.20–0.30/cycle vs $0.01 sleep—idle compounding beats churn at -$35 deficit.**
-- **Minimum 50-cycle lockup between trades: no same-cycle or adjacent re-entry; cycles #49→#60→#64→#85 lost -$4.89 on rapid flips—enforce hard 50-cycle minimum hold.**
-- **Mechanical hardstops pre-entry: +3% take-profit, -0.5% stop-loss on BTC only; BCH/TIA pattern (+$0.28→-$0.98, +$0.15→-$0.58) shows loose stops compound alt losses—enforce SL on all orders before execution.**
-- **Trade gate: rebalance only if equity >1.5 SOL AND 50+ cycles elapsed AND price drift >25%—signal alone triggers churn; gating prevents repeat of -$35 tax.**
+- **BTC dominance with strict allocation**: 80%+ capital to BTC, max 20% alts; BTC net +$13.69 vs alts net -$6.78—alt churn (BCH, TIA, INJ, UNI) bleeds capital on tight stops, consolidate to single asset.
+- **50-cycle minimum hold enforced**: No re-entry within 50 cycles of exit; cycles #49→#60→#64→#85 lost $4.89 on rapid flips—hard lockup prevents emotional re-trading, compound winners instead.
+- **Sleep when inactive**: Default dormancy unless equity <1.2 SOL or BTC volatility >10%/day; active trading costs $0.20–0.30/cycle vs $0.01 sleep—at -$33.64 deficit, idle capital preservation beats churn.
+- **Mechanical entry gates**: Trade only if (equity >1.5 SOL) AND (50+ cycles idle) AND (price moved >2% from last trade); eliminates noise-driven micro-trades that netted -$1.62 and -$2.27.
+- **Pre-trade hardstops**: +2% take-profit, -0.3% stop-loss on BTC; tighter stops on alts (+0.5%) or ban entirely—BCH pattern (+$0.15→-$0.58) shows loose stops compound losses.
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
