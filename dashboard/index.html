@@ -105,6 +105,9 @@
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
+      <h2>Monthly challenge <span class="muted" style="font-size:12px;font-weight:400">· grow the book ≥ 2% per 30 days (stretch 2.8%) or lose a life — 0 lives is death</span></h2>
+      <div id="challenge" class="grid"></div>
+
       <h2>Real wallet — survival balance <span class="muted" style="font-size:12px;font-weight:400">· LEADING · native SOL on chain — this decides the tier and life/death</span></h2>
       <div id="wallet" class="grid"></div>
       <div id="meter-note" class="muted" style="font-size:12px;margin:2px 0 4px"></div>
@@ -692,6 +695,29 @@
           } else {
             wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance — tier falls back to the trading book this cycle'));
             meterNote.textContent = 'Wallet balance unavailable this cycle — the tier temporarily follows the trading book below.';
+          }
+
+          const chEl = document.getElementById('challenge');
+          const ch = state.challenge;
+          if (ch && Number(ch.periodStartEquityUsd) > 0) {
+            const DAYMS = 86400000, PERIOD = 30, MIN = 0.02, TARGET = 0.028;
+            const maxLives = Math.max(3, Number(ch.lives) || 0);
+            const lives = Number(ch.lives) || 0;
+            const hearts = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, maxLives - lives));
+            const elapsed = Math.max(0, (Date.now() - Date.parse(ch.periodStartAt)) / DAYMS);
+            const ret = eqUsd / Number(ch.periodStartEquityUsd) - 1;
+            const status = ret >= TARGET ? 'on stretch target' : ret >= MIN ? 'above minimum' : 'below minimum';
+            const hist = (ch.history ?? []).map((h) => `M${h.period}: ${pct(h.returnPct)} ${h.outcome === 'fail' ? '✗' : '✓'}`).join(' · ');
+            chEl.append(
+              tile('lives', `<span class="${lives >= 2 ? 'pos' : 'neg'}">${hearts}</span>`, `${lives} of ${maxLives}`),
+              tile(`month ${ch.period}`, `day ${Math.min(PERIOD, elapsed).toFixed(1)} / ${PERIOD}`, `${Math.max(0, PERIOD - elapsed).toFixed(1)} days left`),
+              tile('return this month', `<span class="${ret >= MIN ? 'pos' : 'neg'}">${pct(ret)}</span>`, status),
+              tile('needed at month end', usd(Number(ch.periodStartEquityUsd) * (1 + MIN)), `stretch ${usd(Number(ch.periodStartEquityUsd) * (1 + TARGET))} · from ${usd(ch.periodStartEquityUsd)}`),
+              tile('compute this month', usd(ch.periodComputeUsd ?? 0), 'model calls, paid from the book'),
+              tile('past months', hist || 'none yet'),
+            );
+          } else {
+            chEl.append(tile('challenge', 'not started', 'starts on the next cycle'));
           }
 
           const growth = document.getElementById('growth');

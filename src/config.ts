@@ -193,6 +193,29 @@ export interface Config {
     maxSettlePerCycleSol: number;
   };
 
+  /** Monthly return challenge: the agent must grow its book by at least
+   * minReturn per period or lose one of its lives; at zero lives it is dead. */
+  challenge: {
+    enabled: boolean;
+    lives: number;
+    periodDays: number;
+    minReturn: number;
+    targetReturn: number;
+  };
+
+  /** How often the agent may buy a model decision. Every call is real money
+   * charged to the book, so the cadence is the biggest cost lever. */
+  decisions: {
+    /** a scheduled decision at most once per this many hours... */
+    minHoursBetween: number;
+    /** ...but wake early when an OPEN position moved at least this much (fraction)... */
+    positionMoveTrigger: number;
+    /** ...or BTC/ETH moved at least this much since the last decision. */
+    marketMoveTrigger: number;
+    /** hard ceiling on model decisions per rolling 24h, triggers included. */
+    maxPerDay: number;
+  };
+
   /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
    * periodic nudge to consolidate lessons into SOUL.md via the reflect tool. */
   memory: {
@@ -335,8 +358,11 @@ export function loadConfig(): Config {
       slippageBps: envNum('TRADING_SLIPPAGE_BPS', 5),
       shortBorrowApy: envNum('SHORT_BORROW_APY', 0.08),
       dustSol: envNum('TRADING_DUST_SOL', 0.02),
-      yieldApy: envNum('YIELD_APY', 0),
-      metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
+      // A realistic carry for parked capital (stablecoin / staking scale).
+      yieldApy: envNum('YIELD_APY', 0.05),
+      // Off by default: the monthly challenge (below) is the survival pressure,
+      // so the outcome measures skill instead of a fixed bleed no strategy beats.
+      metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },
@@ -345,6 +371,21 @@ export function loadConfig(): Config {
       realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
       floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
       maxSettlePerCycleSol: envNum('WALLET_MAX_SETTLE_PER_CYCLE_SOL', 0.5),
+    },
+
+    challenge: {
+      enabled: envBool('CHALLENGE_ENABLED', true),
+      lives: Math.trunc(envNum('CHALLENGE_LIVES', 3)),
+      periodDays: envNum('CHALLENGE_PERIOD_DAYS', 30),
+      minReturn: envNum('CHALLENGE_MIN_RETURN', 0.02),
+      targetReturn: envNum('CHALLENGE_TARGET_RETURN', 0.028),
+    },
+
+    decisions: {
+      minHoursBetween: envNum('DECISION_MIN_HOURS', 8),
+      positionMoveTrigger: envNum('DECISION_POSITION_MOVE', 0.03),
+      marketMoveTrigger: envNum('DECISION_MARKET_MOVE', 0.02),
+      maxPerDay: Math.trunc(envNum('DECISION_MAX_PER_DAY', 4)),
     },
 
     memory: {
@@ -393,6 +434,15 @@ export function loadConfig(): Config {
 
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
+  const ch = cfg.challenge;
+  if (ch?.enabled && (!(ch.lives >= 1) || !(ch.periodDays > 0) || !Number.isFinite(ch.minReturn) ||
+      !Number.isFinite(ch.targetReturn) || ch.targetReturn < ch.minReturn)) {
+    throw new Error('Challenge config: lives >= 1, period > 0 days, and target return >= minimum return.');
+  }
+  const d = cfg.decisions;
+  if (d && (!(d.minHoursBetween >= 0) || !(d.maxPerDay >= 1) || !(d.positionMoveTrigger > 0) || !(d.marketMoveTrigger > 0))) {
+    throw new Error('Decision cadence: DECISION_MIN_HOURS >= 0, DECISION_MAX_PER_DAY >= 1, move triggers > 0.');
+  }
   if (cfg.pump.enabled && (!Number.isFinite(cfg.pump.maxCreateSol) || cfg.pump.maxCreateSol <= 0 ||
       cfg.pump.maxCreateSol > cfg.rails.perTxCapSol)) {
     throw new Error('PUMP_MAX_CREATE_SOL must be positive and at most PER_TX_CAP_SOL.');

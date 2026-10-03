@@ -27,9 +27,10 @@ export class AnthropicClient implements LLMClient {
     };
 
     if (req.system) {
-      params.system = [
-        { type: 'text', text: req.system, cache_control: { type: 'ephemeral' } },
-      ];
+      // No cache_control: decisions are hours apart, far beyond the 5-minute
+      // cache TTL, so a cache entry is never read back — marking the prompt
+      // would only pay the 1.25x cache-write premium on every call.
+      params.system = req.system;
     }
 
     if (supportsAdaptive) {

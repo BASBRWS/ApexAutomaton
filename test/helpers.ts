@@ -57,6 +57,8 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       metabolicRatePerCycle: 0.0001,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
+    challenge: { enabled: true, lives: 3, periodDays: 30, minReturn: 0.02, targetReturn: 0.028 },
+    decisions: { minHoursBetween: 4, positionMoveTrigger: 0.03, marketMoveTrigger: 0.02, maxPerDay: 6 },
     wallet: {
       realEconomyEnabled: false,
       floorSol: 0.05,

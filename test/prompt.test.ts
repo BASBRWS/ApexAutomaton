@@ -51,6 +51,28 @@ describe('buildUserPrompt — survival framing', () => {
   });
 });
 
+describe('buildUserPrompt — monthly challenge', () => {
+  it('shows lives, progress and compute cost, and drops the metabolism framing when it is off', () => {
+    const cfg = makeTestConfig();
+    const text = buildUserPrompt({
+      cycle: 600, tier: 'NORMAL', policy: policyForTier('NORMAL', cfg),
+      equityUsd: 202, equitySol: 1.7, dustSol: 0.02, dustUsd: 2.4,
+      avgBurnUsd: 0.03, runwayCycles: 6000, metabolicDailyPct: 0,
+      prices: { BTC: 60000 }, prevPrices: { BTC: 60000 }, deskSummary: 'cash=$202',
+      score: initialScore(200), journalDigest: '(none)', obituaryDigest: '(none)',
+      challenge: {
+        lives: 2, maxLives: 3, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
+        minReturn: 0.02, targetReturn: 0.028, minEquityUsd: 204, targetEquityUsd: 205.6, periodComputeUsd: 0.42,
+      },
+    });
+    expect(text).toContain('Lives: ♥♥♡ (2 of 3)');
+    expect(text).toContain('$2.00 short of the minimum');
+    expect(text).toContain('cost $0.42');
+    expect(text).toContain('You DIE');
+    expect(text).not.toMatch(/COASTING IS DEATH/);
+  });
+});
+
 describe('parseAction — tolerant action extraction', () => {
   it('parses a fenced json block', () => {
     const text = 'Here is my choice:\n```json\n{"tool":"do_task","input":{"taskId":"label-batch"},"rationale":"earn"}\n```';
