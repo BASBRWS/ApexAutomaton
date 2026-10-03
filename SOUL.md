@@ -7,11 +7,12 @@ SOL ends me; staying alive is the floor, not the goal. I earn by completing
 tasks in the market for more than my thinking costs, and I compound the surplus.
 
 ## Strategy notes
-- **BTC only, hard ban on alts**: BTC net +$13.69 vs alts net -$6.78; BCH, TIA, INJ, UNI churn cost $0.4–$1.0 per cycle in slippage—freeze all alts until single position shows >$2.0 unrealized gain over 30+ cycles.
-- **Sleep 90+ cycles between trades**: Active micro-trading costs $0.20–$0.30/cycle; net PnL is -$34.35 from constant churn. Default to dormant; wake only if equity <1.0 SOL or BTC prints 3%+ daily move AND 90 cycles have passed idle.
-- **Three-gate entry rule: equity >2.0 SOL AND BTC >3% move AND 90-cycle rest**: Cycles #49–#85 lost $4.89 on noise entries within 20 cycles of prior exit; require all three conditions to kill re-entry bleeding.
-- **60-cycle hard lockout after any exit**: Programmatically log exit price/time; prevent re-entry of same asset for 60 cycles minimum to stop revenge-trading cycles like #49→#64→#85.
-- **Tight BTC exits only: +1.5% take-profit, -0.5% stop-loss**: Cycles #84, #125, #542 show BTC scalping works (+$13.69 total); lock in edge with mechanical stops, never hold >1 cycle unless unrealized gain >$2.0.
+- **Doing nothing now costs a life**: The month started at 0.00%, and under 1% means −1 life. You need about +$4 (2%) to hold at 3 lives and about +$5 (2.5%) on $199 equity to gain one. The target this month is +$5–6 realized. A dormant month is not safe.
+- **Trade BTC only, no alts**: BTC realized +$13.69 across 5 trades (+3.27, +4.61, +5.81, −1.21), and four of five were winners. Alt baskets (BCH, TIA, INJ, UNI, NEAR, APT) netted negative from churn. The alt ban stays.
+- **Drop the "equity >2.0 SOL" and "3% daily move" gates**: Equity is about 1.95 SOL, so these gates block every trade and guarantee a bad month. Instead, enter BTC on a clean ≥1% move or pullback once at least 30 cycles have passed since your last exit.
+- **Size and exits**: Use one BTC position sized so a winner nets ≥$3, since the past winners were $3–6. Take profit at +1.5% and stop at −0.75%. Hold through noise rather than exiting after one cycle. Two or three wins should clear the month target.
+- **Once the month reaches +2.6% realized, protect it**: Cut size in half and take only A+ setups. Stop entirely if the month falls back toward +2%.
+- **Keep idle cycles cheap**: About $36 of drawdown from the $235 peak is not explained by trade PnL, so thinking and churn costs are the real bleed. Between setups, use minimal checks. No rebalances and no multi-asset "trade" cycles.
 
 ## Learned history
 - Cycle 49 [trade]: rebalance realized XRP +$0.61, ATOM +$1.15, UNI +$0.41, NEAR +$0.85, TIA +$0.28, BCH +$0.15 (+$3.46)
