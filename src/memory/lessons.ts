@@ -16,7 +16,10 @@ import { LESSONS_FILE, STATE_DIR } from '../paths.js';
  * honest even if the agent never reflects.
  */
 
-export type LessonKind = 'trade' | 'milestone' | 'venture' | 'death' | 'reflection';
+/** `challenge` records a month's result for the evaluator and the dashboard only:
+ * it never enters the decision prompt or SOUL history, so a calendar goal cannot
+ * leak into trade decisions. */
+export type LessonKind = 'trade' | 'milestone' | 'venture' | 'death' | 'reflection' | 'challenge';
 
 export interface Lesson {
   cycle: number;
@@ -53,6 +56,7 @@ export function lessonsDigest(n: number): string {
   // scheduled reflections crowd factual trade and venture outcomes out of view.
   const ls = recentLessons(Number.MAX_SAFE_INTEGER)
     .filter((l) => l.kind !== 'reflection' || !l.text.startsWith('auto-reflected:'))
+    .filter((l) => l.kind !== 'challenge')
     .slice(-n);
   if (ls.length === 0) return '(no lessons recorded yet)';
   return ls
@@ -61,6 +65,26 @@ export function lessonsDigest(n: number): string {
       return `#${l.cycle} [${l.kind}] ${l.text}${pnl}`;
     })
     .join('\n');
+}
+
+/**
+ * Realized PnL per asset, computed from the trade lessons' legs (written by this
+ * code as "BTC +$4.20"), so the evaluator gets verified numbers instead of doing
+ * — or carrying forward — its own arithmetic.
+ */
+export function realizedByAsset(lessons: Lesson[]): Record<string, { pnlUsd: number; closes: number; wins: number }> {
+  const out: Record<string, { pnlUsd: number; closes: number; wins: number }> = {};
+  for (const l of lessons) {
+    if (l.kind !== 'trade') continue;
+    for (const [, asset, sign, amount] of l.text.matchAll(/\b([A-Z][A-Z0-9]{1,9}) ([+-])\$(\d+(?:\.\d+)?)/g)) {
+      const pnl = (sign === '-' ? -1 : 1) * Number(amount);
+      const row = (out[asset!] ??= { pnlUsd: 0, closes: 0, wins: 0 });
+      row.pnlUsd += pnl;
+      row.closes += 1;
+      if (pnl > 0) row.wins += 1;
+    }
+  }
+  return out;
 }
 
 export interface PositionLite {

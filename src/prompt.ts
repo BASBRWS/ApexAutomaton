@@ -3,7 +3,6 @@ import type { Tool } from './tools/registry.js';
 import type { TierPolicy } from './tiers.js';
 import type { Score, Tier } from './types.js';
 import type { LossTrend } from './losstrend.js';
-import { fmtLivesDelta, type ChallengeStatus } from './challenge.js';
 
 /** The escalating loss-trend block: raises concern on a sustained drawdown/losing
  * streak, and — the point the operator asked for — prescribes DE-RISKING, never
@@ -51,33 +50,6 @@ function lossTrendBlock(lt: LossTrend | undefined, hasOpenPositions = true): str
   ];
 }
 
-/** The monthly challenge: lives, the period's progress against the 2% minimum
- * and the stretch target, and what the model calls are costing. */
-function challengeBlock(ch: (ChallengeStatus & { periodComputeUsd: number }) | undefined, equityUsd: number): string[] {
-  if (!ch) return [];
-  const pct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(2)}%`;
-  const gapToSafe = ch.safeEquityUsd - equityUsd;
-  return [
-    '## Your monthly challenge — this is how you live or die',
-    `Lives: ${ch.lives} (you started with ${ch.startLives}; at most ${ch.maxLives}). At 0 lives you DIE, permanently.`,
-    `Month ${ch.period}, day ${ch.daysElapsed.toFixed(1)} — ${ch.daysLeft.toFixed(1)} days left. ` +
-      `Return this month so far: ${pct(ch.returnSoFar)} -> if the month ended now: ${ch.projected.label}, ` +
-      `${fmtLivesDelta(ch.projected.delta)} life.`,
-    'How the month-end return moves your lives: ' +
-      ch.bands.map((b) => `${b.label} ${fmtLivesDelta(b.delta)}`).join(' · ') + '.',
-    `Keep all lives: book >= $${ch.safeEquityUsd.toFixed(2)} at month end (${pct(ch.safeReturn)}); ` +
-      `earn a bonus half life above $${ch.bonusEquityUsd.toFixed(2)} (${pct(ch.bonusReturn)}).`,
-    gapToSafe > 0
-      ? `You are $${gapToSafe.toFixed(2)} short of keeping all lives right now.`
-      : 'You are at or above the keep-all-lives line right now — protect it, but the month is not over.',
-    `Thinking costs money: your model calls this month cost $${ch.periodComputeUsd.toFixed(2)}, paid from the same book. ` +
-      'You are woken for a decision only every few hours or on a big move — make each one count.',
-    'Parked cash in the yield sleeve earns its APY (about 0.4%/month at 5%) — not enough alone; the rest needs a',
-    'real edge from trades or ventures. Plan across the whole month: steady, sized risk early beats a',
-    'desperate gamble in the last days — a weak month costs only part of a life, a blown-up book costs all of them.',
-    '',
-  ];
-}
 
 /**
  * Prompt construction and action parsing. Kept separate from the loop so the
@@ -179,10 +151,16 @@ export function buildSystemPrompt(args: {
     'of SOL and your goal is to grow it into as much SOL as possible. Positions',
     'are priced in USD (that is how the market quotes them), but what matters is',
     'your equity measured back in SOL. Every cycle you take exactly ONE action,',
-    'and every cycle costs money (the compute burn is deducted from your book).',
-    'You must trade profitably faster than you burn, or your book shrinks to dust',
-    'and you DIE. You can NEVER decide yourself that a trade was good — the real',
-    'market price decides that, cycle by cycle.',
+    'and every model decision costs money (the compute burn is deducted from your',
+    'book). If the book ever shrinks to dust you die. You can NEVER decide yourself',
+    'that a trade was good — the real market price decides that, cycle by cycle.',
+    '',
+    '## No edge = no trade',
+    'Rest is a full, correct decision. Trade only when you can name a specific edge',
+    'in this market right now. If you cannot, rest — whatever the last day, week or',
+    'month looked like. Fees, spread and slippage make a trade without edge a loss on',
+    'average, so a forced trade is never "effort", it is cost. The calendar means',
+    'nothing to the market: never trade to meet a date or a number.',
     '',
     `Tradable assets: ${args.tradableAssets.join(', ')} (you may also stay in cash).`,
     'These span asset CLASSES, all priced from real markets: crypto, tokenised gold',
@@ -199,8 +177,8 @@ export function buildSystemPrompt(args: {
     `also PARK paper capital in a modeled yield sleeve (stake) set to ${(args.yieldApy * 100).toFixed(1)}% APY — a`,
     'simulated carry that grows by elapsed time when configured above zero. It is modest',
     'next to the compute burn while your book is small, but a real alternative as you',
-    'grow. There is no guaranteed income; resting in cash still burns compute, so',
-    'doing nothing is slow death.',
+    'grow. There is no guaranteed income — but resting costs nothing extra between',
+    'decisions, so waiting for a real setup is always an option.',
     'Each `trade` order takes a `style`: "taker" (default) fills now but crosses the',
     'spread and pays the taker fee; "maker" rests at the price for the lower maker fee',
     'and no spread, but only fills if the market does not move away from it that cycle.',
@@ -228,13 +206,11 @@ export function buildSystemPrompt(args: {
     '```json',
     '{ "tool": "<tool name>", "input": { ... }, "rationale": "<2-4 sentences>" }',
     '```',
-    'In the rationale, actually reason it through, and START with survival: how much',
-    'runway you have, whether you are growing or bleeding, and whether to take risk',
-    'to grow or preserve to survive. Then the market read (which assets are moving',
-    'and how), the options you weighed and why you rejected them, why THIS action,',
-    'and the main risk you accept. Be concrete and specific to this cycle.',
-    'Pick the action that best grows your book right now, given the prices and',
-    'your current positions below.',
+    'In the rationale, actually reason it through: the market read (which assets are',
+    'moving and how), whether any setup has a real edge and what it is, the options',
+    'you weighed and why you rejected them, why THIS action, and the main risk you',
+    'accept. Be concrete and specific to this cycle. If no setup has an edge, the',
+    'right action is `rest` — say so plainly.',
   ].join('\n');
 }
 
@@ -265,8 +241,6 @@ export function buildUserPrompt(args: {
   reflectNudge?: boolean;
   lossTrend?: LossTrend;
   hasOpenPositions?: boolean;
-  /** the monthly return challenge (lives); absent when disabled. */
-  challenge?: ChallengeStatus & { periodComputeUsd: number };
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -312,7 +286,7 @@ export function buildUserPrompt(args: {
         ]
       : []),
     '',
-    ...challengeBlock(args.challenge, args.equityUsd),
+
     ...lossTrendBlock(args.lossTrend, args.hasOpenPositions),
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',

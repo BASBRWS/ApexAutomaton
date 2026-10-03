@@ -364,9 +364,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       recentPnls: readRecent(10).map((e) => Number(e.cyclePnlUsd) || 0),
     }),
     hasOpenPositions: Object.keys(state.desk.positions).length > 0,
-    challenge: state.challenge
-      ? { ...challengeStatus(state.challenge, cfg.challenge, equityPre, now()), periodComputeUsd: state.challenge.periodComputeUsd ?? 0 }
-      : undefined,
+    // Deliberately NO challenge here: lives and month results are a scoring rule
+    // for the experiment and context for the weekly evaluator, never pressure on
+    // a trade decision (a calendar goal pushes the decider to force trades).
   });
 
   // --- Think only when another decision can add information. On a flat book
@@ -551,6 +551,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
         cycle,
         score: state.score,
         lessonsShown: cfg.memory.lessonsInPrompt,
+        solPriceUsd: solPrice,
         challenge: state.challenge
           ? { ...challengeStatus(state.challenge, cfg.challenge, equityPre, now()), history: state.challenge.history }
           : undefined,
@@ -646,7 +647,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       appendLesson({
         cycle,
         at: now(),
-        kind: next.lives <= 0 ? 'death' : 'milestone',
+        // 'challenge' lessons never reach the decision prompt or SOUL history.
+        kind: next.lives <= 0 ? 'death' : 'challenge',
         text: `month ${closed.period}: ${closed.returnPct >= 0 ? '+' : ''}${pct}% — ${verdict}`,
         pnlUsd: closed.endEquityUsd - closed.startEquityUsd,
       });
@@ -736,7 +738,6 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     heartbeatNote,
     replicationNote,
     walletNote,
-    challengeNote,
   ].filter(Boolean);
   const entry: JournalEntry = {
     cycle,
@@ -756,6 +757,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     signatures,
     score: state.score,
     note: noteParts.join(' | ') || undefined,
+    // Kept out of `note`: notes feed the decision prompt's recent-cycles digest.
+    challengeEvent: challengeNote,
   };
   state.lastRunAt = now();
   syncSoulHistory(recentLessons(Number.MAX_SAFE_INTEGER));

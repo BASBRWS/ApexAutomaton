@@ -4,7 +4,8 @@ import { usdCostOf } from '../llm/pricing.js';
 import { composeSoul, readSoul, strategyOnly, writeSoul } from '../soul.js';
 import type { Score } from '../types.js';
 import { fmtLivesDelta, type ChallengePeriodResult, type ChallengeStatus } from '../challenge.js';
-import { lessonsDigest } from './lessons.js';
+import { lessonsDigest, realizedByAsset, recentLessons } from './lessons.js';
+import { guardSoulText } from './guard.js';
 
 /**
  * memory/reflect.ts — GUARANTEED reflection, run as a periodic evaluation. When it
@@ -39,6 +40,8 @@ export async function autoReflect(
     cycle: number;
     score: Score;
     lessonsShown: number;
+    /** current SOL price, so the facts can state equity in SOL correctly. */
+    solPriceUsd?: number;
     challenge?: ChallengeStatus & { history: ChallengePeriodResult[] };
   },
 ): Promise<ReflectResult> {
@@ -50,40 +53,65 @@ export async function autoReflect(
   }
   const currentNotes = strategyOnly(readSoul());
 
+  // Verified facts, computed by code. The evaluator must use only these numbers:
+  // earlier notes re-derived and carried numbers forward until they drifted far
+  // from the books (e.g. a stale equity figure, invented alt losses).
+  const realized = realizedByAsset(recentLessons(Number.MAX_SAFE_INTEGER));
+  const realizedLines = Object.entries(realized)
+    .sort((a, b) => b[1].pnlUsd - a[1].pnlUsd)
+    .map(([asset, r]) => `  ${asset}: ${r.pnlUsd >= 0 ? '+' : '-'}$${Math.abs(r.pnlUsd).toFixed(2)} over ${r.closes} close(s), ${r.wins} winner(s)`);
+  const sol = args.solPriceUsd && args.solPriceUsd > 0 ? args.solPriceUsd : 0;
+  const facts = [
+    'VERIFIED FACTS (computed by code — use ONLY these numbers):',
+    `- Equity now: $${score.equityUsd.toFixed(2)}` + (sol ? ` (${(score.equityUsd / sol).toFixed(4)} SOL at $${sol.toFixed(2)}/SOL)` : ''),
+    `- Start equity: $${score.startEquityUsd.toFixed(2)} · peak $${score.peakEquityUsd.toFixed(2)} · net PnL $${score.netPnlUsd.toFixed(2)}`,
+    `- Cumulative model (compute) cost: $${score.cumulativeBurnUsd.toFixed(2)}`,
+    '- Realized PnL per asset (closed or reduced positions, all time):',
+    ...(realizedLines.length ? realizedLines : ['  (none yet)']),
+  ];
+
   const system = [
-    'You are the periodic evaluator ("coach") of Apex Automaton, an autonomous trading +',
-    'venture agent. A cheaper model makes its day-to-day decisions and follows the strategy',
-    'notes you write. Evaluate the period below against its monthly challenge (its lives',
-    'depend on the monthly return), then write an updated "## Strategy notes" for its',
-    'SOUL.md: 3–7 SHORT, concrete, actionable bullet points — what actually earns vs what',
-    'bleeds, how much risk to carry given the challenge standing, what to do more or less',
-    'of. Be specific (name assets/tactics when the lessons do). Consolidate — do not just',
-    'restate every line.',
+    'You are the periodic evaluator ("coach") of Apex Automaton, an autonomous agent trading',
+    'a paper book against real market prices. A cheaper model makes the day-to-day decisions',
+    'and follows the strategy notes you write. Judge the EDGE in its decisions, not the calendar.',
+    '',
+    'Write an updated "## Strategy notes" for its SOUL.md: 3–7 SHORT, concrete, evidence-based',
+    'bullet points — which setups had a real edge, which bled, how to size so a single loss',
+    'stays small, what to do more or less of. Name assets/tactics when the facts do.',
+    '',
+    'Hard rules for the notes (lines that break them are deleted before saving):',
+    '- Use ONLY the verified facts below for numbers. Never copy numbers from the previous',
+    '  notes — they may be stale or wrong. If a number is not in the facts, do not state it.',
+    '- No goals, targets, deadlines, life counts, months or urgency. The decision-maker must',
+    '  not trade to meet a date: the market does not know what month it is.',
+    '- Resting when no setup has an edge is a correct decision. Never write that inaction is',
+    '  unsafe or costly, and never loosen entry rules just to trade more.',
+    '- Every rule must be satisfiable with the facts as they are now (no gates on equity or',
+    '  conditions that cannot occur), and the notes must not contradict each other.',
+    '',
     'Output ONLY the bullet points as markdown "- " lines. No preamble, no header, no fences.',
   ].join('\n');
   const user = [
-    `Cycle ${cycle}. Net PnL since birth: $${score.netPnlUsd.toFixed(2)} (peak $${score.peakEquityUsd.toFixed(2)}, ` +
-      `equity $${score.equityUsd.toFixed(2)}). First profit at cycle ${score.firstProfitAtCycle ?? 'not yet'}.`,
+    `Cycle ${cycle}. First profit at cycle ${score.firstProfitAtCycle ?? 'not yet'}.`,
+    '',
+    ...facts,
     ...(challenge
       ? [
           '',
-          `Monthly challenge: ${challenge.lives} lives (started with ${challenge.startLives}, max ${challenge.maxLives}). Month ${challenge.period}, ` +
-            `day ${challenge.daysElapsed.toFixed(1)} of ${(challenge.daysElapsed + challenge.daysLeft).toFixed(0)}; ` +
-            `return so far ${(challenge.returnSoFar * 100).toFixed(2)}% (would be: ${challenge.projected.label}, ` +
-            `${fmtLivesDelta(challenge.projected.delta)} life).`,
-          'Lives per monthly return: ' +
-            challenge.bands.map((b) => `${b.label} ${fmtLivesDelta(b.delta)}`).join('; ') + '.',
-          challenge.history.length
-            ? 'Past months: ' + challenge.history
-              .map((h) => `M${h.period} ${(h.returnPct * 100).toFixed(2)}% (${fmtLivesDelta(h.livesDelta)})`).join(', ')
-            : 'Past months: none yet.',
+          'Context for you only (a scoring rule of the experiment — never a reason to trade, and',
+          'never to be mentioned in the notes; over many months only a real edge keeps it healthy):',
+          `- ${challenge.lives} lives; current period day ${challenge.daysElapsed.toFixed(1)}, return so far ` +
+            `${(challenge.returnSoFar * 100).toFixed(2)}%. Past periods: ` +
+            (challenge.history.length
+              ? challenge.history.map((h) => `${(h.returnPct * 100).toFixed(2)}% (${fmtLivesDelta(h.livesDelta)})`).join(', ')
+              : 'none yet') + '.',
         ]
       : []),
     '',
-    'Your recent lessons (facts from your own actions):',
+    'Recent lessons (facts from its own actions):',
     digest,
     '',
-    'Your current strategy notes:',
+    'Previous strategy notes (may contain stale numbers — do not copy them):',
     currentNotes,
     '',
     'Write the updated strategy-notes bullets now.',
@@ -98,11 +126,14 @@ export async function autoReflect(
     effort: 'medium',
   });
   const costUsd = usdCostOf(model, resp.usage);
-  const notes = extractNotes(resp.text);
-  if (!notes) {
-    return { ok: false, costUsd, note: 'auto-reflect: model returned no usable notes' };
+  const guarded = guardSoulText(extractNotes(resp.text));
+  const notes = guarded.text.trim();
+  // Count only: this note lands in the journal digest the decider reads, so it
+  // must not repeat what was removed.
+  const droppedNote = guarded.dropped.length ? ` · SOUL guard removed ${guarded.dropped.length} line(s)` : '';
+  if (!/^\s*[-*]\s/m.test(notes)) {
+    return { ok: false, costUsd, note: `auto-reflect: no usable notes after the guard — kept the previous notes${droppedNote}` };
   }
   writeSoul(composeSoul(notes));
-  const firstLine = notes.split('\n').find((l) => l.trim())?.trim() ?? '';
-  return { ok: true, costUsd, note: `auto-reflect: SOUL updated (${firstLine.slice(0, 80)})` };
+  return { ok: true, costUsd, note: `auto-reflect: SOUL updated by ${model}${droppedNote}` };
 }

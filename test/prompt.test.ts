@@ -3,7 +3,6 @@ import { parseAction, buildSystemPrompt, buildUserPrompt } from '../src/prompt.j
 import { initialScore } from '../src/score.js';
 import { policyForTier } from '../src/tiers.js';
 import { makeTestConfig } from './helpers.js';
-import { DEFAULT_LIFE_BANDS } from '../src/challenge.js';
 
 describe('buildUserPrompt — survival framing', () => {
   it('foregrounds survival: dust, runway, and the grow-or-preserve question', () => {
@@ -52,28 +51,25 @@ describe('buildUserPrompt — survival framing', () => {
   });
 });
 
-describe('buildUserPrompt — monthly challenge', () => {
-  it('shows lives, progress and compute cost, and drops the metabolism framing when it is off', () => {
+describe('decision prompt — no calendar pressure', () => {
+  it('anchors rest as a correct decision and carries no month or life count', () => {
     const cfg = makeTestConfig();
-    const text = buildUserPrompt({
+    const user = buildUserPrompt({
       cycle: 600, tier: 'NORMAL', policy: policyForTier('NORMAL', cfg),
       equityUsd: 202, equitySol: 1.7, dustSol: 0.02, dustUsd: 2.4,
       avgBurnUsd: 0.03, runwayCycles: 6000, metabolicDailyPct: 0,
       prices: { BTC: 60000 }, prevPrices: { BTC: 60000 }, deskSummary: 'cash=$202',
       score: initialScore(200), journalDigest: '(none)', obituaryDigest: '(none)',
-      challenge: {
-        lives: 2.75, startLives: 3, maxLives: 4, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
-        projected: { label: 'poor month (1–1.5%)', delta: -0.5 }, safeReturn: 0.02, bonusReturn: 0.025,
-        safeEquityUsd: 204, bonusEquityUsd: 205, bands: DEFAULT_LIFE_BANDS, periodComputeUsd: 0.42,
-      },
     });
-    expect(text).toContain('Lives: 2.75 (you started with 3; at most 4)');
-    expect(text).toContain('poor month (1–1.5%), −0.5 life');
-    expect(text).toContain('strong month (>2.5%) +0.5');
-    expect(text).toContain('$2.00 short of keeping all lives');
-    expect(text).toContain('cost $0.42');
-    expect(text).toContain('You DIE');
-    expect(text).not.toMatch(/COASTING IS DEATH/);
+    expect(user).not.toMatch(/\blives\b|\blife\b|challenge|\bmonth\b/i);
+    expect(user).not.toMatch(/COASTING IS DEATH/);
+    const system = buildSystemPrompt({
+      constitution: 'law', soul: 'soul', tools: [], railsSummary: 'rails',
+      tradableAssets: ['BTC'], maxGrossExposureUsd: 200, yieldApy: 0.05, venturesEnabled: false,
+    });
+    expect(system).toContain('## No edge = no trade');
+    expect(system).toMatch(/Rest is a full, correct decision/);
+    expect(system).not.toMatch(/slow death/);
   });
 });
 
