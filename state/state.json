@@ -1,7 +1,7 @@
 {
   "bornAt": "2026-09-22T13:45:53.557Z",
-  "cycle": 615,
-  "lastRunAt": "2026-10-03T21:17:17.413Z",
+  "cycle": 616,
+  "lastRunAt": "2026-10-03T22:24:00.738Z",
   "desk": {
     "cashUsd": 199.33554189621657,
     "positions": {},
@@ -10,38 +10,38 @@
     "openedAtCycle": 0
   },
   "lastPrices": {
-    "ETH": 2687.615,
-    "XRP": 1.48965,
-    "ADA": 0.245315,
-    "BTC": 84694.655,
-    "AVAX": 11.0955,
+    "ETH": 2687.47,
+    "XRP": 1.4871,
+    "ADA": 0.24465,
+    "BTC": 84762.555,
+    "AVAX": 11.1015,
     "MATIC": 0.108285,
-    "PAXG": 4146.61,
-    "SOL": 119.75,
-    "DOT": 1.1904,
-    "PYTH": 0.077845,
-    "BNB": 785.965,
-    "ARB": 0.20115,
-    "DOGE": 0.093,
-    "SUI": 1.17755,
-    "BONK": 0.000003805,
-    "WIF": 0.253735,
-    "UNI": 9.0524,
-    "LTC": 69,
+    "PAXG": 4146.98,
+    "SOL": 119.78,
+    "DOT": 1.1819,
+    "PYTH": 0.07778,
+    "BNB": 786.59,
+    "ARB": 0.200495,
+    "DOGE": 0.092895,
+    "SUI": 1.17775,
+    "BONK": 0.00000378,
+    "WIF": 0.251605,
+    "UNI": 9.0385,
+    "LTC": 69.5465,
     "JUP": 0.00032194791156383814,
-    "RENDER": 1.9712,
+    "RENDER": 1.9736,
     "ATOM": 1.71235,
-    "LINK": 14.05,
-    "TIA": 0.4718,
-    "TRX": 0.3348701270984138,
-    "XAG": 60.3703055051128,
-    "BCH": 316.505,
-    "INJ": 7.6395,
-    "APT": 0.8033,
-    "OP": 0.136095,
-    "NEAR": 4.75525,
-    "AAVE": 180.905,
-    "ORCA": 1.7939,
+    "LINK": 14.1265,
+    "TIA": 0.46785,
+    "TRX": 0.3349318993749192,
+    "XAG": 60.37030541639362,
+    "BCH": 316.35,
+    "INJ": 7.637,
+    "APT": 0.80055,
+    "OP": 0.135355,
+    "NEAR": 4.75625,
+    "AAVE": 180.685,
+    "ORCA": 1.7982,
     "AAPL": 333.69,
     "NVDA": 233.95,
     "EURUSD": 1.1257,
@@ -64,16 +64,6 @@
     "txCountToday": 0
   },
   "recentSignatures": [
-    {
-      "kind": "heartbeat",
-      "signature": "5gJ5kGm9aHu64MN15iWzqBktdkdfPeT5uB5djwQmMHUFKfVtAAcao1jEdsTbasKx2DxNqbFinPGhW6kRzpTwbbqu",
-      "lamports": 0,
-      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
-      "cycle": 591,
-      "at": "2026-10-03T10:08:37.448Z",
-      "note": "heartbeat (memo)"
-    },
     {
       "kind": "heartbeat",
       "signature": "3am9yRxMRrgwrUu1qnMBWdUPm3BcvXeAFhpAkcLKJij8jzZTUagswRnJeuuoBF5Uped9fvb7eKC5BpQdRq3NadnK",
@@ -313,6 +303,16 @@
       "cycle": 615,
       "at": "2026-10-03T21:17:17.400Z",
       "note": "heartbeat (memo)"
+    },
+    {
+      "kind": "heartbeat",
+      "signature": "np2ymPjefXdYALacDHxfpS4MNnvyMCkhUvig5iuWpz9CpKYfKMcKiUa6dpQwyjUTAxscHSzJTecNEmWmrf2dvpy",
+      "lamports": 0,
+      "from": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "to": "F11dSbtpiRKtks9vUbq1C1DqPBi2nAHoS5KijzwxX2JU",
+      "cycle": 616,
+      "at": "2026-10-03T22:24:00.705Z",
+      "note": "heartbeat (memo)"
     }
   ],
   "score": {
@@ -326,8 +326,8 @@
     "paperEquityUsd": 199.33554189621657,
     "reportedVentureRevenueUsd": 0,
     "cashBenchmarkUsd": 233.92,
-    "solHoldBenchmarkUsd": 239.5,
-    "paperAlphaVsSolUsd": -40.16445810378343
+    "solHoldBenchmarkUsd": 239.56,
+    "paperAlphaVsSolUsd": -40.224458103783434
   },
   "sustainedSovereignCycles": 0,
   "dead": false,
@@ -336,9 +336,9 @@
     "v0002": 0
   },
   "walletSnapshot": {
-    "lamports": 1636796623,
-    "observedAt": "2026-10-03T21:17:17.413Z",
-    "solPriceUsd": 119.75
+    "lamports": 1636786623,
+    "observedAt": "2026-10-03T22:24:00.737Z",
+    "solPriceUsd": 119.78
   },
   "challenge": {
     "lives": 3,
