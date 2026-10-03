@@ -70,10 +70,9 @@ jobs:
           NFT_DEVNET_ENABLED: 'true'
           SPL_DEVNET_ENABLED: 'true'
           AUTONOMOUS_DEVNET_VENTURES_ENABLED: 'true'
-          # The wallet mirrors the trading book: each cycle a gain airdrops SOL in
-          # and a loss/cost burns SOL out, so the real devnet wallet moves with the
-          # trades (devnet simulation — inflow is faucet SOL). See src/wallet-economy.ts.
-          WALLET_REAL_ECONOMY: 'true'
+          # Paper-only: the trading book is the single score; the devnet wallet only
+          # pays the heartbeat's tx fees as on-chain proof of life (no wallet mirror).
+          WALLET_REAL_ECONOMY: 'false'
           # Lets the burst dispatch the Pages redeploy after each cycle's push.
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/burst.sh

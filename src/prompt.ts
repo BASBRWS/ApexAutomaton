@@ -3,7 +3,7 @@ import type { Tool } from './tools/registry.js';
 import type { TierPolicy } from './tiers.js';
 import type { Score, Tier } from './types.js';
 import type { LossTrend } from './losstrend.js';
-import type { ChallengeStatus } from './challenge.js';
+import { fmtLivesDelta, type ChallengeStatus } from './challenge.js';
 
 /** The escalating loss-trend block: raises concern on a sustained drawdown/losing
  * streak, and — the point the operator asked for — prescribes DE-RISKING, never
@@ -56,22 +56,25 @@ function lossTrendBlock(lt: LossTrend | undefined, hasOpenPositions = true): str
 function challengeBlock(ch: (ChallengeStatus & { periodComputeUsd: number }) | undefined, equityUsd: number): string[] {
   if (!ch) return [];
   const pct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(2)}%`;
-  const hearts = '♥'.repeat(Math.max(0, ch.lives)) + '♡'.repeat(Math.max(0, ch.maxLives - ch.lives));
-  const gapToMin = ch.minEquityUsd - equityUsd;
+  const gapToSafe = ch.safeEquityUsd - equityUsd;
   return [
     '## Your monthly challenge — this is how you live or die',
-    `Lives: ${hearts} (${ch.lives} of ${ch.maxLives}). Month ${ch.period}, day ${ch.daysElapsed.toFixed(1)} — ${ch.daysLeft.toFixed(1)} days left.`,
-    `Return this month so far: ${pct(ch.returnSoFar)}. Minimum to keep your lives: ${pct(ch.minReturn)} ` +
-      `(book >= $${ch.minEquityUsd.toFixed(2)} at month end); stretch target ${pct(ch.targetReturn)} ($${ch.targetEquityUsd.toFixed(2)}).`,
-    gapToMin > 0
-      ? `You are $${gapToMin.toFixed(2)} short of the minimum right now.`
-      : `You are above the minimum right now — protect it, but the month is not over.`,
-    'Miss the minimum at month end -> you lose a life. Zero lives -> you DIE, permanently.',
+    `Lives: ${ch.lives} (you started with ${ch.startLives}). At 0 lives you DIE, permanently.`,
+    `Month ${ch.period}, day ${ch.daysElapsed.toFixed(1)} — ${ch.daysLeft.toFixed(1)} days left. ` +
+      `Return this month so far: ${pct(ch.returnSoFar)} -> if the month ended now: ${ch.projected.label}, ` +
+      `${fmtLivesDelta(ch.projected.delta)} life.`,
+    'How the month-end return moves your lives: ' +
+      ch.bands.map((b) => `${b.label} ${fmtLivesDelta(b.delta)}`).join(' · ') + '.',
+    `Keep all lives: book >= $${ch.safeEquityUsd.toFixed(2)} at month end (${pct(ch.safeReturn)}); ` +
+      `earn a bonus half life above $${ch.bonusEquityUsd.toFixed(2)} (${pct(ch.bonusReturn)}).`,
+    gapToSafe > 0
+      ? `You are $${gapToSafe.toFixed(2)} short of keeping all lives right now.`
+      : 'You are at or above the keep-all-lives line right now — protect it, but the month is not over.',
     `Thinking costs money: your model calls this month cost $${ch.periodComputeUsd.toFixed(2)}, paid from the same book. ` +
       'You are woken for a decision only every few hours or on a big move — make each one count.',
     'Parked cash in the yield sleeve earns its APY (about 0.4%/month at 5%) — not enough alone; the rest needs a',
     'real edge from trades or ventures. Plan across the whole month: steady, sized risk early beats a',
-    'desperate gamble in the last days — a missed month costs one life, a blown-up book costs all of them.',
+    'desperate gamble in the last days — a weak month costs only part of a life, a blown-up book costs all of them.',
     '',
   ];
 }

@@ -139,6 +139,8 @@ export interface AutomatonState {
   /** When the agent last bought a model decision, and the prices it saw then —
    * the decision cadence wakes the model on a big move since that point. */
   lastDecision?: { at: string; prices: Record<string, number> };
+  /** when the heavier model last evaluated the period (weekly coach review). */
+  lastReflectAt?: string;
   dead: boolean;
 }
 

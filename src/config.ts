@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { DEFAULT_LIFE_BANDS, type LifeBand } from './challenge.js';
 import { clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 /**
@@ -185,6 +186,9 @@ export interface Config {
   wallet: {
     /** master switch: reconcile the wallet to the book each cycle (settle IN/OUT). */
     realEconomyEnabled: boolean;
+    /** true: tier + death follow the real wallet SOL. false (default, paper-only):
+     * they follow the paper book; the wallet only pays the heartbeat's tx fees. */
+    anchorOnWallet: boolean;
     /** floor (SOL) the settle-OUT (burn) leg never spends below, so the wallet
      * always keeps enough SOL for transaction fees. */
     floorSol: number;
@@ -194,14 +198,15 @@ export interface Config {
   };
 
   /** Monthly return challenge: the agent must grow its book by at least
-   * minReturn per period or lose one of its lives; at zero lives it is dead. */
+   * the bands' thresholds per period or lose (part of) a life; 0 lives is death. */
   challenge: {
     enabled: boolean;
     lives: number;
     periodDays: number;
-    minReturn: number;
-    targetReturn: number;
+    /** monthly-return bands -> lives gained/lost (highest first). */
+    bands: LifeBand[];
   };
+
 
   /** How often the agent may buy a model decision. Every call is real money
    * charged to the book, so the cadence is the biggest cost lever. */
@@ -220,7 +225,11 @@ export interface Config {
    * periodic nudge to consolidate lessons into SOUL.md via the reflect tool. */
   memory: {
     /** nudge the agent to reflect every N cycles (0 disables the periodic nudge). */
-    reflectEveryCycles: number;
+    /** a heavier model evaluates the period and rewrites the strategy notes
+     * every this many days (0 disables). */
+    reflectEveryDays: number;
+    /** the model for that evaluation (default: the frontier model). */
+    reflectModel: string;
     /** how many recent lessons to show in the prompt. */
     lessonsInPrompt: number;
   };
@@ -288,7 +297,9 @@ export function loadConfig(): Config {
 
     models: {
       cheapest: envStr('MODEL_CHEAPEST') ?? 'claude-haiku-4-5',
-      cheaper: envStr('MODEL_CHEAPER') ?? 'claude-sonnet-5',
+      // Decisions are frequent and every call is paid from a small book, so the
+      // default decision mind is the cheapest one; a heavier model evaluates weekly.
+      cheaper: envStr('MODEL_CHEAPER') ?? 'claude-haiku-4-5',
       frontier: envStr('MODEL_FRONTIER') ?? 'claude-opus-5-5',
     },
 
@@ -369,16 +380,16 @@ export function loadConfig(): Config {
 
     wallet: {
       realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
+      anchorOnWallet: envBool('WALLET_ANCHOR', false),
       floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
       maxSettlePerCycleSol: envNum('WALLET_MAX_SETTLE_PER_CYCLE_SOL', 0.5),
     },
 
     challenge: {
       enabled: envBool('CHALLENGE_ENABLED', true),
-      lives: Math.trunc(envNum('CHALLENGE_LIVES', 3)),
+      lives: envNum('CHALLENGE_LIVES', 3),
       periodDays: envNum('CHALLENGE_PERIOD_DAYS', 30),
-      minReturn: envNum('CHALLENGE_MIN_RETURN', 0.02),
-      targetReturn: envNum('CHALLENGE_TARGET_RETURN', 0.028),
+      bands: DEFAULT_LIFE_BANDS,
     },
 
     decisions: {
@@ -389,7 +400,8 @@ export function loadConfig(): Config {
     },
 
     memory: {
-      reflectEveryCycles: Math.trunc(envNum('REFLECT_EVERY_CYCLES', 12)),
+      reflectEveryDays: envNum('REFLECT_EVERY_DAYS', 7),
+      reflectModel: envStr('REFLECT_MODEL') ?? 'claude-opus-5-5',
       lessonsInPrompt: Math.trunc(envNum('LESSONS_IN_PROMPT', 8)),
     },
 
@@ -435,9 +447,9 @@ export function loadConfig(): Config {
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
   const ch = cfg.challenge;
-  if (ch?.enabled && (!(ch.lives >= 1) || !(ch.periodDays > 0) || !Number.isFinite(ch.minReturn) ||
-      !Number.isFinite(ch.targetReturn) || ch.targetReturn < ch.minReturn)) {
-    throw new Error('Challenge config: lives >= 1, period > 0 days, and target return >= minimum return.');
+  if (ch?.enabled && (!(ch.lives > 0) || !(ch.periodDays > 0) || ch.bands.length === 0 ||
+      ch.bands[ch.bands.length - 1]!.min !== Number.NEGATIVE_INFINITY)) {
+    throw new Error('Challenge config: lives > 0, period > 0 days, and a catch-all lowest band.');
   }
   const d = cfg.decisions;
   if (d && (!(d.minHoursBetween >= 0) || !(d.maxPerDay >= 1) || !(d.positionMoveTrigger > 0) || !(d.marketMoveTrigger > 0))) {

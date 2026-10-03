@@ -9,9 +9,9 @@ import { soulForPrompt, ensureSoul, syncSoulHistory } from './soul.js';
 import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } from './journal.js';
 import { assessLossTrend } from './losstrend.js';
 import { decisionReason } from './decision-cadence.js';
-import { initChallenge, evaluateChallenge, challengeStatus } from './challenge.js';
-import { policyForTier, toolNamesForCycle } from './tiers.js';
-import { computeCostUsd, equityToSol, tierForSurvival, survivalSol, onChainHeartbeat } from './economy.js';
+import { initChallenge, evaluateChallenge, challengeStatus, fmtLivesDelta } from './challenge.js';
+import { policyForTier, tierForBalanceSol, toolNamesForCycle } from './tiers.js';
+import { computeCostUsd, equityToSol, survivalSol, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
 import {
   equityUsd as deskEquityUsd,
@@ -251,7 +251,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   } catch {
     state.walletSnapshot = null;
   }
-  const survivalSolPre = survivalSol(walletSol, equitySolPre);
+  // Paper-only by default: survival follows the book. With WALLET_ANCHOR the real
+  // wallet SOL leads instead (falling back to the book on a failed RPC read).
+  const survivalSolPre = cfg.wallet.anchorOnWallet ? survivalSol(walletSol, equitySolPre) : equitySolPre;
+  const anchorLabel = cfg.wallet.anchorOnWallet ? 'wallet anchor' : 'paper book';
 
   // --- Death check: economic, in SOL, on the survival anchor. Never self-resurrect.
   if (survivalSolPre <= cfg.trading.dustSol) {
@@ -261,7 +264,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       cycle,
       at: now(),
       kind: 'death',
-      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (wallet anchor) — the market + burn + metabolism outpaced earnings`,
+      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (${anchorLabel}) — the market + burn + metabolism outpaced earnings`,
       pnlUsd: state.score.netPnlUsd,
     });
     appendEntry({
@@ -273,7 +276,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
       model: '(none)',
       action: 'die',
-      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (wallet anchor; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
+      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (${anchorLabel}; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
       costUsd: 0,
       cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
@@ -287,7 +290,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // Tier from the survival anchor — the real wallet SOL when available, else the
   // paper book's equity-in-SOL (clamp away from DEAD; death is the check above).
-  let tier = tierForSurvival(walletSol, equitySolPre, cfg);
+  let tier = tierForBalanceSol(survivalSolPre, cfg);
   if (tier === 'DEAD') tier = 'CRITICAL';
   const policy = policyForTier(tier, cfg);
 
@@ -332,7 +335,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     policy,
     equityUsd: equityPre,
     equitySol: equitySolPre,
-    walletSol,
+    walletSol: cfg.wallet.anchorOnWallet ? walletSol : undefined,
     survivalSol: survivalSolPre,
     dustSol: cfg.trading.dustSol,
     dustUsd,
@@ -533,15 +536,24 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // cost is folded into this cycle's burn below. -----------------------------
   let reflectNote: string | undefined;
   let reflectCostUsd = 0;
-  const autoReflectDue =
-    cfg.memory.reflectEveryCycles > 0 && cycle % cfg.memory.reflectEveryCycles === 0;
+  // Weekly evaluation by a heavier model (the "coach"): it reviews the period
+  // against the monthly challenge and rewrites the strategy notes the cheap
+  // decision model then follows. Time-based, so the cadence of decisions and of
+  // the heartbeat cannot multiply its cost.
+  const lastReflectMs = state.lastReflectAt ? Date.parse(state.lastReflectAt) : NaN;
+  const autoReflectDue = cfg.memory.reflectEveryDays > 0 &&
+    (!Number.isFinite(lastReflectMs) || Date.now() - lastReflectMs >= cfg.memory.reflectEveryDays * 86_400_000);
   if (autoReflectDue) {
     try {
+      state.lastReflectAt = now();
       const res = await autoReflect(llm, {
         cfg,
         cycle,
         score: state.score,
         lessonsShown: cfg.memory.lessonsInPrompt,
+        challenge: state.challenge
+          ? { ...challengeStatus(state.challenge, cfg.challenge, equityPre, now()), history: state.challenge.history }
+          : undefined,
       });
       reflectCostUsd = res.costUsd;
       state.desk.cashUsd -= reflectCostUsd;
@@ -629,11 +641,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     state.challenge = next;
     if (closed) {
       const pct = (closed.returnPct * 100).toFixed(2);
-      const verdict = closed.outcome === 'fail'
-        ? `MISSED the ${(cfg.challenge.minReturn * 100).toFixed(1)}% minimum — lost a life (${closed.livesAfter} left)`
-        : closed.outcome === 'target'
-          ? `hit the ${(cfg.challenge.targetReturn * 100).toFixed(1)}% stretch target`
-          : `passed the ${(cfg.challenge.minReturn * 100).toFixed(1)}% minimum`;
+      const verdict = `${closed.label}: ${fmtLivesDelta(closed.livesDelta)} life → ${closed.livesAfter} left`;
       challengeNote = `challenge period ${closed.period} closed: ${closed.returnPct >= 0 ? '+' : ''}${pct}% — ${verdict}`;
       appendLesson({
         cycle,
@@ -646,7 +654,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
         state.dead = true;
         writeObituary(
           buildObituary(cycle, equityPost, equityToSol(equityPost, solPrice), state,
-            `Lost my last life: month ${closed.period} returned ${pct}%, below the ${(cfg.challenge.minReturn * 100).toFixed(1)}% minimum.`),
+            `Lost my last life: month ${closed.period} returned ${pct}% (${closed.label}).`),
           cycle,
         );
         challengeNote += ' — DEAD (no lives left)';
@@ -667,7 +675,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
   // Anchored on the same real-wallet survival balance as the live tier above.
-  const finalTier = tierForSurvival(walletSol, equityToSol(equityPost, solPrice), cfg);
+  const finalTier = tierForBalanceSol(
+    cfg.wallet.anchorOnWallet ? survivalSol(walletSol, equityToSol(equityPost, solPrice)) : equityToSol(equityPost, solPrice), cfg);
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 

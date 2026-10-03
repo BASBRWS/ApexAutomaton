@@ -3,6 +3,7 @@ import { parseAction, buildSystemPrompt, buildUserPrompt } from '../src/prompt.j
 import { initialScore } from '../src/score.js';
 import { policyForTier } from '../src/tiers.js';
 import { makeTestConfig } from './helpers.js';
+import { DEFAULT_LIFE_BANDS } from '../src/challenge.js';
 
 describe('buildUserPrompt — survival framing', () => {
   it('foregrounds survival: dust, runway, and the grow-or-preserve question', () => {
@@ -61,12 +62,15 @@ describe('buildUserPrompt — monthly challenge', () => {
       prices: { BTC: 60000 }, prevPrices: { BTC: 60000 }, deskSummary: 'cash=$202',
       score: initialScore(200), journalDigest: '(none)', obituaryDigest: '(none)',
       challenge: {
-        lives: 2, maxLives: 3, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
-        minReturn: 0.02, targetReturn: 0.028, minEquityUsd: 204, targetEquityUsd: 205.6, periodComputeUsd: 0.42,
+        lives: 2.75, startLives: 3, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
+        projected: { label: 'poor month (1–1.5%)', delta: -0.5 }, safeReturn: 0.02, bonusReturn: 0.025,
+        safeEquityUsd: 204, bonusEquityUsd: 205, bands: DEFAULT_LIFE_BANDS, periodComputeUsd: 0.42,
       },
     });
-    expect(text).toContain('Lives: ♥♥♡ (2 of 3)');
-    expect(text).toContain('$2.00 short of the minimum');
+    expect(text).toContain('Lives: 2.75 (you started with 3)');
+    expect(text).toContain('poor month (1–1.5%), −0.5 life');
+    expect(text).toContain('strong month (>2.5%) +0.5');
+    expect(text).toContain('$2.00 short of keeping all lives');
     expect(text).toContain('cost $0.42');
     expect(text).toContain('You DIE');
     expect(text).not.toMatch(/COASTING IS DEATH/);

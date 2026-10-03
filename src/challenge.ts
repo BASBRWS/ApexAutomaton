@@ -1,26 +1,43 @@
 /**
  * challenge.ts — the monthly return challenge with lives.
  *
- * The agent must grow its book by at least `minReturn` (default 2%) per period
- * (default 30 days), measured on the scoreboard equity — so compute costs and
- * any venture revenue count. `targetReturn` (default 2.8%) is the stretch goal.
- * Missing the minimum costs one life; at zero lives the agent is dead.
+ * Every period (default 30 days) the book's return — measured on the scoreboard
+ * equity, so compute costs and any venture revenue count — moves the agent's
+ * lives along a graded scale (the default bands below): a strong month earns a
+ * half life back, a solid month keeps them, a weak month costs a fraction, a bad
+ * month a whole life. At zero lives the agent is dead.
  *
- * A period is measured by wall-clock time, so an irregular heartbeat neither
- * helps nor hurts. If the heartbeat was down across several period boundaries,
- * only ONE period is closed per evaluation and the next starts "now": operator
- * downtime is never charged as a string of failed months.
+ * Periods run on wall-clock time, so an irregular heartbeat neither helps nor
+ * hurts. After an outage spanning several period ends, only ONE period is closed
+ * per evaluation and the next starts "now": downtime is never charged as a
+ * string of failed months.
  */
+
+export interface LifeBand {
+  /** lower bound of the band's monthly return (fraction, e.g. 0.02 = 2%). */
+  min: number;
+  /** true: return must be strictly above `min`; false: at or above. */
+  exclusive?: boolean;
+  /** lives gained (+) or lost (-) when the month lands in this band. */
+  delta: number;
+  label: string;
+}
+
+/** Highest band first; the last band must catch everything (min -Infinity). */
+export const DEFAULT_LIFE_BANDS: LifeBand[] = [
+  { min: 0.025, exclusive: true, delta: 0.5, label: 'strong month (>2.5%)' },
+  { min: 0.02, delta: 0, label: 'solid month (2–2.5%)' },
+  { min: 0.015, delta: -0.25, label: 'weak month (1.5–2%)' },
+  { min: 0.01, delta: -0.5, label: 'poor month (1–1.5%)' },
+  { min: Number.NEGATIVE_INFINITY, delta: -1, label: 'bad month (<1%)' },
+];
 
 export interface ChallengeConfig {
   enabled: boolean;
   /** lives at the start of the challenge. */
   lives: number;
   periodDays: number;
-  /** minimum period return (fraction) to keep all lives, e.g. 0.02 = 2%. */
-  minReturn: number;
-  /** stretch target (fraction), e.g. 0.028 = 2.8%. */
-  targetReturn: number;
+  bands: LifeBand[];
 }
 
 export interface ChallengePeriodResult {
@@ -30,8 +47,8 @@ export interface ChallengePeriodResult {
   startEquityUsd: number;
   endEquityUsd: number;
   returnPct: number;
-  /** 'target' (>= stretch), 'pass' (>= minimum) or 'fail' (below minimum: -1 life). */
-  outcome: 'target' | 'pass' | 'fail';
+  label: string;
+  livesDelta: number;
   livesAfter: number;
 }
 
@@ -50,19 +67,25 @@ export interface ChallengeState {
 
 export interface ChallengeStatus {
   lives: number;
-  maxLives: number;
+  startLives: number;
   period: number;
   daysElapsed: number;
   daysLeft: number;
   returnSoFar: number;
-  minReturn: number;
-  targetReturn: number;
-  /** USD equity needed at period end for the minimum / the stretch target. */
-  minEquityUsd: number;
-  targetEquityUsd: number;
+  /** the band the month would land in if it ended now. */
+  projected: { label: string; delta: number };
+  /** monthly return that keeps all lives, and the one that earns a bonus. */
+  safeReturn: number;
+  bonusReturn: number;
+  /** USD equity needed at period end to keep all lives / to earn the bonus. */
+  safeEquityUsd: number;
+  bonusEquityUsd: number;
+  bands: LifeBand[];
 }
 
 const DAY_MS = 86_400_000;
+// Tolerance so 204/200-1 = 0.020000000000000018 and 0.0199999999 both read as 2%.
+const EPS = 1e-9;
 
 export function initChallenge(cfg: ChallengeConfig, equityUsd: number, now: string): ChallengeState {
   return { lives: cfg.lives, period: 1, periodStartAt: now, periodStartEquityUsd: equityUsd, history: [] };
@@ -72,10 +95,16 @@ export function periodReturn(ch: ChallengeState, equityUsd: number): number {
   return ch.periodStartEquityUsd > 0 ? equityUsd / ch.periodStartEquityUsd - 1 : 0;
 }
 
-export function outcomeFor(returnPct: number, cfg: ChallengeConfig): ChallengePeriodResult['outcome'] {
-  if (returnPct >= cfg.targetReturn) return 'target';
-  if (returnPct >= cfg.minReturn) return 'pass';
-  return 'fail';
+export function bandFor(returnPct: number, bands: LifeBand[]): LifeBand {
+  for (const b of bands) {
+    if (b.exclusive ? returnPct > b.min + EPS : returnPct >= b.min - EPS) return b;
+  }
+  return bands[bands.length - 1]!;
+}
+
+/** Lives are kept to two decimals so repeated quarter-steps never drift. */
+function roundLives(x: number): number {
+  return Math.round(x * 100) / 100;
 }
 
 /**
@@ -95,8 +124,8 @@ export function evaluateChallenge(
     return { next: ch, closed: null };
   }
   const returnPct = periodReturn(ch, equityUsd);
-  const outcome = outcomeFor(returnPct, cfg);
-  const livesAfter = outcome === 'fail' ? Math.max(0, ch.lives - 1) : ch.lives;
+  const band = bandFor(returnPct, cfg.bands);
+  const livesAfter = Math.max(0, roundLives(ch.lives + band.delta));
   const closed: ChallengePeriodResult = {
     period: ch.period,
     startedAt: ch.periodStartAt,
@@ -104,7 +133,8 @@ export function evaluateChallenge(
     startEquityUsd: ch.periodStartEquityUsd,
     endEquityUsd: equityUsd,
     returnPct,
-    outcome,
+    label: band.label,
+    livesDelta: band.delta,
     livesAfter,
   };
   return {
@@ -121,16 +151,28 @@ export function evaluateChallenge(
 
 export function challengeStatus(ch: ChallengeState, cfg: ChallengeConfig, equityUsd: number, now: string): ChallengeStatus {
   const elapsed = Math.max(0, (Date.parse(now) - Date.parse(ch.periodStartAt)) / DAY_MS);
+  const ret = periodReturn(ch, equityUsd);
+  const projected = bandFor(ret, cfg.bands);
+  const safe = cfg.bands.find((b) => b.delta === 0)?.min ?? 0;
+  const bonus = cfg.bands.find((b) => b.delta > 0)?.min ?? safe;
   return {
     lives: ch.lives,
-    maxLives: cfg.lives,
+    startLives: cfg.lives,
     period: ch.period,
     daysElapsed: elapsed,
     daysLeft: Math.max(0, cfg.periodDays - elapsed),
-    returnSoFar: periodReturn(ch, equityUsd),
-    minReturn: cfg.minReturn,
-    targetReturn: cfg.targetReturn,
-    minEquityUsd: ch.periodStartEquityUsd * (1 + cfg.minReturn),
-    targetEquityUsd: ch.periodStartEquityUsd * (1 + cfg.targetReturn),
+    returnSoFar: ret,
+    projected: { label: projected.label, delta: projected.delta },
+    safeReturn: safe,
+    bonusReturn: bonus,
+    safeEquityUsd: ch.periodStartEquityUsd * (1 + safe),
+    bonusEquityUsd: ch.periodStartEquityUsd * (1 + bonus),
+    bands: cfg.bands,
   };
+}
+
+/** "−0.25", "+0.5", "±0" — for prompts, lessons and the dashboard. */
+export function fmtLivesDelta(d: number): string {
+  if (d === 0) return '±0';
+  return `${d > 0 ? '+' : '−'}${Math.abs(d)}`;
 }
