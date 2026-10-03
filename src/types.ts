@@ -146,6 +146,8 @@ export interface AutomatonState {
 
 export interface JournalEntry {
   cycle: number;
+  /** a closed challenge month (evaluator/dashboard only; never in the decision prompt). */
+  challengeEvent?: string;
   at: string;
   tier: Tier;
   /** book equity in SOL terms (for the survival tiers). */

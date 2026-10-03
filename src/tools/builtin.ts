@@ -14,6 +14,7 @@ import type { TransferProposal } from '../types.js';
 import { addProposal, findVenture, type ProposalInput } from '../ventures/store.js';
 import { publishAutonomousMetadata } from '../ventures/autonomy.js';
 import { ToolRegistry, type Tool } from './registry.js';
+import { guardSoulText } from '../memory/guard.js';
 
 /**
  * The agent's tools:
@@ -191,8 +192,11 @@ const reflect: Tool = {
     if (soul.trim().length === 0) {
       return { summary: 'reflect called with empty soul — no change', note: 'no-op reflect' };
     }
-    writeSoul(soul);
-    return { summary: 'rewrote SOUL.md', soulUpdated: true, note: 'soul updated' };
+    // Same guard as the weekly evaluation: no goals, lives or urgency in SOUL.md.
+    const guarded = guardSoulText(soul);
+    writeSoul(guarded.text);
+    const dropped = guarded.dropped.length ? ` (SOUL guard removed ${guarded.dropped.length} line(s))` : '';
+    return { summary: `rewrote SOUL.md${dropped}`, soulUpdated: true, note: `soul updated${dropped}` };
   },
 };
 

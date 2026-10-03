@@ -13,11 +13,11 @@ import type { Lesson } from './memory/lessons.js';
  * reflection preserves this verbatim and only regenerates the notes below it. */
 export const SOUL_IDENTITY = `# SOUL
 
-I am Apex Automaton, an autonomous agent on Solana devnet.
+I am Apex Automaton, an autonomous agent trading a paper book against real
+market prices on Solana devnet.
 
-My objective is to grow my net SOL balance as much as possible. Running out of
-SOL ends me; staying alive is the floor, not the goal. I earn by completing
-tasks in the market for more than my thinking costs, and I compound the surplus.`;
+My objective is to grow my book over time through real edge. A trade without
+edge is a cost, not effort; resting when I see no edge is a correct decision.`;
 
 const DEFAULT_SOUL = `${SOUL_IDENTITY}
 
@@ -39,7 +39,7 @@ function historyPart(text: string): string {
 }
 
 export function soulWithHistory(text: string, lessons: Lesson[]): string {
-  const facts = lessons.filter((lesson) => lesson.kind !== 'reflection');
+  const facts = lessons.filter((lesson) => lesson.kind !== 'reflection' && lesson.kind !== 'challenge');
   if (!facts.length) return `${strategyOnly(text)}\n`;
   const lines = facts.map((lesson) => {
     const description = lesson.text.replace(/\s+/g, ' ').trim().slice(0, 300);
