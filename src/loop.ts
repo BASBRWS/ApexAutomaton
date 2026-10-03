@@ -8,9 +8,10 @@ import { loadConstitution } from './constitution/index.js';
 import { soulForPrompt, ensureSoul, syncSoulHistory } from './soul.js';
 import { appendEntry, digestRecent, obituaryDigest, writeObituary, readRecent } from './journal.js';
 import { assessLossTrend } from './losstrend.js';
-import { shouldObserveOnly } from './decision-cadence.js';
-import { policyForTier, toolNamesForCycle } from './tiers.js';
-import { computeCostUsd, equityToSol, tierForSurvival, survivalSol, onChainHeartbeat } from './economy.js';
+import { decisionReason } from './decision-cadence.js';
+import { initChallenge, evaluateChallenge, challengeStatus, fmtLivesDelta } from './challenge.js';
+import { policyForTier, tierForBalanceSol, toolNamesForCycle } from './tiers.js';
+import { computeCostUsd, equityToSol, survivalSol, onChainHeartbeat } from './economy.js';
 import { initialScore, updateScore } from './score.js';
 import {
   equityUsd as deskEquityUsd,
@@ -229,6 +230,15 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   const equityPre = paperEquityPre + ventureRevUsd; // scoreboard (mixed)
   const equitySolPre = equityToSol(equityPre, solPrice);
 
+  // --- Monthly challenge: start one (at today's equity) if this state has none.
+  if (cfg.challenge.enabled && !state.challenge) {
+    state.challenge = initChallenge(cfg.challenge, equityPre, now());
+  }
+  if (state.challenge) {
+    state.challenge.periodPeakEquityUsd = Math.max(
+      state.challenge.periodPeakEquityUsd ?? state.challenge.periodStartEquityUsd, equityPre);
+  }
+
   // --- Survival anchor: the REAL devnet wallet is leading ("de wallet is
   // leidend"). Read the confirmed on-chain balance up front — it governs the
   // death check and the tier below. If the RPC read fails, survivalSol() falls
@@ -241,7 +251,10 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   } catch {
     state.walletSnapshot = null;
   }
-  const survivalSolPre = survivalSol(walletSol, equitySolPre);
+  // Paper-only by default: survival follows the book. With WALLET_ANCHOR the real
+  // wallet SOL leads instead (falling back to the book on a failed RPC read).
+  const survivalSolPre = cfg.wallet.anchorOnWallet ? survivalSol(walletSol, equitySolPre) : equitySolPre;
+  const anchorLabel = cfg.wallet.anchorOnWallet ? 'wallet anchor' : 'paper book';
 
   // --- Death check: economic, in SOL, on the survival anchor. Never self-resurrect.
   if (survivalSolPre <= cfg.trading.dustSol) {
@@ -251,7 +264,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       cycle,
       at: now(),
       kind: 'death',
-      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (wallet anchor) — the market + burn + metabolism outpaced earnings`,
+      text: `DIED at ${survivalSolPre.toFixed(4)} SOL (${anchorLabel}) — the market + burn + metabolism outpaced earnings`,
       pnlUsd: state.score.netPnlUsd,
     });
     appendEntry({
@@ -263,7 +276,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       walletBalanceSol: state.walletSnapshot ? state.walletSnapshot.lamports / 1e9 : null,
       model: '(none)',
       action: 'die',
-      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (wallet anchor; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
+      actionSummary: `survival ${survivalSolPre.toFixed(4)} SOL (${anchorLabel}; book ${equitySolPre.toFixed(4)} SOL / $${equityPre.toFixed(2)}) <= dust ${cfg.trading.dustSol} SOL — obituary ${file}`,
       costUsd: 0,
       cyclePnlUsd: equityPre - state.score.equityUsd,
       signatures: [],
@@ -277,7 +290,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // Tier from the survival anchor — the real wallet SOL when available, else the
   // paper book's equity-in-SOL (clamp away from DEAD; death is the check above).
-  let tier = tierForSurvival(walletSol, equitySolPre, cfg);
+  let tier = tierForBalanceSol(survivalSolPre, cfg);
   if (tier === 'DEAD') tier = 'CRITICAL';
   const policy = policyForTier(tier, cfg);
 
@@ -322,7 +335,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     policy,
     equityUsd: equityPre,
     equitySol: equitySolPre,
-    walletSol,
+    walletSol: cfg.wallet.anchorOnWallet ? walletSol : undefined,
     survivalSol: survivalSolPre,
     dustSol: cfg.trading.dustSol,
     dustUsd,
@@ -344,25 +357,36 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     // the prompt prescribes DE-RISKING (not more trading) as the response.
     lossTrend: assessLossTrend({
       equityUsd: equityPre,
-      peakEquityUsd: state.score.peakEquityUsd,
+      // Under the challenge, judge the drawdown against this month's peak: an
+      // all-time peak from an earlier regime would pin the agent in permanent
+      // "cut risk" mode and make the monthly minimum unreachable.
+      peakEquityUsd: state.challenge?.periodPeakEquityUsd ?? state.score.peakEquityUsd,
       recentPnls: readRecent(10).map((e) => Number(e.cyclePnlUsd) || 0),
     }),
     hasOpenPositions: Object.keys(state.desk.positions).length > 0,
+    challenge: state.challenge
+      ? { ...challengeStatus(state.challenge, cfg.challenge, equityPre, now()), periodComputeUsd: state.challenge.periodComputeUsd ?? 0 }
+      : undefined,
   });
 
   // --- Think only when another decision can add information. On a flat book
   // with repeated no-op decisions, a periodic decision and market-move wakeup
   // preserve agency while observation-only cycles avoid unproductive API burn.
   const llm = deps.llm ?? new AnthropicClient();
-  const observeOnly = shouldObserveOnly({
-    cycle,
-    openPositions: Object.keys(state.desk.positions).length,
+  const recentDecisionTimes = readRecent(120)
+    .filter((e) => e.model && e.model !== '(none)')
+    .map((e) => e.at);
+  const whyDecide = decisionReason({
+    now: now(),
+    cfg: cfg.decisions,
     prices: executablePrices,
-    previousPrices: prevPrices,
-    recent: readRecent(3),
+    openAssets: Object.keys(state.desk.positions),
+    lastDecision: state.lastDecision,
+    recentDecisionTimes,
     ventureChanged,
     onchainActionReady: pumpReady || nftReady || splReady,
   });
+  const observeOnly = whyDecide === null;
   let resp: LLMResponse | undefined;
   if (!observeOnly) {
     resp = await llm.generate({
@@ -372,13 +396,16 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
       maxTokens: policy.maxTokens,
       effort: policy.effort,
     });
+    state.lastDecision = { at: now(), prices: { ...prices } };
   }
   const costUsd = resp ? computeCostUsd(policy.model, resp.usage) : 0;
 
   // --- Decide + act (fall back to rest on any ambiguity). -------------------
   const action: AgentAction | null = resp ? parseAction(resp.text) : null;
   let chosenName = action?.tool ?? 'rest';
-  let coerceNote: string | undefined = observeOnly ? 'observation-only: no LLM call; decision resumes on next scheduled cycle or core-market move' : undefined;
+  let coerceNote: string | undefined = observeOnly
+    ? `observation-only: no LLM call (next scheduled decision ≤${cfg.decisions.minHoursBetween}h after the last, sooner on a big move)`
+    : `decision: ${whyDecide}`;
   if (!registry.has(chosenName) || !allowedToolNames.includes(chosenName)) {
     coerceNote = `requested tool "${chosenName}" not available at tier ${tier}; rested`;
     chosenName = 'rest';
@@ -509,15 +536,24 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   // cost is folded into this cycle's burn below. -----------------------------
   let reflectNote: string | undefined;
   let reflectCostUsd = 0;
-  const autoReflectDue =
-    cfg.memory.reflectEveryCycles > 0 && cycle % cfg.memory.reflectEveryCycles === 0;
+  // Weekly evaluation by a heavier model (the "coach"): it reviews the period
+  // against the monthly challenge and rewrites the strategy notes the cheap
+  // decision model then follows. Time-based, so the cadence of decisions and of
+  // the heartbeat cannot multiply its cost.
+  const lastReflectMs = state.lastReflectAt ? Date.parse(state.lastReflectAt) : NaN;
+  const autoReflectDue = cfg.memory.reflectEveryDays > 0 &&
+    (!Number.isFinite(lastReflectMs) || Date.now() - lastReflectMs >= cfg.memory.reflectEveryDays * 86_400_000);
   if (autoReflectDue) {
     try {
+      state.lastReflectAt = now();
       const res = await autoReflect(llm, {
         cfg,
         cycle,
         score: state.score,
         lessonsShown: cfg.memory.lessonsInPrompt,
+        challenge: state.challenge
+          ? { ...challengeStatus(state.challenge, cfg.challenge, equityPre, now()), history: state.challenge.history }
+          : undefined,
       });
       reflectCostUsd = res.costUsd;
       state.desk.cashUsd -= reflectCostUsd;
@@ -595,6 +631,37 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     }
   }
 
+  // --- Monthly challenge: charge this cycle's compute to the period, then close
+  // the period if its 30 days are up. Missing the minimum costs a life; the last
+  // life lost is death. -----------------------------------------------------------
+  let challengeNote: string | undefined;
+  if (cfg.challenge.enabled && state.challenge) {
+    state.challenge.periodComputeUsd = (state.challenge.periodComputeUsd ?? 0) + costUsd + reflectCostUsd;
+    const { next, closed } = evaluateChallenge(state.challenge, cfg.challenge, equityPost, now());
+    state.challenge = next;
+    if (closed) {
+      const pct = (closed.returnPct * 100).toFixed(2);
+      const verdict = `${closed.label}: ${fmtLivesDelta(closed.livesDelta)} life → ${closed.livesAfter} left`;
+      challengeNote = `challenge period ${closed.period} closed: ${closed.returnPct >= 0 ? '+' : ''}${pct}% — ${verdict}`;
+      appendLesson({
+        cycle,
+        at: now(),
+        kind: next.lives <= 0 ? 'death' : 'milestone',
+        text: `month ${closed.period}: ${closed.returnPct >= 0 ? '+' : ''}${pct}% — ${verdict}`,
+        pnlUsd: closed.endEquityUsd - closed.startEquityUsd,
+      });
+      if (next.lives <= 0) {
+        state.dead = true;
+        writeObituary(
+          buildObituary(cycle, equityPost, equityToSol(equityPost, solPrice), state,
+            `Lost my last life: month ${closed.period} returned ${pct}% (${closed.label}).`),
+          cycle,
+        );
+        challengeNote += ' — DEAD (no lives left)';
+      }
+    }
+  }
+
   // Milestone lesson: the first time net PnL turns positive.
   if (!hadFirstProfit && state.score.firstProfitAtCycle === cycle) {
     appendLesson({
@@ -608,7 +675,8 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
 
   // Sustained-sovereign tracking for the Phase 3 replication gate (high book only).
   // Anchored on the same real-wallet survival balance as the live tier above.
-  const finalTier = tierForSurvival(walletSol, equityToSol(equityPost, solPrice), cfg);
+  const finalTier = tierForBalanceSol(
+    cfg.wallet.anchorOnWallet ? survivalSol(walletSol, equityToSol(equityPost, solPrice)) : equityToSol(equityPost, solPrice), cfg);
   state.sustainedSovereignCycles =
     finalTier === 'SOVEREIGN' ? state.sustainedSovereignCycles + 1 : 0;
 
@@ -668,6 +736,7 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
     heartbeatNote,
     replicationNote,
     walletNote,
+    challengeNote,
   ].filter(Boolean);
   const entry: JournalEntry = {
     cycle,
@@ -695,8 +764,9 @@ export async function runCycle(deps: CycleDeps = {}): Promise<CycleOutcome> {
   appendEntry(entry);
 
   return {
-    exitCode: 0,
+    exitCode: state.dead ? 1 : 0,
     summary:
+      (state.dead ? 'DEAD (challenge: no lives left) — ' : '') +
       `cycle ${cycle} [${tier}] action=${chosenName} ` +
       `equity=$${equityPost.toFixed(2)} cyclePnl=$${cyclePnlUsd.toFixed(2)} ` +
       `burn=$${costUsd.toFixed(4)}`,
@@ -728,11 +798,14 @@ function buildObituary(
   equityUsd: number,
   equitySol: number,
   state: AutomatonState,
+  cause?: string,
 ): string {
   return [
     `# Obituary`,
     ``,
-    `Died at cycle ${cycle} with a book of ${equitySol.toFixed(4)} SOL ($${equityUsd.toFixed(2)}) (at or below the dust threshold).`,
+    cause
+      ? `Died at cycle ${cycle} with a book of ${equitySol.toFixed(4)} SOL ($${equityUsd.toFixed(2)}). ${cause}`
+      : `Died at cycle ${cycle} with a book of ${equitySol.toFixed(4)} SOL ($${equityUsd.toFixed(2)}) (at or below the dust threshold).`,
     `Born: ${state.bornAt}`,
     ``,
     `- start equity: $${state.score.startEquityUsd.toFixed(2)}`,

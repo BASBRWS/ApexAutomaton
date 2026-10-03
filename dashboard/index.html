@@ -105,15 +105,18 @@
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
-      <h2>Real wallet — survival balance <span class="muted" style="font-size:12px;font-weight:400">· LEADING · native SOL on chain — this decides the tier and life/death</span></h2>
-      <div id="wallet" class="grid"></div>
-      <div id="meter-note" class="muted" style="font-size:12px;margin:2px 0 4px"></div>
+      <h2>Monthly challenge <span class="muted" style="font-size:12px;font-weight:400">· every 30 days: &gt;2.5% +½ life · 2–2.5% ±0 · 1.5–2% −¼ · 1–1.5% −½ · &lt;1% −1 — max 4 lives, 0 is death</span></h2>
+      <div id="challenge" class="grid"></div>
 
       <h2>Trading book <span class="muted" style="font-size:12px;font-weight:400">· marked to real market prices (fees, spread &amp; slippage included)</span></h2>
       <div id="tiles" class="grid"></div>
 
       <h2>Growth <span class="muted" style="font-size:12px;font-weight:400">· combined paper equity and reported venture revenue</span></h2>
       <div id="growth" class="grid"></div>
+
+      <h2>Devnet wallet <span class="muted" style="font-size:12px;font-weight:400">· on-chain proof of life — pays the heartbeat's tx fees only, not part of the score</span></h2>
+      <div id="wallet" class="grid"></div>
+      <div id="meter-note" class="muted" style="font-size:12px;margin:2px 0 4px"></div>
 
       <h2>Book equity over time</h2>
       <div class="chart-controls">
@@ -675,23 +678,48 @@
               + (Number.isFinite(observed) ? ` · ${new Date(observed).toLocaleString()}` : '')
               + ' — live chain may differ';
             wallet.append(
-              tile('wallet SOL', sol(nativeSol), asOf + ' (leading — sets the tier)'),
+              tile('wallet SOL', sol(nativeSol), asOf),
               tile('wallet at SOL price', quote > 0 ? usd(nativeSol * quote) : 'quote unavailable', asOf),
             );
-            // Adaptive: when the wallet tracks the book equity (within ~2%), the
-            // real-economy reconciliation is on — the wallet mirrors the book, one
-            // number. Otherwise they are two separate meters.
-            const mirrored = eqSol > 0 && Math.abs(nativeSol - eqSol) / eqSol < 0.02;
-            meterNote.innerHTML = mirrored
-              ? 'The <strong>wallet mirrors the trading book</strong>: a gain airdrops SOL in, a loss (or the cost of living) '
-                + 'burns SOL out, so the wallet moves with the trades — one number, on-chain. Devnet simulation: the inflow '
-                + 'is faucet SOL, not real profit (real profit needs a real market / mainnet, out of scope).'
-              : 'Two meters. The <strong>wallet SOL</strong> above is the real balance that decides the tier and life/death. '
-                + 'The <strong>trading book</strong> below is marked to real prices but is not (yet) settled onto the wallet, '
-                + 'so the two can diverge. When the wallet reading is unavailable, the tier falls back to the book.';
+            meterNote.textContent = 'Paper-only: the trading book above is the single score (lives, tier, death). '
+              + 'The wallet just pays the ~0.000005 SOL heartbeat fee per cycle as on-chain proof the agent runs.';
           } else {
-            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance — tier falls back to the trading book this cycle'));
-            meterNote.textContent = 'Wallet balance unavailable this cycle — the tier temporarily follows the trading book below.';
+            wallet.append(tile('wallet SOL', 'unavailable', 'No confirmed RPC balance this cycle'));
+            meterNote.textContent = 'Paper-only: the trading book above is the single score; the wallet only pays heartbeat fees.';
+          }
+
+          const chEl = document.getElementById('challenge');
+          const ch = state.challenge;
+          if (ch && Number(ch.periodStartEquityUsd) > 0) {
+            const DAYMS = 86400000, PERIOD = 30, START_LIVES = 3, MAX_LIVES = 4;
+            // Mirrors DEFAULT_LIFE_BANDS in src/challenge.ts (highest first).
+            const BANDS = [
+              { min: 0.025, ex: true, d: 0.5, label: 'strong' },
+              { min: 0.02, d: 0, label: 'solid' },
+              { min: 0.015, d: -0.25, label: 'weak' },
+              { min: 0.01, d: -0.5, label: 'poor' },
+              { min: -Infinity, d: -1, label: 'bad' },
+            ];
+            const bandOf = (r) => BANDS.find((b) => (b.ex ? r > b.min + 1e-9 : r >= b.min - 1e-9));
+            const fmtD = (d) => (d === 0 ? '±0' : `${d > 0 ? '+' : '−'}${Math.abs(d)}`);
+            const lives = Number(ch.lives) || 0;
+            const full = Math.floor(lives), frac = lives - full;
+            const hearts = '♥'.repeat(full) + (frac > 0 ? '◐' : '') + '♡'.repeat(Math.max(0, MAX_LIVES - full - (frac > 0 ? 1 : 0)));
+            const elapsed = Math.max(0, (Date.now() - Date.parse(ch.periodStartAt)) / DAYMS);
+            const start = Number(ch.periodStartEquityUsd);
+            const ret = eqUsd / start - 1;
+            const band = bandOf(ret);
+            const hist = (ch.history ?? []).map((h) => `M${h.period}: ${pct(h.returnPct)} (${fmtD(h.livesDelta)})`).join(' · ');
+            chEl.append(
+              tile('lives', `<span class="${lives >= 2 ? 'pos' : 'neg'}">${hearts}</span>`, `${lives} of max ${MAX_LIVES} (started with ${START_LIVES})`),
+              tile(`month ${ch.period}`, `day ${Math.min(PERIOD, elapsed).toFixed(1)} / ${PERIOD}`, `${Math.max(0, PERIOD - elapsed).toFixed(1)} days left`),
+              tile('return this month', `<span class="${band.d >= 0 ? 'pos' : 'neg'}">${pct(ret)}</span>`, `if it ended now: ${band.label} month, ${fmtD(band.d)} life`),
+              tile('keep all lives at', usd(start * 1.02), `bonus above ${usd(start * 1.025)} · from ${usd(start)}`),
+              tile('compute this month', usd(ch.periodComputeUsd ?? 0), 'model calls, paid from the book'),
+              tile('past months', hist || 'none yet'),
+            );
+          } else {
+            chEl.append(tile('challenge', 'not started', 'starts on the next cycle'));
           }
 
           const growth = document.getElementById('growth');

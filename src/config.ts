@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { DEFAULT_LIFE_BANDS, type LifeBand } from './challenge.js';
 import { clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 /**
@@ -185,6 +186,9 @@ export interface Config {
   wallet: {
     /** master switch: reconcile the wallet to the book each cycle (settle IN/OUT). */
     realEconomyEnabled: boolean;
+    /** true: tier + death follow the real wallet SOL. false (default, paper-only):
+     * they follow the paper book; the wallet only pays the heartbeat's tx fees. */
+    anchorOnWallet: boolean;
     /** floor (SOL) the settle-OUT (burn) leg never spends below, so the wallet
      * always keeps enough SOL for transaction fees. */
     floorSol: number;
@@ -193,11 +197,41 @@ export interface Config {
     maxSettlePerCycleSol: number;
   };
 
+  /** Monthly return challenge: the agent must grow its book by at least
+   * the bands' thresholds per period or lose (part of) a life; 0 lives is death. */
+  challenge: {
+    enabled: boolean;
+    lives: number;
+    /** ceiling on lives; bonus months never lift them above this. */
+    maxLives: number;
+    periodDays: number;
+    /** monthly-return bands -> lives gained/lost (highest first). */
+    bands: LifeBand[];
+  };
+
+
+  /** How often the agent may buy a model decision. Every call is real money
+   * charged to the book, so the cadence is the biggest cost lever. */
+  decisions: {
+    /** a scheduled decision at most once per this many hours... */
+    minHoursBetween: number;
+    /** ...but wake early when an OPEN position moved at least this much (fraction)... */
+    positionMoveTrigger: number;
+    /** ...or BTC/ETH moved at least this much since the last decision. */
+    marketMoveTrigger: number;
+    /** hard ceiling on model decisions per rolling 24h, triggers included. */
+    maxPerDay: number;
+  };
+
   /** Memory / learning: a durable lessons ledger fed back each cycle, plus a
    * periodic nudge to consolidate lessons into SOUL.md via the reflect tool. */
   memory: {
     /** nudge the agent to reflect every N cycles (0 disables the periodic nudge). */
-    reflectEveryCycles: number;
+    /** a heavier model evaluates the period and rewrites the strategy notes
+     * every this many days (0 disables). */
+    reflectEveryDays: number;
+    /** the model for that evaluation (default: the frontier model). */
+    reflectModel: string;
     /** how many recent lessons to show in the prompt. */
     lessonsInPrompt: number;
   };
@@ -265,7 +299,9 @@ export function loadConfig(): Config {
 
     models: {
       cheapest: envStr('MODEL_CHEAPEST') ?? 'claude-haiku-4-5',
-      cheaper: envStr('MODEL_CHEAPER') ?? 'claude-sonnet-5',
+      // Decisions are frequent and every call is paid from a small book, so the
+      // default decision mind is the cheapest one; a heavier model evaluates weekly.
+      cheaper: envStr('MODEL_CHEAPER') ?? 'claude-haiku-4-5',
       frontier: envStr('MODEL_FRONTIER') ?? 'claude-opus-5-5',
     },
 
@@ -335,20 +371,40 @@ export function loadConfig(): Config {
       slippageBps: envNum('TRADING_SLIPPAGE_BPS', 5),
       shortBorrowApy: envNum('SHORT_BORROW_APY', 0.08),
       dustSol: envNum('TRADING_DUST_SOL', 0.02),
-      yieldApy: envNum('YIELD_APY', 0),
-      metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0.0001),
+      // A realistic carry for parked capital (stablecoin / staking scale).
+      yieldApy: envNum('YIELD_APY', 0.05),
+      // Off by default: the monthly challenge (below) is the survival pressure,
+      // so the outcome measures skill instead of a fixed bleed no strategy beats.
+      metabolicRatePerCycle: envNum('METABOLIC_RATE_PER_CYCLE', 0),
       priceApiBase:
         envStr('PRICE_API_BASE') ?? 'https://api.coingecko.com/api/v3/simple/price',
     },
 
     wallet: {
       realEconomyEnabled: envBool('WALLET_REAL_ECONOMY', false),
+      anchorOnWallet: envBool('WALLET_ANCHOR', false),
       floorSol: envNum('WALLET_FLOOR_SOL', 0.05),
       maxSettlePerCycleSol: envNum('WALLET_MAX_SETTLE_PER_CYCLE_SOL', 0.5),
     },
 
+    challenge: {
+      enabled: envBool('CHALLENGE_ENABLED', true),
+      lives: envNum('CHALLENGE_LIVES', 3),
+      maxLives: envNum('CHALLENGE_MAX_LIVES', 4),
+      periodDays: envNum('CHALLENGE_PERIOD_DAYS', 30),
+      bands: DEFAULT_LIFE_BANDS,
+    },
+
+    decisions: {
+      minHoursBetween: envNum('DECISION_MIN_HOURS', 8),
+      positionMoveTrigger: envNum('DECISION_POSITION_MOVE', 0.03),
+      marketMoveTrigger: envNum('DECISION_MARKET_MOVE', 0.02),
+      maxPerDay: Math.trunc(envNum('DECISION_MAX_PER_DAY', 4)),
+    },
+
     memory: {
-      reflectEveryCycles: Math.trunc(envNum('REFLECT_EVERY_CYCLES', 12)),
+      reflectEveryDays: envNum('REFLECT_EVERY_DAYS', 7),
+      reflectModel: envStr('REFLECT_MODEL') ?? 'claude-opus-5-5',
       lessonsInPrompt: Math.trunc(envNum('LESSONS_IN_PROMPT', 8)),
     },
 
@@ -393,6 +449,15 @@ export function loadConfig(): Config {
 
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
+  const ch = cfg.challenge;
+  if (ch?.enabled && (!(ch.lives > 0) || !(ch.maxLives >= ch.lives) || !(ch.periodDays > 0) || ch.bands.length === 0 ||
+      ch.bands[ch.bands.length - 1]!.min !== Number.NEGATIVE_INFINITY)) {
+    throw new Error('Challenge config: lives > 0, max lives >= lives, period > 0 days, and a catch-all lowest band.');
+  }
+  const d = cfg.decisions;
+  if (d && (!(d.minHoursBetween >= 0) || !(d.maxPerDay >= 1) || !(d.positionMoveTrigger > 0) || !(d.marketMoveTrigger > 0))) {
+    throw new Error('Decision cadence: DECISION_MIN_HOURS >= 0, DECISION_MAX_PER_DAY >= 1, move triggers > 0.');
+  }
   if (cfg.pump.enabled && (!Number.isFinite(cfg.pump.maxCreateSol) || cfg.pump.maxCreateSol <= 0 ||
       cfg.pump.maxCreateSol > cfg.rails.perTxCapSol)) {
     throw new Error('PUMP_MAX_CREATE_SOL must be positive and at most PER_TX_CAP_SOL.');

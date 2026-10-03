@@ -1,3 +1,4 @@
+import type { ChallengeState } from './challenge.js';
 /** Shared types used across the automaton. */
 
 import type { Desk } from './trading/desk.js';
@@ -132,6 +133,14 @@ export interface AutomatonState {
   splMints?: Record<string, { mint: string; signature: string; at: string }>;
   /** consecutive cycles at/above the replicate threshold (Phase 3 gating). */
   sustainedSovereignCycles: number;
+  /** Monthly return challenge with lives (see challenge.ts). Older states omit
+   * it; the loop starts a fresh challenge at the current equity. */
+  challenge?: ChallengeState;
+  /** When the agent last bought a model decision, and the prices it saw then —
+   * the decision cadence wakes the model on a big move since that point. */
+  lastDecision?: { at: string; prices: Record<string, number> };
+  /** when the heavier model last evaluated the period (weekly coach review). */
+  lastReflectAt?: string;
   dead: boolean;
 }
 

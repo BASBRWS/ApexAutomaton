@@ -1,4 +1,5 @@
 import type { Config } from '../src/config.js';
+import { DEFAULT_LIFE_BANDS } from '../src/challenge.js';
 
 /** A complete Config for tests, independent of process.env. Mirrors the
  * shipped defaults so tests double as a check on those defaults. */
@@ -57,8 +58,12 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
       metabolicRatePerCycle: 0.0001,
       priceApiBase: 'https://api.coingecko.com/api/v3/simple/price',
     },
+    challenge: { enabled: true, lives: 3, maxLives: 4, periodDays: 30, bands: DEFAULT_LIFE_BANDS },
+    memory: { reflectEveryDays: 7, reflectModel: 'claude-opus-5-5', lessonsInPrompt: 8 },
+    decisions: { minHoursBetween: 4, positionMoveTrigger: 0.03, marketMoveTrigger: 0.02, maxPerDay: 6 },
     wallet: {
       realEconomyEnabled: false,
+      anchorOnWallet: false,
       floorSol: 0.05,
       maxSettlePerCycleSol: 0.5,
     },

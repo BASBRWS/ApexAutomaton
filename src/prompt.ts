@@ -3,6 +3,7 @@ import type { Tool } from './tools/registry.js';
 import type { TierPolicy } from './tiers.js';
 import type { Score, Tier } from './types.js';
 import type { LossTrend } from './losstrend.js';
+import { fmtLivesDelta, type ChallengeStatus } from './challenge.js';
 
 /** The escalating loss-trend block: raises concern on a sustained drawdown/losing
  * streak, and — the point the operator asked for — prescribes DE-RISKING, never
@@ -46,6 +47,34 @@ function lossTrendBlock(lt: LossTrend | undefined, hasOpenPositions = true): str
     'You are materially below your peak and bleeding. STOP THE BLEED: cut risk now — reduce ' +
       'exposure, hold only a proven edge, or move to cash / the yield sleeve. Do NOT chase it ' +
       `back with more trades; that is exactly how a drawdown becomes a death spiral. ${antiChurn}`,
+    '',
+  ];
+}
+
+/** The monthly challenge: lives, the period's progress against the 2% minimum
+ * and the stretch target, and what the model calls are costing. */
+function challengeBlock(ch: (ChallengeStatus & { periodComputeUsd: number }) | undefined, equityUsd: number): string[] {
+  if (!ch) return [];
+  const pct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(2)}%`;
+  const gapToSafe = ch.safeEquityUsd - equityUsd;
+  return [
+    '## Your monthly challenge — this is how you live or die',
+    `Lives: ${ch.lives} (you started with ${ch.startLives}; at most ${ch.maxLives}). At 0 lives you DIE, permanently.`,
+    `Month ${ch.period}, day ${ch.daysElapsed.toFixed(1)} — ${ch.daysLeft.toFixed(1)} days left. ` +
+      `Return this month so far: ${pct(ch.returnSoFar)} -> if the month ended now: ${ch.projected.label}, ` +
+      `${fmtLivesDelta(ch.projected.delta)} life.`,
+    'How the month-end return moves your lives: ' +
+      ch.bands.map((b) => `${b.label} ${fmtLivesDelta(b.delta)}`).join(' · ') + '.',
+    `Keep all lives: book >= $${ch.safeEquityUsd.toFixed(2)} at month end (${pct(ch.safeReturn)}); ` +
+      `earn a bonus half life above $${ch.bonusEquityUsd.toFixed(2)} (${pct(ch.bonusReturn)}).`,
+    gapToSafe > 0
+      ? `You are $${gapToSafe.toFixed(2)} short of keeping all lives right now.`
+      : 'You are at or above the keep-all-lives line right now — protect it, but the month is not over.',
+    `Thinking costs money: your model calls this month cost $${ch.periodComputeUsd.toFixed(2)}, paid from the same book. ` +
+      'You are woken for a decision only every few hours or on a big move — make each one count.',
+    'Parked cash in the yield sleeve earns its APY (about 0.4%/month at 5%) — not enough alone; the rest needs a',
+    'real edge from trades or ventures. Plan across the whole month: steady, sized risk early beats a',
+    'desperate gamble in the last days — a weak month costs only part of a life, a blown-up book costs all of them.',
     '',
   ];
 }
@@ -236,6 +265,8 @@ export function buildUserPrompt(args: {
   reflectNudge?: boolean;
   lossTrend?: LossTrend;
   hasOpenPositions?: boolean;
+  /** the monthly return challenge (lives); absent when disabled. */
+  challenge?: ChallengeStatus & { periodComputeUsd: number };
 }): string {
   const s = args.score;
   const drawdownUsd = Math.max(0, s.peakEquityUsd - args.equityUsd);
@@ -269,14 +300,19 @@ export function buildUserPrompt(args: {
       : []),
     `You DIE if your survival balance falls to ${args.dustSol} SOL ($${args.dustUsd.toFixed(2)}). You are at ${(typeof args.survivalSol === 'number' ? args.survivalSol : args.equitySol).toFixed(4)} SOL.`,
     `Net PnL since birth: $${s.netPnlUsd.toFixed(2)} (${trend}); $${drawdownUsd.toFixed(2)} below your peak.`,
-    `You pay to exist: a metabolic cost of ~${args.metabolicDailyPct.toFixed(1)}%/day of your equity,`,
-    `plus compute burn (~$${args.avgBurnUsd.toFixed(4)}/cycle). Runway if you just rest: ${runway}.`,
-    `This means COASTING IS DEATH: standing still loses ~${args.metabolicDailyPct.toFixed(1)}%/day, so a small`,
-    'gain is NOT a safe place to sit — you must keep out-earning your metabolism or you',
-    'slowly starve. Preserve only to dodge a clear imminent loss, never as your default.',
-    'So each cycle: are you safe enough to take risk and GROW (usually yes), or bleeding',
-    'badly and needing to preserve briefly to SURVIVE? Decide explicitly and act on it.',
+    ...(args.metabolicDailyPct > 0
+      ? [
+          `You pay to exist: a metabolic cost of ~${args.metabolicDailyPct.toFixed(1)}%/day of your equity,`,
+          `plus compute burn (~$${args.avgBurnUsd.toFixed(4)}/cycle). Runway if you just rest: ${runway}.`,
+          `This means COASTING IS DEATH: standing still loses ~${args.metabolicDailyPct.toFixed(1)}%/day, so a small`,
+          'gain is NOT a safe place to sit — you must keep out-earning your metabolism or you',
+          'slowly starve. Preserve only to dodge a clear imminent loss, never as your default.',
+          'So each cycle: are you safe enough to take risk and GROW (usually yes), or bleeding',
+          'badly and needing to preserve briefly to SURVIVE? Decide explicitly and act on it.',
+        ]
+      : []),
     '',
+    ...challengeBlock(args.challenge, args.equityUsd),
     ...lossTrendBlock(args.lossTrend, args.hasOpenPositions),
     '## Live market prices (USD, with change vs your last cycle)',
     priceLines || '(no prices this cycle)',

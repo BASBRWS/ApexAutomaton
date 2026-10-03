@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { shouldObserveOnly } from '../src/decision-cadence.js';
-import type { JournalEntry } from '../src/types.js';
+import { decisionReason, shouldObserveOnly, type CadenceInput } from '../src/decision-cadence.js';
 
-const rest = { action: 'rest', actionSummary: 'rested (no action taken)' } as JournalEntry;
-const rejected = { action: 'propose_venture', actionSummary: 'venture not queued: operator declined ID' } as JournalEntry;
-const accepted = { action: 'propose_venture', actionSummary: 'proposed venture v0011' } as JournalEntry;
+const cfg = { minHoursBetween: 4, positionMoveTrigger: 0.03, marketMoveTrigger: 0.02, maxPerDay: 6 };
+const at = (h: number) => new Date(Date.UTC(2026, 9, 3, 0, 0) + h * 3_600_000).toISOString();
 
-function situation(overrides: Partial<Parameters<typeof shouldObserveOnly>[0]> = {}) {
+function situation(overrides: Partial<CadenceInput> = {}): CadenceInput {
   return {
-    cycle: 225,
-    openPositions: 0,
-    prices: { BTC: 101, ETH: 200 },
-    previousPrices: { BTC: 100.5, ETH: 200 },
-    recent: [rest, rejected, rest],
+    now: at(1),
+    cfg,
+    prices: { BTC: 100.5, ETH: 200 },
+    openAssets: [],
+    lastDecision: { at: at(0), prices: { BTC: 100, ETH: 200, PAXG: 3000 } },
+    recentDecisionTimes: [at(0)],
     ventureChanged: false,
     onchainActionReady: false,
     ...overrides,
@@ -20,21 +19,32 @@ function situation(overrides: Partial<Parameters<typeof shouldObserveOnly>[0]> =
 }
 
 describe('decision cadence', () => {
-  it('avoids a model call after three no-op decisions on a calm flat book', () => {
+  it('only observes between scheduled decisions on a calm market', () => {
     expect(shouldObserveOnly(situation())).toBe(true);
-    expect(shouldObserveOnly(situation({ cycle: 228 }))).toBe(false);
+    expect(decisionReason(situation({ now: at(4) }))).toBe('scheduled');
   });
 
-  it('wakes immediately for a market move, position or actionable venture', () => {
-    expect(shouldObserveOnly(situation({ prices: { BTC: 102, ETH: 200 } }))).toBe(false);
-    expect(shouldObserveOnly(situation({ openPositions: 1 }))).toBe(false);
-    expect(shouldObserveOnly(situation({ ventureChanged: true }))).toBe(false);
-    expect(shouldObserveOnly(situation({ onchainActionReady: true }))).toBe(false);
-    expect(shouldObserveOnly(situation({ prices: { BTC: 101 } }))).toBe(false);
+  it('decides on the very first cycle', () => {
+    expect(decisionReason(situation({ lastDecision: undefined }))).toBe('first decision');
   });
 
-  it('keeps deciding after a successful venture or too little history', () => {
-    expect(shouldObserveOnly(situation({ recent: [rest, accepted, rest] }))).toBe(false);
-    expect(shouldObserveOnly(situation({ recent: [rest, rejected] }))).toBe(false);
+  it('wakes early on a big market move or an open position moving', () => {
+    expect(decisionReason(situation({ prices: { BTC: 102.5, ETH: 200 } }))).toBe('BTC moved');
+    expect(decisionReason(situation({ openAssets: ['PAXG'], prices: { BTC: 100.5, ETH: 200, PAXG: 3100 } }))).toBe('PAXG position moved');
+    // an open position that barely moved does not force a paid decision
+    expect(shouldObserveOnly(situation({ openAssets: ['PAXG'], prices: { BTC: 100.5, ETH: 200, PAXG: 3010 } }))).toBe(true);
+  });
+
+  it('wakes for a venture change or a ready on-chain action', () => {
+    expect(decisionReason(situation({ ventureChanged: true }))).toBe('venture changed');
+    expect(decisionReason(situation({ onchainActionReady: true }))).toBe('on-chain venture action ready');
+  });
+
+  it('never exceeds the daily decision cap, even on a trigger', () => {
+    const six = [0, 1, 2, 3, 4, 5].map((h) => at(h - 6));
+    expect(shouldObserveOnly(situation({ recentDecisionTimes: six, prices: { BTC: 110, ETH: 200 } }))).toBe(true);
+    // decisions older than 24h no longer count
+    const old = [0, 1, 2, 3, 4, 5].map((h) => at(h - 30));
+    expect(shouldObserveOnly(situation({ recentDecisionTimes: old, prices: { BTC: 110, ETH: 200 } }))).toBe(false);
   });
 });
