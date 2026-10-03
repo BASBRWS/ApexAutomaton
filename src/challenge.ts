@@ -36,6 +36,8 @@ export interface ChallengeConfig {
   enabled: boolean;
   /** lives at the start of the challenge. */
   lives: number;
+  /** ceiling: bonus months never lift the lives above this. */
+  maxLives: number;
   periodDays: number;
   bands: LifeBand[];
 }
@@ -68,6 +70,7 @@ export interface ChallengeState {
 export interface ChallengeStatus {
   lives: number;
   startLives: number;
+  maxLives: number;
   period: number;
   daysElapsed: number;
   daysLeft: number;
@@ -125,7 +128,7 @@ export function evaluateChallenge(
   }
   const returnPct = periodReturn(ch, equityUsd);
   const band = bandFor(returnPct, cfg.bands);
-  const livesAfter = Math.max(0, roundLives(ch.lives + band.delta));
+  const livesAfter = Math.min(cfg.maxLives, Math.max(0, roundLives(ch.lives + band.delta)));
   const closed: ChallengePeriodResult = {
     period: ch.period,
     startedAt: ch.periodStartAt,
@@ -158,6 +161,7 @@ export function challengeStatus(ch: ChallengeState, cfg: ChallengeConfig, equity
   return {
     lives: ch.lives,
     startLives: cfg.lives,
+    maxLives: cfg.maxLives,
     period: ch.period,
     daysElapsed: elapsed,
     daysLeft: Math.max(0, cfg.periodDays - elapsed),

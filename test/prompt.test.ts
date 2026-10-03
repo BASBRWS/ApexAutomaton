@@ -62,12 +62,12 @@ describe('buildUserPrompt — monthly challenge', () => {
       prices: { BTC: 60000 }, prevPrices: { BTC: 60000 }, deskSummary: 'cash=$202',
       score: initialScore(200), journalDigest: '(none)', obituaryDigest: '(none)',
       challenge: {
-        lives: 2.75, startLives: 3, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
+        lives: 2.75, startLives: 3, maxLives: 4, period: 2, daysElapsed: 10, daysLeft: 20, returnSoFar: 0.01,
         projected: { label: 'poor month (1–1.5%)', delta: -0.5 }, safeReturn: 0.02, bonusReturn: 0.025,
         safeEquityUsd: 204, bonusEquityUsd: 205, bands: DEFAULT_LIFE_BANDS, periodComputeUsd: 0.42,
       },
     });
-    expect(text).toContain('Lives: 2.75 (you started with 3)');
+    expect(text).toContain('Lives: 2.75 (you started with 3; at most 4)');
     expect(text).toContain('poor month (1–1.5%), −0.5 life');
     expect(text).toContain('strong month (>2.5%) +0.5');
     expect(text).toContain('$2.00 short of keeping all lives');

@@ -67,7 +67,7 @@ export async function autoReflect(
     ...(challenge
       ? [
           '',
-          `Monthly challenge: ${challenge.lives} lives (started with ${challenge.startLives}). Month ${challenge.period}, ` +
+          `Monthly challenge: ${challenge.lives} lives (started with ${challenge.startLives}, max ${challenge.maxLives}). Month ${challenge.period}, ` +
             `day ${challenge.daysElapsed.toFixed(1)} of ${(challenge.daysElapsed + challenge.daysLeft).toFixed(0)}; ` +
             `return so far ${(challenge.returnSoFar * 100).toFixed(2)}% (would be: ${challenge.projected.label}, ` +
             `${fmtLivesDelta(challenge.projected.delta)} life).`,

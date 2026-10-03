@@ -59,7 +59,7 @@ function challengeBlock(ch: (ChallengeStatus & { periodComputeUsd: number }) | u
   const gapToSafe = ch.safeEquityUsd - equityUsd;
   return [
     '## Your monthly challenge — this is how you live or die',
-    `Lives: ${ch.lives} (you started with ${ch.startLives}). At 0 lives you DIE, permanently.`,
+    `Lives: ${ch.lives} (you started with ${ch.startLives}; at most ${ch.maxLives}). At 0 lives you DIE, permanently.`,
     `Month ${ch.period}, day ${ch.daysElapsed.toFixed(1)} — ${ch.daysLeft.toFixed(1)} days left. ` +
       `Return this month so far: ${pct(ch.returnSoFar)} -> if the month ended now: ${ch.projected.label}, ` +
       `${fmtLivesDelta(ch.projected.delta)} life.`,

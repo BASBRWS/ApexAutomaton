@@ -202,6 +202,8 @@ export interface Config {
   challenge: {
     enabled: boolean;
     lives: number;
+    /** ceiling on lives; bonus months never lift them above this. */
+    maxLives: number;
     periodDays: number;
     /** monthly-return bands -> lives gained/lost (highest first). */
     bands: LifeBand[];
@@ -388,6 +390,7 @@ export function loadConfig(): Config {
     challenge: {
       enabled: envBool('CHALLENGE_ENABLED', true),
       lives: envNum('CHALLENGE_LIVES', 3),
+      maxLives: envNum('CHALLENGE_MAX_LIVES', 4),
       periodDays: envNum('CHALLENGE_PERIOD_DAYS', 30),
       bands: DEFAULT_LIFE_BANDS,
     },
@@ -447,9 +450,9 @@ export function loadConfig(): Config {
 /** Structural checks that must hold for the tier gradient to make sense. */
 export function validateConfig(cfg: Config): void {
   const ch = cfg.challenge;
-  if (ch?.enabled && (!(ch.lives > 0) || !(ch.periodDays > 0) || ch.bands.length === 0 ||
+  if (ch?.enabled && (!(ch.lives > 0) || !(ch.maxLives >= ch.lives) || !(ch.periodDays > 0) || ch.bands.length === 0 ||
       ch.bands[ch.bands.length - 1]!.min !== Number.NEGATIVE_INFINITY)) {
-    throw new Error('Challenge config: lives > 0, period > 0 days, and a catch-all lowest band.');
+    throw new Error('Challenge config: lives > 0, max lives >= lives, period > 0 days, and a catch-all lowest band.');
   }
   const d = cfg.decisions;
   if (d && (!(d.minHoursBetween >= 0) || !(d.maxPerDay >= 1) || !(d.positionMoveTrigger > 0) || !(d.marketMoveTrigger > 0))) {

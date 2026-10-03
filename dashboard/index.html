@@ -105,7 +105,7 @@
       <div class="muted">Autonomous agent growing a paper book against real prices. SOL equity uses the latest observed SOL price.</div>
       <div id="nav" class="muted" style="margin-top:6px">Setup wizard: run npm run setup locally.</div>
 
-      <h2>Monthly challenge <span class="muted" style="font-size:12px;font-weight:400">· every 30 days: &gt;2.5% +½ life · 2–2.5% ±0 · 1.5–2% −¼ · 1–1.5% −½ · &lt;1% −1 — 0 lives is death</span></h2>
+      <h2>Monthly challenge <span class="muted" style="font-size:12px;font-weight:400">· every 30 days: &gt;2.5% +½ life · 2–2.5% ±0 · 1.5–2% −¼ · 1–1.5% −½ · &lt;1% −1 — max 4 lives, 0 is death</span></h2>
       <div id="challenge" class="grid"></div>
 
       <h2>Trading book <span class="muted" style="font-size:12px;font-weight:400">· marked to real market prices (fees, spread &amp; slippage included)</span></h2>
@@ -691,7 +691,7 @@
           const chEl = document.getElementById('challenge');
           const ch = state.challenge;
           if (ch && Number(ch.periodStartEquityUsd) > 0) {
-            const DAYMS = 86400000, PERIOD = 30, START_LIVES = 3;
+            const DAYMS = 86400000, PERIOD = 30, START_LIVES = 3, MAX_LIVES = 4;
             // Mirrors DEFAULT_LIFE_BANDS in src/challenge.ts (highest first).
             const BANDS = [
               { min: 0.025, ex: true, d: 0.5, label: 'strong' },
@@ -704,14 +704,14 @@
             const fmtD = (d) => (d === 0 ? '±0' : `${d > 0 ? '+' : '−'}${Math.abs(d)}`);
             const lives = Number(ch.lives) || 0;
             const full = Math.floor(lives), frac = lives - full;
-            const hearts = '♥'.repeat(full) + (frac > 0 ? '◐' : '') + '♡'.repeat(Math.max(0, START_LIVES - full - (frac > 0 ? 1 : 0)));
+            const hearts = '♥'.repeat(full) + (frac > 0 ? '◐' : '') + '♡'.repeat(Math.max(0, MAX_LIVES - full - (frac > 0 ? 1 : 0)));
             const elapsed = Math.max(0, (Date.now() - Date.parse(ch.periodStartAt)) / DAYMS);
             const start = Number(ch.periodStartEquityUsd);
             const ret = eqUsd / start - 1;
             const band = bandOf(ret);
             const hist = (ch.history ?? []).map((h) => `M${h.period}: ${pct(h.returnPct)} (${fmtD(h.livesDelta)})`).join(' · ');
             chEl.append(
-              tile('lives', `<span class="${lives >= 2 ? 'pos' : 'neg'}">${hearts}</span>`, `${lives} (started with ${START_LIVES})`),
+              tile('lives', `<span class="${lives >= 2 ? 'pos' : 'neg'}">${hearts}</span>`, `${lives} of max ${MAX_LIVES} (started with ${START_LIVES})`),
               tile(`month ${ch.period}`, `day ${Math.min(PERIOD, elapsed).toFixed(1)} / ${PERIOD}`, `${Math.max(0, PERIOD - elapsed).toFixed(1)} days left`),
               tile('return this month', `<span class="${band.d >= 0 ? 'pos' : 'neg'}">${pct(ret)}</span>`, `if it ended now: ${band.label} month, ${fmtD(band.d)} life`),
               tile('keep all lives at', usd(start * 1.02), `bonus above ${usd(start * 1.025)} · from ${usd(start)}`),

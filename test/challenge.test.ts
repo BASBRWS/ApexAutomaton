@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initChallenge, evaluateChallenge, challengeStatus, bandFor, DEFAULT_LIFE_BANDS } from '../src/challenge.js';
 
-const cfg = { enabled: true, lives: 3, periodDays: 30, bands: DEFAULT_LIFE_BANDS };
+const cfg = { enabled: true, lives: 3, maxLives: 4, periodDays: 30, bands: DEFAULT_LIFE_BANDS };
 const day = (d: number) => new Date(Date.UTC(2026, 9, 3) + d * 86_400_000).toISOString();
 /** lives after one month that ends at `endEquity` from a $200 start */
 const after = (endEquity: number, lives = 3) =>
@@ -35,6 +35,12 @@ describe('monthly challenge — graded lives', () => {
     expect(next).toMatchObject({ lives: 2.75, period: 2, periodStartEquityUsd: 203, periodStartAt: day(30) });
     expect(next.periodComputeUsd).toBeUndefined();
     expect(next.periodPeakEquityUsd).toBeUndefined();
+  });
+
+  it('caps bonus lives at 4', () => {
+    expect(after(206, 3.75)).toBe(4);
+    expect(after(206, 4)).toBe(4);
+    expect(after(203, 4)).toBe(3.75);
   });
 
   it('dies when the lives run out, and never goes below zero', () => {
