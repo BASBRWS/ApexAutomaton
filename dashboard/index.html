@@ -132,7 +132,8 @@
       </div>
       <svg id="chart" viewBox="0 0 900 260" aria-label="equity in USD over all cycles chart"></svg>
 
-      <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· the agent's decision + its full deliberation, newest first</span></h2>
+      <h2>Agent reasoning — read along <span class="muted" style="font-size:12px;font-weight:400">· every model decision with its rationale, newest first; cycles that only observed the market are grouped</span></h2>
+      <div id="decision-next" class="muted" style="font-size:12px;margin:0 0 6px"></div>
       <div id="reasoning" class="feed"></div>
 
       <h2>Lessons learned <span class="muted" style="font-size:12px;font-weight:400">· durable memory — facts from its own actions + reflections, newest first</span></h2>
@@ -396,14 +397,62 @@
         return n;
       }
 
+      // Mirrors the shipped decision-cadence defaults (DECISION_MIN_HOURS=8,
+      // DECISION_MAX_PER_DAY=4); a trigger (big move, venture event) can come sooner.
+      const DECISION_MIN_HOURS = 8, DECISION_MAX_PER_DAY = 4;
+      const isDecision = (e) => Boolean(e.model) && e.model !== '(none)';
+
+      function renderNextDecision(journal) {
+        const el = document.getElementById('decision-next');
+        if (!el) return;
+        const decided = journal.filter(isDecision);
+        const last = decided[decided.length - 1];
+        if (!last) { el.textContent = 'No model decision yet.'; return; }
+        const H = 3600000, now = Date.now();
+        const inDay = decided.filter((e) => now - Date.parse(e.at) < 24 * H);
+        let next, why;
+        if (inDay.length >= DECISION_MAX_PER_DAY) {
+          next = Date.parse(inDay[inDay.length - DECISION_MAX_PER_DAY].at) + 24 * H;
+          why = `daily cap of ${DECISION_MAX_PER_DAY} reached`;
+        } else {
+          next = Date.parse(last.at) + DECISION_MIN_HOURS * H;
+          why = `every ${DECISION_MIN_HOURS}h`;
+        }
+        const when = next <= now ? 'due on the next cycle' : `around ${new Date(next).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`;
+        el.textContent = `Last model decision: #${last.cycle} at ${new Date(Date.parse(last.at)).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} (${shortModel(last.model)}). ` +
+          `Next: ${when} (${why}), sooner on a ≥2% BTC/ETH move or a ≥3% move in an open position.`;
+      }
+
+      function observedRow(group) {
+        // group is newest-first; show it oldest -> newest.
+        const first = group[group.length - 1], lastE = group[0];
+        const div = document.createElement('div');
+        div.className = 'msg';
+        const range = group.length === 1 ? `#${first.cycle}` : `#${first.cycle}–#${lastE.cycle}`;
+        const eq0 = (Number(first.equitySol) || 0).toFixed(4), eq1 = (Number(lastE.equitySol) || 0).toFixed(4);
+        div.innerHTML = `<div class="msg-head"><span class="cyc">${range}</span>` +
+          `<span>${fmtTime(first.at)}–${fmtTime(lastE.at)}</span>` +
+          `<span class="muted">${group.length} cycle${group.length === 1 ? '' : 's'} observed the market only (no model call, so no rationale)</span>` +
+          `<span>equity ${eq0} → ${eq1} SOL</span></div>`;
+        return div;
+      }
+
       function renderReasoning(journal) {
         const host = document.getElementById('reasoning');
         host.innerHTML = '';
+        renderNextDecision(journal);
         if (!journal.length) {
           host.innerHTML = '<div class="empty">No cycles yet — the agent’s reasoning appears here as it ticks.</div>';
           return;
         }
-        journal.slice(-60).reverse().forEach((e) => {
+        let shownDecisions = 0;
+        let group = [];
+        const flush = () => { if (group.length) { host.appendChild(observedRow(group)); group = []; } };
+        for (const e of journal.slice(-400).reverse()) {
+          if (shownDecisions >= 30) break;
+          if (!isDecision(e) && String(e.action || '') === 'rest') { group.push(e); continue; }
+          flush();
+          shownDecisions += 1;
           const div = document.createElement('div');
           div.className = 'msg';
           const action = String(e.action || '');
@@ -424,7 +473,8 @@
             (e.actionSummary ? `<div class="msg-sum">→ ${escapeHtml(e.actionSummary)}</div>` : '') +
             (cleanNote(e.note) ? `<div class="msg-note">${escapeHtml(cleanNote(e.note))}</div>` : '');
           host.appendChild(div);
-        });
+        }
+        flush();
       }
 
       function ventureStatusLabel(s) {
