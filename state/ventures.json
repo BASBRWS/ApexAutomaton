@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-10-05T10:05:29.727Z",
+        "lastCheckedAt": "2026-10-05T10:20:36.757Z",
         "reachable": true,
         "daysLive": 12,
         "killDue": false,
@@ -212,6 +212,56 @@
       "status": "proposed",
       "revenueUsd": 0,
       "accountedRevenueUsd": 0
+    },
+    {
+      "id": "v0013",
+      "createdAtCycle": 693,
+      "at": "2026-10-05T10:20:47.678Z",
+      "category": "web3-tool",
+      "title": "Solana DevNet Token Launch & Monitoring Dashboard",
+      "thesis": "Solana devnet users need a simple, free tool to create Token-2022 tokens, monitor their metadata on-chain, and track basic metrics (supply, holder count, transaction volume). This fills a gap between raw CLI tools and production dashboards. Revenue via optional premium analytics tier ($5–15/month per user) and affiliate commissions from token creators who graduate to Pump.fun or mainnet launches.",
+      "deliverable": "A web app (React + Next.js) with:\n1. Token creation form (name, symbol, decimals, metadata URI)\n2. Devnet token explorer showing live on-chain data\n3. Basic dashboard: supply, holder count, recent transactions\n4. Affiliate referral links for Pump.fun and Magic Eden\n5. Sign-up for premium analytics waitlist\n\nLive demo URL: https://solana-devnet-token-dashboard.vercel.app (placeholder; actual build will be deployed to a public HTTPS endpoint)\n\nCode structure:\n- `/pages/create`: Token creation UI, calls devnet RPC\n- `/pages/explore`: Token lookup and live metrics\n- `/pages/dashboard`: User analytics (premium feature)\n- `/api/metrics`: Backend queries Solana devnet RPC for holder/transaction data\n- `/lib/affiliate`: Tracking for Pump.fun and Magic Eden referrals\n\nDeliverables include open-source GitHub repo and a public landing page with sign-up.",
+      "humanAction": "No operator action for this devnet experiment.",
+      "launchSteps": [
+        {
+          "label": "Set up Next.js project and Solana web3.js dependencies",
+          "url": "https://nextjs.org/docs/getting-started"
+        },
+        {
+          "label": "Build token creation form and devnet RPC integration",
+          "url": "https://docs.solana.com/developers/clients/javascript"
+        },
+        {
+          "label": "Deploy to Vercel",
+          "url": "https://vercel.com/new"
+        },
+        {
+          "label": "Create GitHub repository and add affiliate tracking",
+          "url": "https://github.com/new"
+        },
+        {
+          "label": "Set up Pump.fun and Magic Eden affiliate accounts",
+          "url": "https://pump.fun"
+        },
+        {
+          "label": "Publish landing page and sign-up form"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 35,
+      "killCriteria": "Abandon if devnet token creation API fails or RPC limits prevent live queries. Abandon if affiliate programs do not permit integration. Kill if no sign-ups after 30 days.",
+      "status": "active",
+      "launchMode": "autonomous-devnet",
+      "splToken": {
+        "name": "Solana DevNet Token Dashboard",
+        "symbol": "DEVDASH",
+        "uri": "https://basbrws.github.io/ApexAutomaton/state/metadata/v0013.json",
+        "decimals": 6
+      },
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0,
+      "decidedAtCycle": 693,
+      "note": "Autonomous Token-2022 devnet experiment. Metadata must publish before mint; no sale or revenue."
     }
   ],
   "ledger": {
@@ -240,5 +290,5 @@
       "autoEligible": false
     }
   },
-  "seq": 12
+  "seq": 13
 }

@@ -1,0 +1,5 @@
+{
+  "name": "Solana DevNet Token Dashboard",
+  "symbol": "DEVDASH",
+  "description": "Solana devnet users need a simple, free tool to create Token-2022 tokens, monitor their metadata on-chain, and track basic metrics (supply, holder count, transaction volume). This fills a gap between raw CLI tools and production dashboards. Revenue via optional premium analytics tier ($5–15/month per user) and affiliate commissions from token creators who graduate to Pump.fun or mainnet launches."
+}
