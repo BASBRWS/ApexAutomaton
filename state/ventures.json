@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-10-05T10:20:36.757Z",
+        "lastCheckedAt": "2026-10-05T10:35:57.496Z",
         "reachable": true,
         "daysLive": 12,
         "killDue": false,
@@ -256,7 +256,9 @@
         "name": "Solana DevNet Token Dashboard",
         "symbol": "DEVDASH",
         "uri": "https://basbrws.github.io/ApexAutomaton/state/metadata/v0013.json",
-        "decimals": 6
+        "decimals": 6,
+        "mint": "HJ7D51KjiYXWEfMtLJ9GCpEmrfvMprk7bAsR7dmnAgDz",
+        "signature": "RSjhx7rNHn4nmvdRc3ChLdJ6qwjsfaAKn9eTEmDL1jCeRSsUsLKuXqoaaVZGkzaQM5HvQnEnQ7xPN4tfPEyufLd"
       },
       "revenueUsd": 0,
       "accountedRevenueUsd": 0,
