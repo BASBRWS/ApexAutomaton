@@ -36,7 +36,7 @@
       "listedAt": "2026-09-23T06:20:48.419Z",
       "decidedAtCycle": -1,
       "monitor": {
-        "lastCheckedAt": "2026-10-05T18:22:46.726Z",
+        "lastCheckedAt": "2026-10-05T18:37:52.790Z",
         "reachable": true,
         "daysLive": 12,
         "killDue": false,
@@ -264,6 +264,34 @@
       "accountedRevenueUsd": 0,
       "decidedAtCycle": 693,
       "note": "Autonomous Token-2022 devnet experiment. Metadata must publish before mint; no sale or revenue."
+    },
+    {
+      "id": "v0014",
+      "createdAtCycle": 705,
+      "at": "2026-10-05T18:38:02.648Z",
+      "category": "web3-tool",
+      "title": "Solana Devnet Trade Journal & PnL Tracker",
+      "thesis": "Autonomous traders and retail devnet users need a real-time, persistent trade log that auto-calculates realized/unrealized PnL, tracks entry/exit discipline, and exports data for analysis. This fills a gap: most devnet traders manually log trades in spreadsheets. A web3 tool that reads on-chain transaction history and auto-journals builds genuine utility and can monetize via a freemium model (free basic tracking, $5–10/month for advanced analytics and export).",
+      "deliverable": "A Solana devnet web app (HTML/React prototype) that: (1) Connects a devnet wallet via Phantom; (2) Reads transaction history from the devnet RPC; (3) Parses trade metadata (asset, size, price, timestamp); (4) Auto-calculates realized PnL per trade and cumulative; (5) Shows equity curve and Sharpe ratio; (6) Exports CSV for external analysis. Includes a sample dashboard showing mock trade data and a monetization page describing the freemium upsell (advanced filters, multi-wallet tracking, strategy comparison). No human approval needed for devnet-only prototype; real revenue would come from a future mainnet launch.",
+      "humanAction": "None required for devnet prototype. Observe usage interest; if demand is clear, propose a mainnet version with a real payment connector.",
+      "launchSteps": [
+        {
+          "label": "Deploy prototype to Vercel or similar (free tier)",
+          "url": "https://vercel.com"
+        },
+        {
+          "label": "Share link with Solana devnet trader communities (Discord, Twitter)"
+        },
+        {
+          "label": "Track sign-ups and feedback; if >50 active users, propose paid tier"
+        }
+      ],
+      "estCostUsd": 0,
+      "estRevenueUsd": 15,
+      "killCriteria": "If fewer than 10 devnet users sign up within 2 weeks, or if Solana RPC parsing fails due to devnet instability. Kill if no path to a real mainnet connector within 4 weeks.",
+      "status": "proposed",
+      "revenueUsd": 0,
+      "accountedRevenueUsd": 0
     }
   ],
   "ledger": {
@@ -292,5 +320,5 @@
       "autoEligible": false
     }
   },
-  "seq": 13
+  "seq": 14
 }
